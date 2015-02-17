@@ -20,34 +20,36 @@ package com.dataArtisans.flinkCascading.planning;
 
 import cascading.flow.BaseFlow;
 import cascading.flow.FlowProcess;
-import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.hadoop.conf.Configuration;
 
 import java.util.Map;
 
-public class FlinkFlow extends BaseFlow<FlinkConfig> {
+public class FlinkFlow extends BaseFlow<Configuration> {
 
 	private ExecutionEnvironment flinkEnv;
 
 	public FlinkFlow(ExecutionEnvironment env) {
+
 		this.flinkEnv = env;
+//		initializeNewJobsMap();
 	}
 
 	@Override
-	protected void initConfig(Map map, FlinkConfig o) {
+	protected void initConfig(Map map, Configuration o) {
 		// nothing to do
 	}
 
 
 	@Override
-	protected void setConfigProperty(FlinkConfig config, Object key, Object value) {
+	protected void setConfigProperty(Configuration config, Object key, Object value) {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	protected FlinkConfig newConfig(FlinkConfig o) {
+	protected Configuration newConfig(Configuration o) {
 
-		return new FlinkConfig();
+		return new Configuration();
 	}
 
 	@Override
@@ -64,8 +66,18 @@ public class FlinkFlow extends BaseFlow<FlinkConfig> {
 
 	@Override
 	protected void internalClean(boolean b) {
-		// not sure what to do here...
-		throw new UnsupportedOperationException();
+		// TODO: clean-up execution
+
+	}
+
+	@Override
+	public void complete() {
+		// TODO!!! (overrides superclass method)
+		try {
+			flinkEnv.execute();
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -75,18 +87,19 @@ public class FlinkFlow extends BaseFlow<FlinkConfig> {
 
 	@Override
 	protected void internalShutdown() {
-		// not sure what to do here...
-		throw new UnsupportedOperationException();
+		// TODO
 	}
 
 	@Override
-	public FlinkConfig getConfig() {
-		return new FlinkConfig();
+	public Configuration getConfig() {
+		return null;
+//		return new Configuration();
 	}
 
 	@Override
-	public FlinkConfig getConfigCopy() {
-		return new FlinkConfig();
+	public Configuration getConfigCopy() {
+		return null;
+//		return new Configuration();
 	}
 
 	@Override
@@ -104,8 +117,7 @@ public class FlinkFlow extends BaseFlow<FlinkConfig> {
 	@Override
 	public FlowProcess getFlowProcess() {
 		// not sure what to do here...
-//		throw new UnsupportedOperationException();
-		return new FlinkFlowProcess(this.getFlowSession());
+		throw new UnsupportedOperationException();
 	}
 
 	@Override

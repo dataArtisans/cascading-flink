@@ -19,12 +19,11 @@
 package com.dataArtisans.flinkCascading.exec;
 
 import cascading.flow.FlowProcess;
-import cascading.flow.FlowSession;
 import cascading.tap.Tap;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
-import com.dataArtisans.flinkCascading.planning.FlinkConfig;
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -33,40 +32,53 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class FlinkFlowProcess extends FlowProcess<FlinkConfig> {
+public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	private transient RuntimeContext runtimeContext;
 
-	FlinkConfig conf;
+	Configuration conf;
+
+	int numTasks;
+	int taskId;
 
 	public FlinkFlowProcess() {}
 
-	public FlinkFlowProcess(RuntimeContext runtimeContext) {
-		this.conf = new FlinkConfig();
-		this.runtimeContext = runtimeContext;
-	}
-
-	public FlinkFlowProcess(FlowSession flowSession) {
-		super(flowSession);
-	}
-
-	public FlinkFlowProcess(FlinkConfig conf) {
+	public FlinkFlowProcess(Configuration conf) {
 		this.conf = conf;
 	}
 
+	public FlinkFlowProcess(Configuration conf, RuntimeContext runtimeContext) {
+
+		this(conf);
+		this.runtimeContext = runtimeContext;
+
+		this.numTasks = runtimeContext.getNumberOfParallelSubtasks();
+		this.taskId = runtimeContext.getIndexOfThisSubtask();
+	}
+
+	public FlinkFlowProcess(RuntimeContext runtimeContext) {
+		this(new Configuration(), runtimeContext);
+	}
+
+	public FlinkFlowProcess(Configuration conf, int numTasks, int taskId) {
+		this(conf);
+		this.numTasks = numTasks;
+		this.taskId = taskId;
+	}
+
 	@Override
-	public FlowProcess copyWith(FlinkConfig entries) {
+	public FlowProcess copyWith(Configuration entries) {
 		return new FlinkFlowProcess(entries);
 	}
 
 	@Override
 	public int getNumProcessSlices() {
-		return this.runtimeContext.getNumberOfParallelSubtasks();
+		return this.numTasks;
 	}
 
 	@Override
 	public int getCurrentSliceNum() {
-		return this.runtimeContext.getIndexOfThisSubtask();
+		return this.taskId;
 	}
 
 	@Override
@@ -136,13 +148,13 @@ public class FlinkFlowProcess extends FlowProcess<FlinkConfig> {
 	}
 
 	@Override
-	public FlinkConfig getConfigCopy() {
-		return null;
+	public Configuration getConfigCopy() {
+		return new Configuration(conf); // TODO
 	}
 
 	@Override
 	public <C> C copyConfig(C c) {
-		return null;
+		return (C)new Configuration(conf); // TODO;
 	}
 
 	@Override
@@ -151,7 +163,7 @@ public class FlinkFlowProcess extends FlowProcess<FlinkConfig> {
 	}
 
 	@Override
-	public FlinkConfig mergeMapIntoConfig(FlinkConfig entries, Map<String, String> map) {
+	public Configuration mergeMapIntoConfig(Configuration entries, Map<String, String> map) {
 		return null;
 	}
 

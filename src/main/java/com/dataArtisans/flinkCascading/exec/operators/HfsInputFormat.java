@@ -25,7 +25,6 @@ import cascading.tap.hadoop.Hfs;
 import cascading.tuple.TupleEntryIterator;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.planning.FlinkConfig;
 import org.apache.flink.api.common.io.FileInputFormat.FileBaseStatistics;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.io.LocatableInputSplitAssigner;
@@ -98,7 +97,7 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 //			conf = HadoopUtil.removePropertiesFrom(conf, "mapred.input.dir", "mapreduce.input.fileinputformat.inputdir"); // hadoop2
 //			hfsTap.sourceConfInit( ffp, conf );
 //		}
-		this.ffp = new FlinkFlowProcess( new FlinkConfig());
+		this.ffp = new FlinkFlowProcess( new org.apache.hadoop.conf.Configuration());
 
 		this.mapredInputFormat = jobConf.getInputFormat();
 
