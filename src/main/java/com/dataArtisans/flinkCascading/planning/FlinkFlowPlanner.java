@@ -32,30 +32,27 @@ import cascading.flow.planner.rule.RuleRegistrySet;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
+import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
-import cascading.tuple.Fields;
-import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.operators.EachFunctionMapper;
-import com.dataArtisans.flinkCascading.exec.operators.EveryReducer;
-import com.dataArtisans.flinkCascading.exec.operators.HfsInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
-import com.dataArtisans.flinkCascading.exec.operators.KeyExtractor;
-import org.apache.flink.api.common.functions.GroupReduceFunction;
-import org.apache.flink.api.common.functions.MapPartitionFunction;
+import com.dataArtisans.flinkCascading.planning.translation.AggregatorOperator;
+import com.dataArtisans.flinkCascading.planning.translation.DataSource;
+import com.dataArtisans.flinkCascading.planning.translation.EachOperator;
+import com.dataArtisans.flinkCascading.planning.translation.Operator;
+import com.dataArtisans.flinkCascading.planning.translation.PipeOperator;
+import com.dataArtisans.flinkCascading.planning.translation.UnionOperator;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.operators.Grouping;
-import org.apache.flink.api.java.operators.SortedGrouping;
-import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.hadoop.conf.Configuration;
 import org.jgrapht.traverse.TopologicalOrderIterator;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -97,11 +94,15 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		return null;
 	}
 
+	// TODO: REWRITE TO A GRAPH OF FLINK OPERATOR NODES:
+	// 1. check flow, choose which pipes to process in one operator, and build a graph from that
+	// 2. translate the graph as a second step
+
 	@Override
 	public FlinkFlow buildFlow( FlowDef flow, RuleRegistrySet ruleRegistrySet ) {
 
-		Map<FlowElement, IntermediateProgram> memo =
-				new HashMap<FlowElement, IntermediateProgram>();
+		Map<FlowElement, Operator> memo =
+				new HashMap<FlowElement, Operator>();
 
 		Pipe[] tailsA = flow.getTailsArray();
 		FlowElementGraph flowGraph = createFlowElementGraph(flow, tailsA);
@@ -117,6 +118,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		while (it.hasNext()) {
 
 			FlowElement e = it.next();
+			System.out.println(e);
 
 			if (memo.containsKey(e)) {
 				// we have been here before
@@ -126,252 +128,118 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			if (e instanceof Extent) {
 				// to nothing
 			}
-			else if (e instanceof Hfs && sources.contains(e)) {
+			else if (e instanceof Tap && sources.contains(e)) {
 
-				memo.put(e, translateHfs((Hfs)e));
+				DataSource source = new DataSource((Tap)e);
+				memo.put(e, source);
 			}
 			else if (e instanceof Hfs && sinks.contains(e)) {
 				// do nothing
 			}
 			else if (e instanceof Each) {
-				Each each = (Each) e;
 
-				memo.put(e, translateEach(each, memo, flowGraph));
-				appendSinkIfTail(each, memo, tails, flowGraph.getSinkMap());
+				Each each = (Each)e;
+				EachOperator eachOp = new EachOperator(each, getInputOp(each, flowGraph, memo));
 
+				memo.put(e, eachOp);
 			}
 			else if (e instanceof GroupBy) {
 				GroupBy groupBy = (GroupBy) e;
 
-				memo.put(e, translateGroupBy(groupBy, memo, flowGraph));
+				FlowElement groupOperation = it.next();
+
+				if(groupOperation instanceof Every) {
+
+					Every every = (Every)groupOperation;
+
+					if(every.isAggregator()) {
+
+						AggregatorOperator aggOp = new AggregatorOperator(groupBy, every, getInputOps(groupBy, flowGraph, memo));
+
+						// TODO: check if this is sufficient or if we need to add it also for the grouping
+						memo.put(every, aggOp);
+					}
+					else if(every.isBuffer()) {
+						throw new RuntimeException("Buffer not yet supported");
+					}
+					else if(every.isGroupAssertion()) {
+						throw new RuntimeException("GroupAssertion not yet supported");
+					}
+					else {
+						throw new RuntimeException("Unknown Every type");
+					}
+
+				}
+
 			}
 			else if (e instanceof Every) {
 				Every every = (Every) e;
 
-				memo.put(e, translateEvery(every, memo, flowGraph));
-				appendSinkIfTail(every, memo, tails, flowGraph.getSinkMap());
+				if(every.isAggregator()) {
+					// check if we can append to existing aggregation
 
+					List<Operator> inputOps = getInputOps(every, flowGraph, memo);
+					if(inputOps.size() != 1) {
+						throw new RuntimeException("Every accepts only a single input.");
+					}
+					Operator inputOp = inputOps.get(0);
+					if(!(inputOp instanceof AggregatorOperator)) {
+						// TODO: can also be a Every after a CoGroup...
+						throw new RuntimeException("Aggregation Every can only be appended to other Aggregations");
+					}
+					((AggregatorOperator) inputOp).addAggregator(every);
+
+				}
+				else {
+					throw new RuntimeException("Can not handle abandoned Every.");
+				}
+
+			}
+			else if (e instanceof Merge) {
+
+				Merge merge = (Merge) e;
+				UnionOperator unionOp = new UnionOperator(getInputOps(merge, flowGraph, memo));
+
+				memo.put(merge, unionOp);
 			}
 			else if (e instanceof Pipe) {
 				// must stay last because it is super-class
 				Pipe pipe = (Pipe) e;
 
-				memo.put(e, translatePipe(pipe, memo, flowGraph));
+				PipeOperator pipeOp = new PipeOperator(pipe, getInputOp(pipe, flowGraph, memo));
+
+				memo.put(pipe, pipeOp);
 			} else {
 				throw new UnsupportedOperationException("Unknown FlowElement");
 			}
+		}
+
+		Map<String, Tap> sinkMap = flowGraph.getSinkMap();
+		for(FlowElement tail : tails) {
+			Operator tailOp = memo.get(tail);
+			DataSet flinkTail = tailOp.getFlinkOperator(env);
+			attachSink(flinkTail, (Pipe) tail, sinkMap);
 		}
 
 		return new FlinkFlow(env);
 
 	}
 
-	private IntermediateProgram translateHfs(Hfs hfs) {
 
-		Configuration conf = new Configuration();
-		hfs.getScheme().sourceConfInit(null, hfs, conf);
-		conf.set("mapreduce.input.fileinputformat.inputdir", hfs.getPath().toString());
+	private Operator getInputOp(Pipe pipe, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
 
-		DataSet<Tuple> src = env.createInput(new HfsInputFormat(hfs, conf));
-		Scope outScope = hfs.outgoingScopeFor(Collections.singleton(new Scope()));
+		List<Operator> inputOps = getInputOps(pipe, flowGraph, memo);
 
-		return new IntermediateProgram(src, outScope);
-	}
-
-	private IntermediateProgram translateEach(Each each, Map<FlowElement, IntermediateProgram> memo, FlowElementGraph flowGraph) {
-
-		FlowElement[] prevs = getPrevious(each, flowGraph);
-		FlowElement prev;
-
-		if(prevs == null) {
-			throw new RuntimeException("Could not find input of Each");
-		} else if (prevs.length == 1) {
-			prev = prevs[0];
-		} else {
-			// TODO: check if this should be allowed
-			throw new RuntimeException("Multi-input not supported, yet");
-		}
-
-		IntermediateProgram input = memo.get(prev);
-		if (input == null) {
-			throw new RuntimeException("Input was not translated!");
-		}
-
-		Scope inScope = input.getOutgoing();
-		Scope outScope = each.outgoingScopeFor(Collections.singleton(inScope));
-
-		MapPartitionFunction mapFunc;
-
-		if (each.isFunction()) {
-			mapFunc = new EachFunctionMapper(each, inScope, outScope);
-		}
-		else if (each.isFilter()) {
-			throw new UnsupportedOperationException("Filter not supported yet!");
-		}
-		else if (each.isValueAssertion()) {
-			throw new UnsupportedOperationException("ValueAssertion not supported yet!");
+		if(inputOps.size() > 1) {
+			throw new RuntimeException("Operator with a single input has multiple inputs.");
 		}
 		else {
-			throw new UnsupportedOperationException("Unsupported Each!");
-		}
-		DataSet mapped = input.getDataSet()
-				.mapPartition(mapFunc)
-				.name(each.getName());
-
-		return new IntermediateProgram(mapped, outScope);
-
-	}
-
-
-	private IntermediateProgram translateEvery(Every every, Map<FlowElement, IntermediateProgram> memo, FlowElementGraph flowGraph) {
-
-		FlowElement[] prevs = getPrevious(every, flowGraph);
-		FlowElement prev;
-
-		if (prevs == null) {
-			throw new RuntimeException("Could not find input of Each");
-		} else if (prevs.length == 1) {
-			prev = prevs[0];
-		} else {
-			throw new RuntimeException("Multi-input not supported, yet");
-		}
-
-		IntermediateProgram input = memo.get(prev);
-		if (input == null) {
-			throw new RuntimeException("Input was not translated!");
-		}
-
-		Scope inScope = input.getOutgoing();
-		Scope outScope = every.outgoingScopeFor(Collections.singleton(inScope));
-
-		if (!input.isGrouping()) {
-			throw new RuntimeException("Input is not a grouping");
-		}
-
-		GroupReduceFunction reduceFunc;
-
-		if (every.isAggregator()) {
-			reduceFunc = new EveryReducer(every, inScope, outScope);
-		}
-		else if (every.isBuffer()) {
-			throw new RuntimeException("Buffer not supported, yet");
-		}
-		else if (every.isGroupAssertion()) {
-			throw new RuntimeException("GroupAssertion not supported, yet");
-		}
-
-		// add reduce function
-
-		Grouping grouping = input.getGrouping();
-		DataSet reduced;
-		if (grouping instanceof UnsortedGrouping) {
-			reduced = ((UnsortedGrouping) grouping)
-					.reduceGroup(new EveryReducer(every, inScope, outScope))
-					.name(every.getName());
-		} else if (grouping instanceof SortedGrouping) {
-			reduced = ((SortedGrouping) grouping)
-					.reduceGroup(new EveryReducer(every, inScope, outScope))
-					.name(every.getName());
-		} else {
-			throw new RuntimeException("Unknown grouping encountered!");
-		}
-
-		return new IntermediateProgram(reduced, outScope);
-	}
-
-	private IntermediateProgram translateGroupBy(GroupBy groupBy, Map<FlowElement, IntermediateProgram> memo, FlowElementGraph flowGraph) {
-
-		FlowElement[] prevs = getPrevious(groupBy, flowGraph);
-		FlowElement prev;
-
-		Scope inScope;
-		DataSet input;
-
-		if(prevs == null) {
-			throw new RuntimeException("Could not find input of Each");
-		} else if (prevs.length == 1) {
-
-			IntermediateProgram i = memo.get(prevs[0]);
-			if (i == null) {
-				throw new RuntimeException("Input was not translated!");
-			}
-
-//			inScope = i.getOutgoing();
-			inScope = new Scope(i.getOutgoing()); // TODO
-			inScope.setName("wc"); // TODO
-
-			input = i.getDataSet();
-
-		} else {
-
-			IntermediateProgram i = memo.get(prevs[0]);
-			if (i == null) {
-				throw new RuntimeException("Input was not translated!");
-			}
-
-			// TODO: we assume all input have the same schema. Need to check that probably
-//			inScope = i.getOutgoing();
-			inScope = new Scope(i.getOutgoing()); // TODO
-			inScope.setName("wc"); // TODO
-
-			input = i.getDataSet();
-			for(int j=1; j<prevs.length; j++) {
-
-				i = memo.get(prevs[j]);
-				if(i == null) {
-					throw new RuntimeException("Input was not translated!");
-				}
-
-				input = input.union(i.getDataSet());
-			}
-		}
-
-		Scope outScope = groupBy.outgoingScopeFor(Collections.singleton(inScope));
-
-		Map<String, Fields> groupingKeys = groupBy.getKeySelectors();
-		Map<String, Fields> sortingKeys = groupBy.getSortingSelectors();
-
-		// TODO
-		Grouping grouping = input.map(
-				new KeyExtractor(groupingKeys.get("wc"), groupingKeys.get("wc"), sortingKeys.get("wc")))
-				.groupBy(0);
-
-		return new IntermediateProgram(grouping, outScope);
-
-	}
-
-	private IntermediateProgram translatePipe(Pipe pipe, Map<FlowElement, IntermediateProgram> memo, FlowElementGraph flowGraph) {
-
-		FlowElement[] prevs = getPrevious(pipe, flowGraph);
-		FlowElement prev;
-
-		if(prevs == null) {
-			throw new RuntimeException("Could not find input of Each");
-		} else if (prevs.length == 1) {
-			prev = prevs[0];
-		} else {
-			// TODO: check if this is possible
-			throw new RuntimeException("Multi-input not supported, yet");
-		}
-
-		IntermediateProgram input = memo.get(prev);
-		if (input == null) {
-			throw new RuntimeException("Input was not translated!");
-		}
-
-		Scope inScope = input.getOutgoing();
-		Scope outScope = pipe.outgoingScopeFor(Collections.singleton(inScope));
-
-		if (input.isGrouping()) {
-			// TODO: check if this is possible
-			return new IntermediateProgram(input.getGrouping(), outScope);
-		} else {
-			return new IntermediateProgram(input.getDataSet(), outScope);
+			return inputOps.get(0);
 		}
 
 	}
 
-	private FlowElement[] getPrevious(Pipe pipe, FlowElementGraph flowGraph) {
+	private List<Operator> getInputOps(Pipe pipe, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
 
 		FlowElement[] inputs = pipe.getPrevious();
 		if(inputs == null || inputs.length == 0) {
@@ -383,70 +251,43 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				return null;
 			}
 		}
-		return inputs;
 
-	}
-
-	private void appendSinkIfTail(Pipe p, Map<FlowElement, IntermediateProgram> memo, Set<FlowElement> tails, Map<String, Tap> sinkMap) {
-		if(tails.contains(p)) {
-
-			DataSet tail = memo.get(p).getDataSet();
-			Tap sink = sinkMap.get(p.getName());
-
-			if(PRINT_STDOUT) {
-				tail.print();
-				return;
-			} else {
-
-				if (sink instanceof Hfs) {
-
-					Hfs hfs = (Hfs) sink;
-					Configuration conf = new Configuration();
-
-					tail
-							.output(new HfsOutputFormat(hfs, conf))
-							.setParallelism(1);
-				} else {
-					throw new RuntimeException("Unsupported Tap");
-				}
+		List<Operator> inputOps = new ArrayList<Operator>();
+		for(FlowElement e : inputs) {
+			Operator op = memo.get(e);
+			if(op == null) {
+				throw new RuntimeException("Could not find flink operator for input flow element.");
 			}
-
+			inputOps.add(memo.get(e));
 		}
+
+		return inputOps;
+
 	}
 
 
-	private static class IntermediateProgram {
+	private void attachSink(DataSet tail, Pipe p, Map<String, Tap> sinkMap) {
 
-		private DataSet dataSet;
-		private Grouping grouping;
+		Tap sink = sinkMap.get(p.getName());
 
-		private Scope outgoing;
+		if(PRINT_STDOUT) {
+			tail.print();
+			return;
+		} else {
 
-		public IntermediateProgram(DataSet dataSet, Scope outgoing) {
-			this.dataSet = dataSet;
-			this.outgoing = outgoing;
+			if (sink instanceof Hfs) {
+
+				Hfs hfs = (Hfs) sink;
+				Configuration conf = new Configuration();
+
+				tail
+						.output(new HfsOutputFormat(hfs, conf))
+						.setParallelism(1);
+			} else {
+				throw new RuntimeException("Unsupported Tap");
+			}
 		}
 
-		public IntermediateProgram(Grouping grouping, Scope outgoing) {
-			this.grouping = grouping;
-			this.outgoing = outgoing;
-		}
-
-		public boolean isGrouping() {
-			return this.grouping != null;
-		}
-
-		public DataSet getDataSet() {
-			return dataSet;
-		}
-
-		public Grouping getGrouping() {
-			return grouping;
-		}
-
-		public Scope getOutgoing() {
-			return outgoing;
-		}
 	}
 
 

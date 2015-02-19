@@ -74,6 +74,9 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	public void complete() {
 		// TODO!!! (overrides superclass method)
 		try {
+
+			System.out.println(flinkEnv.getExecutionPlan());
+
 			flinkEnv.execute();
 		} catch(Exception e) {
 			e.printStackTrace();

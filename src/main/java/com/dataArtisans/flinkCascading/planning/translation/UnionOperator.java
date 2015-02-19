@@ -16,28 +16,36 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.flows;
+package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.FlowDef;
-import cascading.operation.regex.RegexSplitGenerator;
-import cascading.pipe.Each;
-import cascading.pipe.Pipe;
-import cascading.tuple.Fields;
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
 
-public class TokenizeFlow {
+import java.util.List;
 
-	public static FlowDef getTokenizeFlow() {
 
-		Fields token = new Fields( "token" );
-		Fields text = new Fields( "line" );
-		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "[ \\[\\]\\(\\),.]" );
-		// only returns "token"
-		Pipe docPipe = new Each( "token", text, splitter, Fields.RESULTS );
+public class UnionOperator extends Operator {
 
-		FlowDef flowDef = FlowDef.flowDef().setName( "wc" )
-				.addTail( docPipe );
+	public UnionOperator(List<Operator> inputs) {
+		super(inputs);
 
-		return flowDef;
 	}
+
+	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+
+		if(inputs.size() <= 1) {
+			throw new RuntimeException("Union requires at least two inputs");
+		}
+
+		DataSet unioned = inputs.get(0);
+
+		for(int i=1; i < inputs.size(); i++) {
+			unioned = unioned.union(inputs.get(i));
+		}
+
+		return unioned;
+
+	}
+
 
 }

@@ -16,29 +16,33 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.flows;
+package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.FlowDef;
+import cascading.flow.planner.Scope;
 import cascading.pipe.Pipe;
-import cascading.scheme.local.TextLine;
-import cascading.tap.Tap;
-import cascading.tap.local.FileTap;
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
 
-public class CopyFlow {
+import java.util.Collections;
+import java.util.List;
 
-	public static FlowDef getCopyFlow(String inPath, String outPath) {
 
-		Tap inTap = new FileTap(new TextLine(), inPath);
-		Tap outTap = new FileTap(new TextLine(), outPath);
+public class PipeOperator extends Operator {
 
-		Pipe copyPipe = new Pipe("copy");
+	public PipeOperator(Pipe pipe, Operator inputOp) {
+		super(inputOp);
 
-		FlowDef flowDef = FlowDef.flowDef()
-				.addSource(copyPipe, inTap)
-				.addTailSink(copyPipe, outTap);
-
-		return flowDef;
+		setIncomingScope(inputOp.getOutgoingScope());
+		Scope outgoing = pipe.outgoingScopeFor(Collections.singleton(getIncomingScope()));
+		outgoing.setName(pipe.getName());
+		setOutgoingScope(outgoing);
 
 	}
+
+	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+
+		return inputs.get(0);
+	}
+
 
 }

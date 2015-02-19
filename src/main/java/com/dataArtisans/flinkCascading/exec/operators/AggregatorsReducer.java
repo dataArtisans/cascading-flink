@@ -39,7 +39,7 @@ import static cascading.tuple.util.TupleViews.createComposite;
 import static cascading.tuple.util.TupleViews.createNarrow;
 import static cascading.tuple.util.TupleViews.createOverride;
 
-public class EveryReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tuple>, Tuple> {
+public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tuple>, Tuple> {
 
 	private Every every;
 	private Scope outgoingScope;
@@ -52,12 +52,13 @@ public class EveryReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tup
 	private transient ConcreteCall call;
 	private FlinkFlowProcess ffp;
 
-	public EveryReducer() {}
+	public AggregatorsReducer() {}
 
-	public EveryReducer(Every every, Scope incomingScope, Scope outgoingScope) {
+	public AggregatorsReducer(Every every, Scope incoming, Scope outgoing) {
+		// TODO
 		this.every = every;
-		this.incomingScope = incomingScope;
-		this.outgoingScope = outgoingScope;
+		this.incomingScope = incoming;
+		this.outgoingScope = outgoing;
 	}
 
 	@Override

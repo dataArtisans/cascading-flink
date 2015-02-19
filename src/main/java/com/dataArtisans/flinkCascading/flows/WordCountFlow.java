@@ -25,17 +25,11 @@ import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
 import cascading.pipe.Pipe;
-import cascading.scheme.hadoop.TextLine;
-import cascading.tap.Tap;
-import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 
 public class WordCountFlow {
 
-	public static FlowDef getWordCountFlow(String inPath, String outPath) {
-
-		Tap docTap = new Hfs(new TextLine(), inPath);
-		Tap wcTap = new Hfs(new TextLine(), outPath);
+	public static FlowDef getWordCountFlow() {
 
 		Fields token = new Fields( "token" );
 		Fields text = new Fields( "line" );
@@ -48,8 +42,7 @@ public class WordCountFlow {
 		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
 
 		FlowDef flowDef = FlowDef.flowDef().setName( "wc" )
-				.addSource( docPipe, docTap )
-				.addTailSink( wcPipe, wcTap );
+				.addTails(wcPipe);
 
 		return flowDef;
 	}

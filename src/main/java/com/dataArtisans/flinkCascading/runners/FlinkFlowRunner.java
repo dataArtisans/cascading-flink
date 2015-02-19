@@ -19,6 +19,9 @@
 package com.dataArtisans.flinkCascading.runners;
 
 import cascading.flow.FlowDef;
+import cascading.scheme.hadoop.TextLine;
+import cascading.tap.Tap;
+import cascading.tap.hadoop.Hfs;
 import com.dataArtisans.flinkCascading.flows.MultiAggregateFlow;
 import com.dataArtisans.flinkCascading.flows.TokenizeFlow;
 import com.dataArtisans.flinkCascading.flows.WordCountFlow;
@@ -29,17 +32,24 @@ public class FlinkFlowRunner {
 
 	public static void main(String[] args) throws Exception {
 
-		FlowDef tokenizeFlow = TokenizeFlow.getTokenizeFlow(
-				"file:///users/fhueske/testFile",
-				"file:///users/fhueske/wcResult");
 
-		FlowDef wcFlow = WordCountFlow.getWordCountFlow(
-				"file:///users/fhueske/testFile",
-				"file:///users/fhueske/wcResult");
+		Tap docTap = new Hfs(new TextLine(), "file:///users/fhueske/testFile");
+		Tap wcTap = new Hfs(new TextLine(), "file:///users/fhueske/wcResult");
 
-		FlowDef aggFlow = MultiAggregateFlow.getFlow(
-				"file:///users/fhueske/testFile",
-				"file:///users/fhueske/wcResult");
+//		Tap docTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/testFile");
+//		Tap wcTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/wcResult");
+
+		FlowDef tokenizeFlow = TokenizeFlow.getTokenizeFlow()
+				.addSource( "token", docTap )
+				.addSink("token", wcTap);
+
+		FlowDef wcFlow = WordCountFlow.getWordCountFlow()
+				.addSource( "token", docTap )
+				.addSink("wc", wcTap);
+
+		FlowDef aggFlow = MultiAggregateFlow.getFlow()
+				.addSource( "token", docTap )
+				.addSink("wc", wcTap);
 
 
 //		cascading.flow.local.LocalFlowConnector lfc = new cascading.flow.local.LocalFlowConnector();
@@ -48,7 +58,8 @@ public class FlinkFlowRunner {
 		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
 
 		FlinkConnector fc = new FlinkConnector(env);
-		fc.connect(aggFlow).complete();
+		fc.connect(wcFlow).complete();
+//		fc.connect(aggFlow).complete();
 
 	}
 
