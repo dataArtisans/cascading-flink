@@ -38,6 +38,7 @@ import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
 import com.dataArtisans.flinkCascading.planning.translation.AggregatorOperator;
+import com.dataArtisans.flinkCascading.planning.translation.BufferOperator;
 import com.dataArtisans.flinkCascading.planning.translation.DataSource;
 import com.dataArtisans.flinkCascading.planning.translation.EachOperator;
 import com.dataArtisans.flinkCascading.planning.translation.Operator;
@@ -170,12 +171,17 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 								Collections.singletonList(getSingleScope(groupByInScopes)), getSingleScope(groupByOutScopes),
 								getSingleScope(everyInScopes), getSingleScope(everyOutScopes), inOps);
 
-						// TODO: check if this is sufficient or if we need to add it also for the grouping
 						memo.put(every, aggOp);
 
 					}
 					else if(every.isBuffer()) {
-						throw new RuntimeException("Buffer not yet supported");
+
+						BufferOperator bufOp = new BufferOperator(groupBy, every,
+								Collections.singletonList(getSingleScope(groupByInScopes)), getSingleScope(groupByOutScopes),
+								getSingleScope(everyInScopes), getSingleScope(everyOutScopes), inOps);
+
+						memo.put(every, bufOp);
+
 					}
 					else if(every.isGroupAssertion()) {
 						throw new RuntimeException("GroupAssertion not yet supported");
@@ -209,6 +215,10 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 					// add to memo
 					memo.put(every, inputOp);
 
+				}
+				else if(every.isBuffer()) {
+					throw new RuntimeException("Buffer without grouping not possible");
+					// TODO: check for CoGroup...
 				}
 				else {
 					throw new RuntimeException("Can not handle abandoned Every.");

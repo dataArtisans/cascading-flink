@@ -30,8 +30,6 @@ import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.common.functions.RichFilterFunction;
 import org.apache.flink.configuration.Configuration;
 
-import java.io.Serializable;
-
 public class EachFilter extends RichFilterFunction<Tuple> {
 
 	private Each each;

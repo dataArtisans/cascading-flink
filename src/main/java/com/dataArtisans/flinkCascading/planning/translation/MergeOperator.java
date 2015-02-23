@@ -24,9 +24,9 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.List;
 
-public class UnionOperator extends Operator {
+public class MergeOperator extends Operator {
 
-	public UnionOperator(List<Operator> inputs, List<Scope> incomingScopes, Scope outgoingScope) {
+	public MergeOperator(List<Operator> inputs, List<Scope> incomingScopes, Scope outgoingScope) {
 		super(inputs, incomingScopes, outgoingScope);
 
 	}

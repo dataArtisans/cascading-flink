@@ -27,6 +27,7 @@ import cascading.operation.FunctionCall;
 import cascading.operation.OperationCall;
 import cascading.operation.aggregator.Count;
 import cascading.operation.aggregator.Sum;
+import cascading.operation.buffer.FirstNBuffer;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
@@ -60,8 +61,8 @@ public class MultiAggregateFlow {
 		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
 		wcPipe = new Every( wcPipe, blubb, new Sum(num), Fields.ALL );
 		wcPipe = new Each( wcPipe, token, new TokenFilter());
-//		wcPipe = new Each( wcPipe, num, new DoubleFunc(num), Fields.ALL);
-//		wcPipe = new Every( wcPipe, offset, new Sum(new Fields("secondSum")), Fields.ALL );
+		wcPipe = new GroupBy( wcPipe, cnt);
+		wcPipe = new Every( wcPipe, cnt, new FirstNBuffer(2), Fields.REPLACE);
 
 		return FlowDef.flowDef().setName( "wc" )
 				.addTails(wcPipe);
