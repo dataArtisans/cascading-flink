@@ -18,28 +18,22 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
+import cascading.flow.planner.Scope;
 import cascading.pipe.Each;
 import com.dataArtisans.flinkCascading.exec.operators.EachFunctionMapper;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
-import java.util.Collections;
 import java.util.List;
-
 
 public class EachOperator extends Operator {
 
 	private Each each;
 
-	public EachOperator(Each each, Operator inputOp) {
-		super(inputOp);
+	public EachOperator(Each each, Scope incomingScope, Scope outgoingScope, Operator inputOp) {
+		super(inputOp, incomingScope, outgoingScope);
 		this.each = each;
-
-		// set scopes
-		setIncomingScope(inputOp.getOutgoingScope());
-		setOutgoingScope(each.outgoingScopeFor(Collections.singleton(getIncomingScope())));
-
 	}
 
 	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {

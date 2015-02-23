@@ -42,7 +42,6 @@ import com.dataArtisans.flinkCascading.planning.translation.DataSource;
 import com.dataArtisans.flinkCascading.planning.translation.EachOperator;
 import com.dataArtisans.flinkCascading.planning.translation.Operator;
 import com.dataArtisans.flinkCascading.planning.translation.PipeOperator;
-import com.dataArtisans.flinkCascading.planning.translation.UnionOperator;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
@@ -50,6 +49,7 @@ import org.jgrapht.traverse.TopologicalOrderIterator;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -106,6 +106,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 		Pipe[] tailsA = flow.getTailsArray();
 		FlowElementGraph flowGraph = createFlowElementGraph(flow, tailsA);
+		flowGraph.resolveFields();
 
 		TopologicalOrderIterator<FlowElement, Scope> it = flowGraph.getTopologicalIterator();
 		Collection<Tap> sources = flowGraph.getSources();
@@ -118,7 +119,6 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		while (it.hasNext()) {
 
 			FlowElement e = it.next();
-			System.out.println(e);
 
 			if (memo.containsKey(e)) {
 				// we have been here before
@@ -130,7 +130,9 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			}
 			else if (e instanceof Tap && sources.contains(e)) {
 
-				DataSource source = new DataSource((Tap)e);
+				Set<Scope> outScopes = flowGraph.outgoingEdgesOf(e);
+
+				DataSource source = new DataSource((Tap)e, getSingleScope(outScopes));
 				memo.put(e, source);
 			}
 			else if (e instanceof Hfs && sinks.contains(e)) {
@@ -139,25 +141,38 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			else if (e instanceof Each) {
 
 				Each each = (Each)e;
-				EachOperator eachOp = new EachOperator(each, getInputOp(each, flowGraph, memo));
+				Operator inOp = getInputOp(each, flowGraph, memo);
+				Set<Scope> inScopes = flowGraph.incomingEdgesOf(e);
+				Set<Scope> outScopes = flowGraph.outgoingEdgesOf(e);
+
+				EachOperator eachOp = new EachOperator(each, getSingleScope(inScopes), getSingleScope(outScopes), inOp );
 
 				memo.put(e, eachOp);
 			}
 			else if (e instanceof GroupBy) {
 				GroupBy groupBy = (GroupBy) e;
+				Set<Scope> groupByInScopes = flowGraph.incomingEdgesOf(e);
+				Set<Scope> groupByOutScopes = flowGraph.outgoingEdgesOf(e);
+				List<Operator> inOps = getInputOps(groupBy, flowGraph, memo);
 
 				FlowElement groupOperation = it.next();
 
 				if(groupOperation instanceof Every) {
 
 					Every every = (Every)groupOperation;
+					Set<Scope> everyInScopes = flowGraph.incomingEdgesOf(every);
+					Set<Scope> everyOutScopes = flowGraph.outgoingEdgesOf(every);
 
 					if(every.isAggregator()) {
 
-						AggregatorOperator aggOp = new AggregatorOperator(groupBy, every, getInputOps(groupBy, flowGraph, memo));
+						// TODO: handle multi input correctly. Get inscopes and ops in the same order
+						AggregatorOperator aggOp = new AggregatorOperator(groupBy, every,
+								Collections.singletonList(getSingleScope(groupByInScopes)), getSingleScope(groupByOutScopes),
+								getSingleScope(everyInScopes), getSingleScope(everyOutScopes), inOps);
 
 						// TODO: check if this is sufficient or if we need to add it also for the grouping
 						memo.put(every, aggOp);
+
 					}
 					else if(every.isBuffer()) {
 						throw new RuntimeException("Buffer not yet supported");
@@ -174,6 +189,8 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			}
 			else if (e instanceof Every) {
 				Every every = (Every) e;
+				Set<Scope> inScopes = flowGraph.incomingEdgesOf(every);
+				Set<Scope> outScopes = flowGraph.outgoingEdgesOf(every);
 
 				if(every.isAggregator()) {
 					// check if we can append to existing aggregation
@@ -187,7 +204,10 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 						// TODO: can also be a Every after a CoGroup...
 						throw new RuntimeException("Aggregation Every can only be appended to other Aggregations");
 					}
-					((AggregatorOperator) inputOp).addAggregator(every);
+					((AggregatorOperator) inputOp).addAggregator(every, getSingleScope(inScopes), getSingleScope(outScopes));
+
+					// add to memo
+					memo.put(every, inputOp);
 
 				}
 				else {
@@ -197,16 +217,25 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			}
 			else if (e instanceof Merge) {
 
-				Merge merge = (Merge) e;
-				UnionOperator unionOp = new UnionOperator(getInputOps(merge, flowGraph, memo));
+				throw new RuntimeException("Merge not yet supported...");
 
-				memo.put(merge, unionOp);
+//				Merge merge = (Merge) e;
+//				Set<Scope> inScopes = flowGraph.incomingEdgesOf(e);
+//				Set<Scope> outScopes = flowGraph.outgoingEdgesOf(e);
+//				List<Operator> inOps = getInputOps(merge, flowGraph, memo);
+//
+//				UnionOperator unionOp = new UnionOperator(inOps, );
+//
+//				memo.put(merge, unionOp);
 			}
 			else if (e instanceof Pipe) {
 				// must stay last because it is super-class
 				Pipe pipe = (Pipe) e;
+				Set<Scope> inScopes = flowGraph.incomingEdgesOf(e);
+				Set<Scope> outScopes = flowGraph.outgoingEdgesOf(e);
+				Operator inOp = getInputOp(pipe, flowGraph, memo);
 
-				PipeOperator pipeOp = new PipeOperator(pipe, getInputOp(pipe, flowGraph, memo));
+				PipeOperator pipeOp = new PipeOperator(pipe, getSingleScope(inScopes), getSingleScope(outScopes), inOp );
 
 				memo.put(pipe, pipeOp);
 			} else {
@@ -288,6 +317,13 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			}
 		}
 
+	}
+
+	private Scope getSingleScope(Set<Scope> scopes) {
+		if(scopes.size() != 1) {
+			throw new RuntimeException("Not exactly one scope.");
+		}
+		return scopes.iterator().next();
 	}
 
 

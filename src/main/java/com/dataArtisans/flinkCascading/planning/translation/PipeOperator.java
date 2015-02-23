@@ -23,19 +23,19 @@ import cascading.pipe.Pipe;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
-import java.util.Collections;
 import java.util.List;
 
 
 public class PipeOperator extends Operator {
 
-	public PipeOperator(Pipe pipe, Operator inputOp) {
-		super(inputOp);
+	public PipeOperator(Pipe pipe, Scope incomingScope, Scope outgoingScope, Operator inputOp) {
+		super(inputOp, incomingScope, outgoingScope);
 
-		setIncomingScope(inputOp.getOutgoingScope());
-		Scope outgoing = pipe.outgoingScopeFor(Collections.singleton(getIncomingScope()));
-		outgoing.setName(pipe.getName());
-		setOutgoingScope(outgoing);
+		// TODO: check if we can remove this!!
+//		setIncomingScope(inputOp.getOutgoingScope());
+//		Scope outgoing = pipe.outgoingScopeFor(Collections.singleton(getIncomingScope()));
+//		outgoing.setName(pipe.getName());
+//		setOutgoingScope(outgoing);
 
 	}
 

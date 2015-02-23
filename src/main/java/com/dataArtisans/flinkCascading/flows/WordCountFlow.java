@@ -42,7 +42,7 @@ public class WordCountFlow {
 		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
 
 		FlowDef flowDef = FlowDef.flowDef().setName( "wc" )
-				.addTails(wcPipe);
+				.addTail(wcPipe);
 
 		return flowDef;
 	}

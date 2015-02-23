@@ -35,10 +35,9 @@ public class DataSource extends Operator {
 
 	private Tap tap;
 
-	public DataSource(Tap tap) {
-		super(Collections.EMPTY_LIST);
+	public DataSource(Tap tap, Scope outgoingScope) {
+		super(Collections.EMPTY_LIST, Collections.EMPTY_LIST, outgoingScope);
 		this.tap = tap;
-		setOutgoingScope(tap.outgoingScopeFor(Collections.singleton(new Scope())));
 
 	}
 

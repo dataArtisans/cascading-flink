@@ -20,26 +20,28 @@ package com.dataArtisans.flinkCascading.exec;
 
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
+import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.util.TupleBuilder;
 import org.apache.flink.util.Collector;
 
-import java.io.IOException;
-
-public class FlinkCollector extends TupleBuilderCollector {
+public abstract class TupleBuilderCollector extends TupleEntryCollector {
 
 	private Collector<Tuple> wrappedCollector;
+	private TupleBuilder builder;
 
-	public FlinkCollector(Collector<Tuple> wrappedCollector, TupleBuilder builder, Fields declaredFields) {
-		super(builder, declaredFields);
-		this.wrappedCollector = wrappedCollector;
+	private Tuple inTuple;
+
+	public TupleBuilderCollector(TupleBuilder builder, Fields declaredFields) {
+		super(declaredFields);
+		this.builder = builder;
 	}
 
-	@Override
-	protected void collect(TupleEntry outTupleE) throws IOException {
-
-		Tuple outgoing = buildTuple(outTupleE.getTuple());
-		// TODO: remove additional Tuple instantiation (Kryo serialization problem)
-		this.wrappedCollector.collect(new Tuple(outgoing));
+	public void setInTuple(Tuple inTuple) {
+		this.inTuple = inTuple;
 	}
+
+	public Tuple buildTuple(Tuple t) {
+		return builder.makeResult(inTuple, t );
+	}
+
 }

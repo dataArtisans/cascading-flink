@@ -18,28 +18,41 @@
 
 package com.dataArtisans.flinkCascading.exec;
 
+import cascading.flow.FlowProcess;
+import cascading.operation.Aggregator;
+import cascading.operation.AggregatorCall;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.util.TupleBuilder;
-import org.apache.flink.util.Collector;
 
 import java.io.IOException;
 
-public class FlinkCollector extends TupleBuilderCollector {
+public class PassOnCollector extends TupleBuilderCollector {
 
-	private Collector<Tuple> wrappedCollector;
+	private Aggregator followingAgg;
+	private TupleBuilderCollector followingCollector;
+	private FlowProcess ffp;
+	private AggregatorCall call;
 
-	public FlinkCollector(Collector<Tuple> wrappedCollector, TupleBuilder builder, Fields declaredFields) {
+	public PassOnCollector(Aggregator followingAgg, TupleBuilderCollector followingCollector, FlowProcess ffp, AggregatorCall call, TupleBuilder builder, Fields declaredFields) {
 		super(builder, declaredFields);
-		this.wrappedCollector = wrappedCollector;
+		this.followingAgg = followingAgg;
+		this.followingCollector = followingCollector;
+		this.ffp = ffp;
+		this.call = call;
 	}
 
 	@Override
 	protected void collect(TupleEntry outTupleE) throws IOException {
 
+		// build new tuple
 		Tuple outgoing = buildTuple(outTupleE.getTuple());
-		// TODO: remove additional Tuple instantiation (Kryo serialization problem)
-		this.wrappedCollector.collect(new Tuple(outgoing));
+
+		// set tuple as new in tuple in following collector
+		followingCollector.setInTuple(outgoing);
+
+		// call aggregator complete
+		followingAgg.complete(ffp, call);
 	}
 }

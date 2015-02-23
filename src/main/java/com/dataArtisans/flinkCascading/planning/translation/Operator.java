@@ -28,8 +28,8 @@ import java.util.List;
 
 public abstract class Operator {
 
-	private List<Scope> incoming;
-	private Scope outgoing;
+	protected List<Scope> incoming;
+	protected Scope outgoing;
 
 	private List<Operator> inputOps;
 
@@ -39,12 +39,19 @@ public abstract class Operator {
 
 	}
 
-	public Operator(Operator inputOp) {
+	public Operator(Operator inputOp, Scope incoming, Scope outgoing) {
 		this.inputOps = Collections.singletonList(inputOp);
+		this.incoming = Collections.singletonList(incoming);
+		this.outgoing = outgoing;
 	}
 
-	public Operator(List<Operator> inputOps) {
+	public Operator(List<Operator> inputOps, List<Scope> incoming, Scope outgoing) {
+		if(inputOps.size() != incoming.size()) {
+			throw new IllegalArgumentException("Number of input operators and incoming scopes must be equal");
+		}
 		this.inputOps = inputOps;
+		this.incoming = incoming;
+		this.outgoing = outgoing;
 	}
 
 	public DataSet getFlinkOperator(ExecutionEnvironment env) {
@@ -72,14 +79,6 @@ public abstract class Operator {
 		return this.inputOps;
 	}
 
-	public void setIncomingScope(Scope incomingScope) {
-		this.incoming = Collections.singletonList(incomingScope);
-	}
-
-	public void setIncomingScopes(List<Scope> incomingScopes) {
-		this.incoming = incomingScopes;
-	}
-
 	public Scope getIncomingScope() {
 		if(this.incoming.size() != 1) {
 			throw new RuntimeException("Operator does not have exactly one incoming scope");
@@ -89,10 +88,6 @@ public abstract class Operator {
 
 	public List<Scope> getIncomingScopes() {
 		return this.incoming;
-	}
-
-	public void setOutgoingScope(Scope outgoingScope) {
-		this.outgoing = outgoingScope;
 	}
 
 	public Scope getOutgoingScope() {

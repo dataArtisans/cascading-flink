@@ -18,16 +18,16 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
+import cascading.flow.planner.Scope;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.List;
 
-
 public class UnionOperator extends Operator {
 
-	public UnionOperator(List<Operator> inputs) {
-		super(inputs);
+	public UnionOperator(List<Operator> inputs, List<Scope> incomingScopes, Scope outgoingScope) {
+		super(inputs, incomingScopes, outgoingScope);
 
 	}
 

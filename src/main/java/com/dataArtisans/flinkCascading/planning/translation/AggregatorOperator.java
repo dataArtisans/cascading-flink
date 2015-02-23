@@ -30,8 +30,6 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -41,24 +39,27 @@ public class AggregatorOperator extends Operator {
 	private GroupBy groupBy;
 	private List<Every> aggregators;
 
+	private List<Scope> allIncoming;
 	private List<Scope> allOutgoing;
 
-	public AggregatorOperator(GroupBy groupBy, Every every, List<Operator> inputOps) {
-		super(inputOps);
+	public AggregatorOperator(GroupBy groupBy, Every every, List<Scope> incomingScopes, Scope groupByOutgoingScope,
+								Scope everyIncomingScope, Scope everyOutgoingScope, List<Operator> inputOps) {
+		super(inputOps, incomingScopes, groupByOutgoingScope);
 
 		this.groupBy = groupBy;
 		this.aggregators = new ArrayList<Every>();
 
-		setIncomingScopes(getOutgoingScopes(inputOps));
-		setOutgoingScope(groupBy.outgoingScopeFor(new HashSet<Scope>(getIncomingScopes())));
+		allIncoming = new ArrayList<Scope>();
+		allIncoming.add(null);
 
 		allOutgoing = new ArrayList<Scope>();
-		allOutgoing.add(getOutgoingScope());
+		allOutgoing.add(groupByOutgoingScope);
 
-		this.addAggregator(every);
+		this.addAggregator(every, everyIncomingScope, everyOutgoingScope);
+
 	}
 
-	public void addAggregator(Every every) {
+	public void addAggregator(Every every, Scope incomingScope, Scope outgoingScope) {
 
 		if(!every.isAggregator()) {
 			throw new RuntimeException("Every is not an aggregator");
@@ -66,8 +67,10 @@ public class AggregatorOperator extends Operator {
 		this.aggregators.add(every);
 
 		// adapt and append outgoing scope
-		setOutgoingScope(every.outgoingScopeFor(Collections.singleton(getOutgoingScope())));
-		allOutgoing.add(getOutgoingScope());
+		outgoing = outgoingScope;
+		allIncoming.add(incomingScope);
+		allOutgoing.add(outgoingScope);
+
 	}
 
 	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
@@ -83,21 +86,26 @@ public class AggregatorOperator extends Operator {
 			throw new RuntimeException("Secondary Sort not yet supported");
 		}
 
-		// TODO: remove static string
+		// TODO: we need one key selector for each unioned input!
 		String incomingName = getIncomingScope().getName();
 		MapFunction keyExtractor = new KeyExtractor(
-				getIncomingScope().getOutValuesFields(),  // TODO getOutGroupingValueFields give value fields without grouping fields
-				getIncomingScope().getOutGroupingFields(),
-				null);
+				getIncomingScope().getOutValuesFields(),
+				groupBy.getKeySelectors().get("wc"),
+				groupBy.getSortingSelectors().get("wc"));
 
+		Every[] aggregatorsA = aggregators.toArray(new Every[aggregators.size()]);
 
-		// TODO: remove restriction for single aggregator
-		if(aggregators.size() != 1) {
-			throw new RuntimeException("Currently only one aggregator supported");
+		Scope[] inA = new Scope[aggregators.size()];
+		for(int i=0; i<inA.length; i++) {
+			inA[i] = allIncoming.get(i+1);
 		}
 
+		Scope[] outA = new Scope[aggregators.size()]; // these are the out scopes of all aggregators
+		for(int i=0; i<outA.length; i++) {
+			outA[i] = allOutgoing.get(i+1);
+		}
 		// build the group function
-		GroupReduceFunction aggregationReducer = new AggregatorsReducer(aggregators.get(0), allOutgoing.get(0), allOutgoing.get(1));
+		GroupReduceFunction aggregationReducer = new AggregatorsReducer(aggregatorsA, inA, outA);
 //		throw new RuntimeException("Implement AggregatorsReducer");
 //
 		return inputs.get(0)

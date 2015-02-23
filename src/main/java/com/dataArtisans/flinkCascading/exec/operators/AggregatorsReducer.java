@@ -22,277 +22,131 @@ import cascading.flow.planner.Scope;
 import cascading.operation.Aggregator;
 import cascading.operation.ConcreteCall;
 import cascading.pipe.Every;
-import cascading.pipe.Operator;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.util.TupleBuilder;
-import cascading.tuple.util.TupleViews;
 import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.exec.PassOnCollector;
+import com.dataArtisans.flinkCascading.exec.TupleBuilderCollector;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
-import static cascading.tuple.util.TupleViews.createComposite;
-import static cascading.tuple.util.TupleViews.createNarrow;
-import static cascading.tuple.util.TupleViews.createOverride;
-
 public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tuple>, Tuple> {
 
-	private Every every;
-	private Scope outgoingScope;
-	private Scope incomingScope;
+	private Every[] everies;
+	private Scope[] outgoingScopes;
+	private Scope[] incomingScopes;
 
-	private Aggregator aggregator;
-	private TupleEntry argumentsEntry;
-	private TupleBuilder argumentsBuilder;
-	private TupleBuilder outgoingBuilder;
-	private transient ConcreteCall call;
-	private FlinkFlowProcess ffp;
+	private transient Aggregator[] aggregators;
+	private transient TupleEntry[] argumentsEntries;
+	private transient TupleBuilder[] argumentsBuilders;
+	private transient TupleBuilder[] outgoingBuilders;
+	private transient ConcreteCall[] calls;
+	private transient FlinkFlowProcess[] ffps;
 
-	public AggregatorsReducer() {}
 
-	public AggregatorsReducer(Every every, Scope incoming, Scope outgoing) {
-		// TODO
-		this.every = every;
-		this.incomingScope = incoming;
-		this.outgoingScope = outgoing;
+	public AggregatorsReducer(Every[] everies, Scope[] incomings, Scope[] outgoings) {
+
+		if(everies.length != outgoings.length) {
+			throw new IllegalArgumentException("Number of everies and outgoing scopes must be equal.");
+		}
+
+		this.everies = everies;
+		this.incomingScopes = incomings;
+		this.outgoingScopes = outgoings;
 	}
 
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(this.getRuntimeContext());
-		this.aggregator = this.every.getAggregator();
+		int num = everies.length;
 
-		call = new ConcreteCall( outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields() );
+		this.aggregators = new Aggregator[num];
+		this.argumentsEntries = new TupleEntry[num];
+		this.argumentsBuilders = new TupleBuilder[num];
+		this.outgoingBuilders = new TupleBuilder[num];
+		this.calls = new ConcreteCall[num];
+		this.ffps = new FlinkFlowProcess[num];
 
-		Fields argumentsSelector = outgoingScope.getArgumentsSelector();
-		Fields remainderFields = outgoingScope.getRemainderPassThroughFields();
-		Fields outgoingSelector = outgoingScope.getOutValuesSelector();
+		for (int i=0; i<everies.length; i++) {
 
-		argumentsEntry = new TupleEntry( outgoingScope.getArgumentsDeclarator(), true );
-		argumentsBuilder = createArgumentsBuilder(incomingScope.getIncomingFunctionArgumentFields(), argumentsSelector);
-		outgoingBuilder = createOutgoingBuilder( every, incomingScope.getIncomingFunctionPassThroughFields(), argumentsSelector,
-				remainderFields, outgoingScope.getOperationDeclaredFields(), outgoingSelector );
+			this.ffps[i] = new FlinkFlowProcess(this.getRuntimeContext());
+			this.aggregators[i] = this.everies[i].getAggregator();
 
-		call.setArguments( argumentsEntry );
+			this.calls[i] = new ConcreteCall(outgoingScopes[i].getArgumentsDeclarator(), outgoingScopes[i].getOperationDeclaredFields());
 
-		aggregator.prepare(ffp, call);
+			Fields argumentsSelector = outgoingScopes[i].getArgumentsSelector();
+			Fields remainderFields = outgoingScopes[i].getRemainderPassThroughFields();
+			Fields outgoingSelector = outgoingScopes[i].getOutGroupingSelector();
+
+			argumentsEntries[i] = new TupleEntry(outgoingScopes[i].getArgumentsDeclarator(), true);
+			argumentsBuilders[i] = TupleBuilderBuilder.createArgumentsBuilder(
+					incomingScopes[i].getIncomingAggregatorArgumentFields(), argumentsSelector);
+			outgoingBuilders[i] = TupleBuilderBuilder.createOutgoingBuilder(
+					everies[i], incomingScopes[i].getIncomingAggregatorPassThroughFields(), argumentsSelector,
+					remainderFields, outgoingScopes[i].getOperationDeclaredFields(), outgoingSelector);
+
+			calls[i].setArguments(argumentsEntries[i]);
+
+			aggregators[i].prepare(ffps[i], calls[i]);
+		}
 
 	}
 
 	@Override
 	public void reduce(Iterable<Tuple3<Tuple, Tuple, Tuple>> vals, Collector<Tuple> collector) throws Exception {
 
-		// TODO: add support for multiple aggregators!
-
-
-//		FlinkCollector wrappedCollector = new FlinkCollector(collector, this.outgoingBuilder, outgoingScope.getOperationDeclaredFields() );
-//		// TODO: add completeGroup call to Collector!
-//		call.setOutputCollector(wrappedCollector);
-
-		// this.function.prepare(ffp, call); // TODO: do we need to prepare the aggregator?
-
 		boolean first = true;
 		Tuple key = null;
-		Tuple val = null;
+		Tuple val;
 
 		for(Tuple3<Tuple, Tuple, Tuple> v : vals) {
 
 			key = v.f0;
 			val = v.f2;
 
-			if(first) {
-				// start group
+			for(int i=0; i<aggregators.length; i++) {
 
-				call.setGroup( new TupleEntry(key) ); // set group key
-				call.setArguments( null );  // zero it out
-				call.setOutputCollector( null ); // zero it out
+				if (first) {
+					// start group
 
-				// start group
-				aggregator.start(ffp, call);
+					calls[i].setGroup(new TupleEntry(key)); // set group key
+					calls[i].setArguments(null);  // zero it out
+					calls[i].setOutputCollector(null); // zero it out
 
-				first = false;
+					// start group
+					aggregators[i].start(ffps[i], calls[i]);
+
+				}
+
+				argumentsEntries[i].setTuple(argumentsBuilders[i].makeResult(val, null));
+				calls[i].setArguments(argumentsEntries[i]);
+				aggregators[i].aggregate(ffps[i], calls[i]);
 			}
+			first = false;
 
-			argumentsEntry.setTuple( argumentsBuilder.makeResult( val, null ) );
-			call.setArguments( argumentsEntry );
-			aggregator.aggregate(ffp, call);
+		}
 
+		int i = this.aggregators.length-1;
+
+		TupleBuilderCollector x = new FlinkCollector(collector, this.outgoingBuilders[i], outgoingScopes[i].getOperationDeclaredFields() );
+		calls[i].setOutputCollector(x);
+		calls[i].setArguments(null);
+		for(i=this.aggregators.length-1; i > 0; i--) {
+			// chain collectors
+			x = new PassOnCollector(aggregators[i], x, ffps[i], calls[i], outgoingBuilders[i-1], outgoingScopes[i-1].getOperationDeclaredFields() );
+			calls[i-1].setOutputCollector(x);
+			calls[i-1].setArguments(null);
 		}
 
 		// finish group
-		FlinkCollector wrappedCollector = new FlinkCollector(collector, this.outgoingBuilder, outgoingScope.getOperationDeclaredFields() );
-		wrappedCollector.setInTuple(key);
-
-		call.setArguments( null );
-		call.setOutputCollector( wrappedCollector );
-
-		aggregator.complete(ffp, call);
+		x.setInTuple(key);
+		aggregators[0].complete(ffps[0], calls[0]);
 
 	}
 
-
-	protected TupleBuilder createArgumentsBuilder( final Fields incomingFields, final Fields argumentsSelector )
-	{
-		if( incomingFields.isUnknown() ) {
-			return new TupleBuilder() {
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					return input.get(incomingFields, argumentsSelector);
-				}
-			};
-		}
-
-		if( argumentsSelector.isAll() ) {
-			return new TupleBuilder() {
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					return input;
-				}
-			};
-		}
-
-		if( argumentsSelector.isNone() ) {
-			return new TupleBuilder() {
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					return Tuple.NULL;
-				}
-			};
-		}
-
-		final Fields inputDeclarationFields = Fields.asDeclaration( incomingFields );
-
-		return new TupleBuilder()
-		{
-			Tuple result = createNarrow( inputDeclarationFields.getPos( argumentsSelector ) );
-
-			@Override
-			public Tuple makeResult( Tuple input, Tuple output )
-			{
-				return TupleViews.reset(result, input);
-			}
-		};
-	}
-
-	protected TupleBuilder createOutgoingBuilder( final Operator operator, final Fields incomingFields, final Fields argumentSelector,
-													final Fields remainderFields, final Fields declaredFields, final Fields outgoingSelector ) {
-		final Fields inputDeclarationFields = Fields.asDeclaration(incomingFields);
-
-		if (operator.getOutputSelector().isResults()) {
-			return new TupleBuilder() {
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					return output;
-				}
-			};
-		}
-
-		if (operator.getOutputSelector().isAll() && !(incomingFields.isUnknown() || declaredFields.isUnknown())) {
-			return new TupleBuilder() {
-				Tuple result = createComposite(inputDeclarationFields, declaredFields);
-
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					return TupleViews.reset(result, input, output);
-				}
-			};
-		}
-
-		if (operator.getOutputSelector().isReplace()) {
-			if (incomingFields.isUnknown()) {
-				return new TupleBuilder() {
-					Fields resultFields = operator.getFieldDeclaration().isArguments() ? argumentSelector : declaredFields;
-
-					@Override
-					public Tuple makeResult(Tuple input, Tuple output) {
-						Tuple result = new Tuple(input);
-
-						result.set(Fields.UNKNOWN, resultFields, output);
-
-						return result;
-					}
-				};
-			}
-
-			return new TupleBuilder() {
-				Fields resultFields = operator.getFieldDeclaration().isArguments() ? argumentSelector : declaredFields;
-				Tuple result = createOverride(inputDeclarationFields, resultFields);
-
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					return TupleViews.reset(result, input, output);
-				}
-			};
-		}
-
-		if (operator.getOutputSelector().isSwap()) {
-			if (remainderFields.size() == 0) { // the same as Fields.RESULTS
-				return new TupleBuilder() {
-					@Override
-					public Tuple makeResult(Tuple input, Tuple output) {
-						return output;
-					}
-				};
-			}
-			else if (declaredFields.isUnknown()) {
-				return new TupleBuilder() {
-					@Override
-					public Tuple makeResult(Tuple input, Tuple output) {
-						return input.get(incomingFields, remainderFields).append(output);
-					}
-				};
-			}
-			else {
-				return new TupleBuilder() {
-					Tuple view = createNarrow(inputDeclarationFields.getPos(remainderFields));
-					Tuple result = createComposite(Fields.asDeclaration(remainderFields), declaredFields);
-
-					@Override
-					public Tuple makeResult(Tuple input, Tuple output) {
-						TupleViews.reset(view, input);
-
-						return TupleViews.reset(result, view, output);
-					}
-				};
-			}
-		}
-
-		if (incomingFields.isUnknown() || declaredFields.isUnknown()) {
-			return new TupleBuilder() {
-				Fields selector = outgoingSelector.isUnknown() ? Fields.ALL : outgoingSelector;
-				TupleEntry incoming = new TupleEntry(incomingFields, true);
-				TupleEntry declared = new TupleEntry(declaredFields, true);
-
-				@Override
-				public Tuple makeResult(Tuple input, Tuple output) {
-					incoming.setTuple(input);
-					declared.setTuple(output);
-
-					return TupleEntry.select(selector, incoming, declared);
-				}
-			};
-		}
-
-		return new TupleBuilder()
-		{
-			Fields inputFields = operator.getFieldDeclaration().isArguments() ? Fields.mask( inputDeclarationFields, declaredFields ) : inputDeclarationFields;
-			Tuple appended = createComposite( inputFields, declaredFields );
-			Fields allFields = Fields.resolve( Fields.ALL, inputFields, declaredFields );
-			Tuple result = createNarrow( allFields.getPos( outgoingSelector ), appended );
-
-
-			@Override
-			public Tuple makeResult( Tuple input, Tuple output )
-			{
-				TupleViews.reset( appended, input, output );
-
-				return result;
-			}
-		};
-	}
 }

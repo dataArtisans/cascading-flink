@@ -32,34 +32,45 @@ public class FlinkFlowRunner {
 
 	public static void main(String[] args) throws Exception {
 
+		FlowDef tokenizeFlow = TokenizeFlow.getTokenizeFlow();
+		FlowDef wcFlow = WordCountFlow.getWordCountFlow();
+		FlowDef aggFlow = MultiAggregateFlow.getFlow();
 
-		Tap docTap = new Hfs(new TextLine(), "file:///users/fhueske/testFile");
-		Tap wcTap = new Hfs(new TextLine(), "file:///users/fhueske/wcResult");
+		FlowDef flow = aggFlow;
 
-//		Tap docTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/testFile");
-//		Tap wcTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/wcResult");
+//		runLocal(flow);
+		runFlink(flow);
 
-		FlowDef tokenizeFlow = TokenizeFlow.getTokenizeFlow()
-				.addSource( "token", docTap )
-				.addSink("token", wcTap);
+	}
 
-		FlowDef wcFlow = WordCountFlow.getWordCountFlow()
-				.addSource( "token", docTap )
-				.addSink("wc", wcTap);
+	public static void runFlink(FlowDef flow) {
 
-		FlowDef aggFlow = MultiAggregateFlow.getFlow()
-				.addSource( "token", docTap )
-				.addSink("wc", wcTap);
+		Tap docTap = new Hfs(new TextLine(), "file:///users/fhueske/Data/testFile");
+		Tap wcTap = new Hfs(new TextLine(), "file:///users/fhueske/Data/wcResult");
 
+		flow
+			.addSource("token", docTap)
+			.addSink("wc", wcTap);
 
-//		cascading.flow.local.LocalFlowConnector lfc = new cascading.flow.local.LocalFlowConnector();
-//		lfc.connect(aggFlow).complete();
 
 		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
-
 		FlinkConnector fc = new FlinkConnector(env);
-		fc.connect(wcFlow).complete();
-//		fc.connect(aggFlow).complete();
+		fc.connect(flow).complete();
+
+	}
+
+	public static void runLocal(FlowDef flow) {
+
+		Tap docTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/Data/testFile");
+		Tap wcTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/Data/wcResult");
+
+		flow
+			.addSource( "token", docTap )
+			.addSink("wc", wcTap);
+
+
+		cascading.flow.local.LocalFlowConnector lfc = new cascading.flow.local.LocalFlowConnector();
+		lfc.connect(flow).complete();
 
 	}
 
