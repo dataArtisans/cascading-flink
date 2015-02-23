@@ -20,6 +20,8 @@ package com.dataArtisans.flinkCascading.flows;
 
 import cascading.flow.FlowDef;
 import cascading.flow.FlowProcess;
+import cascading.operation.Filter;
+import cascading.operation.FilterCall;
 import cascading.operation.Function;
 import cascading.operation.FunctionCall;
 import cascading.operation.OperationCall;
@@ -57,6 +59,7 @@ public class MultiAggregateFlow {
 //		wcPipe = new Each( wcPipe, num, new DoubleFunc(offset), Fields.ALL);
 		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
 		wcPipe = new Every( wcPipe, blubb, new Sum(num), Fields.ALL );
+		wcPipe = new Each( wcPipe, token, new TokenFilter());
 //		wcPipe = new Each( wcPipe, num, new DoubleFunc(num), Fields.ALL);
 //		wcPipe = new Every( wcPipe, offset, new Sum(new Fields("secondSum")), Fields.ALL );
 
@@ -152,6 +155,44 @@ public class MultiAggregateFlow {
 		@Override
 		public int getNumArgs() {
 			return 1;
+		}
+
+		@Override
+		public boolean isSafe() {
+			return false;
+		}
+	}
+
+	public static class TokenFilter implements Filter, Serializable {
+
+		@Override
+		public boolean isRemove(FlowProcess flowProcess, FilterCall filterCall) {
+			return filterCall.getArguments().getString("token").length() > 5;
+		}
+
+		@Override
+		public void prepare(FlowProcess flowProcess, OperationCall operationCall) {
+
+		}
+
+		@Override
+		public void flush(FlowProcess flowProcess, OperationCall operationCall) {
+
+		}
+
+		@Override
+		public void cleanup(FlowProcess flowProcess, OperationCall operationCall) {
+
+		}
+
+		@Override
+		public Fields getFieldDeclaration() {
+			return Fields.ALL;
+		}
+
+		@Override
+		public int getNumArgs() {
+			return 0;
 		}
 
 		@Override

@@ -20,6 +20,7 @@ package com.dataArtisans.flinkCascading.planning.translation;
 
 import cascading.flow.planner.Scope;
 import cascading.pipe.Each;
+import com.dataArtisans.flinkCascading.exec.operators.EachFilter;
 import com.dataArtisans.flinkCascading.exec.operators.EachFunctionMapper;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.java.DataSet;
@@ -41,10 +42,14 @@ public class EachOperator extends Operator {
 		// get map function
 		MapPartitionFunction mapper;
 		if(this.each.isFunction()) {
-			mapper = new EachFunctionMapper(each, getIncomingScope(), getOutgoingScope());
+			return inputs.get(0)
+					.mapPartition(new EachFunctionMapper(each, getIncomingScope(), getOutgoingScope()))
+					.name(each.getName());
 		}
 		else if (this.each.isFilter()) {
-			throw new UnsupportedOperationException("Filter not supported yet!");
+			return inputs.get(0)
+					.filter(new EachFilter(each, getIncomingScope(), getOutgoingScope()))
+					.name(each.getName());
 		}
 		else if (this.each.isValueAssertion()) {
 			throw new UnsupportedOperationException("ValueAssertion not supported yet!");
@@ -52,10 +57,6 @@ public class EachOperator extends Operator {
 		else {
 			throw new UnsupportedOperationException("Unsupported Each!");
 		}
-
-		return inputs.get(0)
-				.mapPartition(mapper)
-				.name(each.getName());
 
 	}
 
