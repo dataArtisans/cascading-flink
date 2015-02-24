@@ -102,4 +102,13 @@ public abstract class Operator {
 
 		return inScopes.iterator().next();
 	}
+
+	protected Scope getAnyIncomingScopeFor(FlowElement e) {
+		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
+		if(inScopes.size() < 0) {
+			throw new RuntimeException(this.lastCOp+" has no outgoing scope");
+		}
+
+		return inScopes.iterator().next();
+	}
 }

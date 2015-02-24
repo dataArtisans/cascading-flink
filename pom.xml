@@ -27,7 +27,7 @@ under the License.
 	<version>0.1</version>
 
 	<name>Cascading on Flink</name>
-	<packaging>pom</packaging>
+	<packaging>jar</packaging>
 	<inceptionYear>2015</inceptionYear>
 
 	<licenses>
@@ -54,45 +54,44 @@ under the License.
 		<kryoserialization.version>0.3.2</kryoserialization.version>
 	</properties>
 
-    <repositories>
-        <repository>
-            <id>conjars.org</id>
-            <url>http://conjars.org/repo</url>
-        </repository>
-    </repositories>
+	<repositories>
+		<repository>
+			<id>conjars.org</id>
+			<url>http://conjars.org/repo</url>
+		</repository>
+	</repositories>
 
 	<dependencies>
 
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-clients</artifactId>
-            <version>0.9-SNAPSHOT</version>
-        </dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-clients</artifactId>
+			<version>0.9-SNAPSHOT</version>
+		</dependency>
 
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-java</artifactId>
-            <version>0.9-SNAPSHOT</version>
-        </dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-java</artifactId>
+			<version>0.9-SNAPSHOT</version>
+		</dependency>
 
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-local</artifactId>
-            <version>3.0.0-wip-63</version>
-        </dependency>
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-local</artifactId>
+			<version>3.0.0-wip-65</version>
+		</dependency>
 
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-hadoop</artifactId>
-            <version>3.0.0-wip-63</version>
-        </dependency>
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-hadoop</artifactId>
+			<version>3.0.0-wip-65</version>
+		</dependency>
 
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-core</artifactId>
-            <version>3.0.0-wip-63</version>
-        </dependency>
-
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-core</artifactId>
+			<version>3.0.0-wip-65</version>
+		</dependency>
 
 
 		<dependency>
@@ -159,9 +158,7 @@ under the License.
 			<scope>test</scope>
 		</dependency>
 
-
-    </dependencies>
-	
+	</dependencies>
 
 	<reporting>
 		<plugins>
@@ -268,6 +265,7 @@ under the License.
 					</excludes>
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-checkstyle-plugin</artifactId>
@@ -288,6 +286,7 @@ under the License.
 					<logViolationsToConsole>true</logViolationsToConsole>
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<!-- just define the Java version to be used for compiling and plugins -->
 				<groupId>org.apache.maven.plugins</groupId>
@@ -299,6 +298,7 @@ under the License.
 					<!-- High optimization, no debugging <compilerArgument>-g:none -O</compilerArgument> -->
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<artifactId>maven-failsafe-plugin</artifactId>
 				<version>2.17</version><!--$NO-MVN-MAN-VER$-->
@@ -311,6 +311,7 @@ under the License.
 					</execution>
 				</executions>
 				<configuration>
+					<!--<failIfNoTests>true</failIfNoTests>-->
 					<forkCount>${flink.forkCount}</forkCount>
 					<reuseForks>${flink.reuseForks}</reuseForks>
 					<systemPropertyVariables>
@@ -321,6 +322,7 @@ under the License.
 					<argLine>-Xmx800m -Dlog4j.configuration=log4j-test.properties -XX:-UseGCOverheadLimit</argLine>
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
@@ -334,6 +336,7 @@ under the License.
 					<argLine>-Xmx800m -Dlog4j.configuration=log4j-test.properties -XX:-UseGCOverheadLimit</argLine>
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
@@ -355,6 +358,7 @@ under the License.
 					</execution>
 				</executions>
 			</plugin>
+
 		</plugins>
 
 	</build>

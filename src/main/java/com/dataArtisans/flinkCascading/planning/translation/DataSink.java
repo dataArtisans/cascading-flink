@@ -31,8 +31,6 @@ import java.util.List;
 
 public class DataSink extends Operator {
 
-	private static final boolean PRINT_STDOUT = true;
-
 	private Tap tap;
 
 	public DataSink(Tap tap, Operator inputOp, FlowElementGraph flowGraph) {
@@ -46,11 +44,6 @@ public class DataSink extends Operator {
 
 		if(inputs.size() != 1) {
 			throw new RuntimeException("Each requires exactly one input");
-		}
-
-		if(PRINT_STDOUT) {
-			inputs.get(0).print();
-			return null;
 		}
 
 		if (tap instanceof Hfs) {

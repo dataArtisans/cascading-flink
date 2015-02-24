@@ -16,39 +16,61 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.flows;
+package com.dataArtisans.flinkCascading;
 
 import cascading.flow.FlowDef;
 import cascading.operation.aggregator.Count;
+import cascading.operation.buffer.FirstNBuffer;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
 import cascading.pipe.Pipe;
 import cascading.tuple.Fields;
+import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;
+import com.dataArtisans.flinkCascading.util.TestData;
 
-public class MultiGroupByFlow {
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
-	public static FlowDef getFlow() {
+
+public class BufferITCase extends FlinkCascadingTestBase {
+
+	@Override
+	public Map<String, String> getInPipeDataMap() {
+		Map<String, String> inPipeDataMap = new HashMap<String, String>(1);
+		inPipeDataMap.put("tokens", TestData.getTextData());
+
+		return inPipeDataMap;
+	}
+
+	@Override
+	public Set<String> getOutPipes() {
+		return Collections.singleton("first3");
+	}
+
+	@Override
+	public FlowDef getFlow() {
 
 		Fields token = new Fields( "token" );
 		Fields text = new Fields( "line" );
+		Fields count = new Fields( "count" );
 
-		Pipe linePipe1 = new Pipe("line1");
 		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "[ \\[\\]\\(\\),.]" );
-		Pipe docPipe1 = new Each( linePipe1, text, splitter, Fields.RESULTS );
+		Pipe tokensPipe = new Each( "tokens", text, splitter, Fields.RESULTS );
 
-		Pipe linePipe2 = new Pipe("line2");
-		RegexSplitGenerator splitter2 = new RegexSplitGenerator( token, "[ \\[\\]\\(\\),.]" );
-		Pipe docPipe2 = new Each( linePipe2, text, splitter2, Fields.RESULTS );
+		Pipe cntPipe = new Pipe( "counts", tokensPipe );
+		cntPipe = new GroupBy( cntPipe, token );
+		cntPipe = new Every( cntPipe, Fields.ALL, new Count(), Fields.ALL );
 
-		Pipe wcPipe = new GroupBy( "wc", docPipe1, docPipe2, token );
-		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
+		Pipe first3Pipe = new GroupBy( "first3", cntPipe, count, token);
+		first3Pipe = new Every( first3Pipe, count, new FirstNBuffer(3), Fields.REPLACE);
 
-		FlowDef flowDef = FlowDef.flowDef().setName( "wc" )
-				.addTail(wcPipe);
+		FlowDef flowDef = FlowDef.flowDef().setName( "first3" )
+				.addTail(first3Pipe);
 
 		return flowDef;
 	}
-
 }

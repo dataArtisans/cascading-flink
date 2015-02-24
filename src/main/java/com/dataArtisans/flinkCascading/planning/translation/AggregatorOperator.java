@@ -76,7 +76,7 @@ public class AggregatorOperator extends Operator {
 
 			Fields groupByFields = groupBy.getKeySelectors().get(inOp.getOutgoingScope().getName());
 			Fields sortByFields = groupBy.getSortingSelectors().get(inOp.getOutgoingScope().getName());
-			Fields incomingFields = getIncomingScopeFor(groupBy).getOutGroupingFields();
+			Fields incomingFields = getAnyIncomingScopeFor(groupBy).getOutGroupingFields();
 
 			if(sortByFields != null) {
 				secondarySort = true;

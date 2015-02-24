@@ -62,8 +62,6 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	public ExecutionEnvironment env;
 
-	private static boolean PRINT_STDOUT = true;
-
 	public FlinkFlowPlanner(ExecutionEnvironment env) {
 		this.env = env;
 	}
@@ -283,22 +281,16 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 		Tap sink = sinkMap.get(p.getName());
 
-		if(PRINT_STDOUT) {
-			tail.print();
-			return;
+		if (sink instanceof Hfs) {
+
+			Hfs hfs = (Hfs) sink;
+			Configuration conf = new Configuration();
+
+			tail
+					.output(new HfsOutputFormat(hfs, conf))
+					.setParallelism(1);
 		} else {
-
-			if (sink instanceof Hfs) {
-
-				Hfs hfs = (Hfs) sink;
-				Configuration conf = new Configuration();
-
-				tail
-						.output(new HfsOutputFormat(hfs, conf))
-						.setParallelism(1);
-			} else {
-				throw new RuntimeException("Unsupported Tap");
-			}
+			throw new RuntimeException("Unsupported Tap");
 		}
 
 	}
