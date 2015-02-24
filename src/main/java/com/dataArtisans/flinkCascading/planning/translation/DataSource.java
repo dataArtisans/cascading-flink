@@ -18,7 +18,7 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Tuple;
@@ -35,13 +35,15 @@ public class DataSource extends Operator {
 
 	private Tap tap;
 
-	public DataSource(Tap tap, Scope outgoingScope) {
-		super(Collections.EMPTY_LIST, Collections.EMPTY_LIST, outgoingScope);
+	public DataSource(Tap tap, FlowElementGraph flowGraph) {
+		super(Collections.EMPTY_LIST, tap, flowGraph);
 		this.tap = tap;
 
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	@Override
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputs, List<Operator> inputOps) {
 
 		if(tap instanceof Hfs) {
 			Hfs hfs = (Hfs) tap;

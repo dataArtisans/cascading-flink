@@ -29,7 +29,7 @@ import cascading.tuple.Fields;
 
 public class WordCountFlow {
 
-	public static FlowDef getWordCountFlow() {
+	public static FlowDef getFlow() {
 
 		Fields token = new Fields( "token" );
 		Fields text = new Fields( "line" );

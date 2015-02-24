@@ -18,40 +18,39 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
+import cascading.flow.FlowElement;
 import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 public abstract class Operator {
 
-	protected List<Scope> incoming;
-	protected Scope outgoing;
-
 	private List<Operator> inputOps;
+	private FlowElement lastCOp;
+	private FlowElementGraph flowGraph;
 
 	private DataSet memo = null;
 
-	public Operator() {
+	public Operator(Operator inputOp, FlowElement lastCOp, FlowElementGraph flowGraph) {
 
+		this(Collections.singletonList(inputOp), lastCOp, flowGraph);
 	}
 
-	public Operator(Operator inputOp, Scope incoming, Scope outgoing) {
-		this.inputOps = Collections.singletonList(inputOp);
-		this.incoming = Collections.singletonList(incoming);
-		this.outgoing = outgoing;
-	}
+	public Operator(List<Operator> inputOps, FlowElement lastCOp, FlowElementGraph flowGraph) {
 
-	public Operator(List<Operator> inputOps, List<Scope> incoming, Scope outgoing) {
-		if(inputOps.size() != incoming.size()) {
-			throw new IllegalArgumentException("Number of input operators and incoming scopes must be equal");
-		}
 		this.inputOps = inputOps;
-		this.incoming = incoming;
-		this.outgoing = outgoing;
+		this.lastCOp = lastCOp;
+		this.flowGraph = flowGraph;
+	}
+
+	protected void setLastCascadingOp(FlowElement lastCOp) {
+		this.lastCOp = lastCOp;
 	}
 
 	public DataSet getFlinkOperator(ExecutionEnvironment env) {
@@ -67,32 +66,40 @@ public abstract class Operator {
 			}
 
 			// translate this operator
-			this.memo = translateToFlink(env, inputs);
+			this.memo = translateToFlink(env, inputs, inputOps);
 		}
 
 		return this.memo;
 	}
 
-	protected abstract DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs);
+	protected abstract DataSet translateToFlink(ExecutionEnvironment env,
+												List<DataSet> inputs, List<Operator> inputOps);
 
-	public List<Operator> getInputOperators() {
-		return this.inputOps;
+	protected Scope getOutgoingScope() {
+		return getOutgoingScopeFor(this.lastCOp);
 	}
 
-	public Scope getIncomingScope() {
-		if(this.incoming.size() != 1) {
-			throw new RuntimeException("Operator does not have exactly one incoming scope");
+	protected Scope getOutgoingScopeFor(FlowElement e) {
+		Set<Scope> outScopes = this.flowGraph.outgoingEdgesOf(e);
+		if(outScopes.size() < 0) {
+			throw new RuntimeException(this.lastCOp+" has no outgoing scope");
 		}
-		return this.incoming.get(0);
+		else if(outScopes.size() > 1) {
+			throw new RuntimeException(this.lastCOp+" has more than one outgoing scope");
+		}
+
+		return outScopes.iterator().next();
 	}
 
-	public List<Scope> getIncomingScopes() {
-		return this.incoming;
+	protected Scope getIncomingScopeFor(FlowElement e) {
+		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
+		if(inScopes.size() < 0) {
+			throw new RuntimeException(this.lastCOp+" has no outgoing scope");
+		}
+		else if(inScopes.size() > 1) {
+			throw new RuntimeException(this.lastCOp+" has more than one outgoing scope");
+		}
+
+		return inScopes.iterator().next();
 	}
-
-	public Scope getOutgoingScope() {
-		return this.outgoing;
-	}
-
-
 }

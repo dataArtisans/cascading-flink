@@ -18,7 +18,8 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
+import cascading.pipe.Merge;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
@@ -26,15 +27,16 @@ import java.util.List;
 
 public class MergeOperator extends Operator {
 
-	public MergeOperator(List<Operator> inputs, List<Scope> incomingScopes, Scope outgoingScope) {
-		super(inputs, incomingScopes, outgoingScope);
-
+	public MergeOperator(Merge merge, List<Operator> inputOps, FlowElementGraph flowGraph) {
+		super(inputOps, merge, flowGraph);
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	@Override
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputs, List<Operator> inputOps) {
 
 		if(inputs.size() <= 1) {
-			throw new RuntimeException("Union requires at least two inputs");
+			throw new RuntimeException("Merge requires at least two inputs");
 		}
 
 		DataSet unioned = inputs.get(0);

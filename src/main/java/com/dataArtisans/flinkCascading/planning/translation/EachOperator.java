@@ -18,11 +18,10 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Each;
 import com.dataArtisans.flinkCascading.exec.operators.EachFilter;
 import com.dataArtisans.flinkCascading.exec.operators.EachFunctionMapper;
-import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
@@ -32,23 +31,24 @@ public class EachOperator extends Operator {
 
 	private Each each;
 
-	public EachOperator(Each each, Scope incomingScope, Scope outgoingScope, Operator inputOp) {
-		super(inputOp, incomingScope, outgoingScope);
+	public EachOperator(Each each, Operator inputOp, FlowElementGraph flowGraph) {
+		super(inputOp, each, flowGraph);
 		this.each = each;
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	@Override
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputs, List<Operator> inputOps) {
 
 		// get map function
-		MapPartitionFunction mapper;
 		if(this.each.isFunction()) {
 			return inputs.get(0)
-					.mapPartition(new EachFunctionMapper(each, getIncomingScope(), getOutgoingScope()))
+					.mapPartition(new EachFunctionMapper(each, getIncomingScopeFor(each), getOutgoingScopeFor(each)))
 					.name(each.getName());
 		}
 		else if (this.each.isFilter()) {
 			return inputs.get(0)
-					.filter(new EachFilter(each, getIncomingScope(), getOutgoingScope()))
+					.filter(new EachFilter(each, getIncomingScopeFor(each), getOutgoingScopeFor(each)))
 					.name(each.getName());
 		}
 		else if (this.each.isValueAssertion()) {

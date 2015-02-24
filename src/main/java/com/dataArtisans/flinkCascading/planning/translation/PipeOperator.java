@@ -18,28 +18,22 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Pipe;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.List;
 
-
 public class PipeOperator extends Operator {
 
-	public PipeOperator(Pipe pipe, Scope incomingScope, Scope outgoingScope, Operator inputOp) {
-		super(inputOp, incomingScope, outgoingScope);
-
-		// TODO: check if we can remove this!!
-//		setIncomingScope(inputOp.getOutgoingScope());
-//		Scope outgoing = pipe.outgoingScopeFor(Collections.singleton(getIncomingScope()));
-//		outgoing.setName(pipe.getName());
-//		setOutgoingScope(outgoing);
-
+	public PipeOperator(Pipe pipe, Operator inputOp, FlowElementGraph flowGraph) {
+		super(inputOp, pipe, flowGraph);
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	@Override
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputs, List<Operator> inputOps) {
 
 		return inputs.get(0);
 	}

@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
+import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
@@ -34,11 +35,14 @@ public class DataSink extends Operator {
 
 	private Tap tap;
 
-	public DataSink(Tap tap) {
+	public DataSink(Tap tap, Operator inputOp, FlowElementGraph flowGraph) {
+		super(inputOp, tap, flowGraph);
 		this.tap = tap;
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	@Override
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputs, List<Operator> inputOps) {
 
 		if(inputs.size() != 1) {
 			throw new RuntimeException("Each requires exactly one input");

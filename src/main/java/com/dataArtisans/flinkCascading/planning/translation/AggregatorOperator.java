@@ -19,108 +19,94 @@
 package com.dataArtisans.flinkCascading.planning.translation;
 
 import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
 import cascading.tuple.Fields;
+import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
 import com.dataArtisans.flinkCascading.exec.operators.KeyExtractor;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.tuple.Tuple3;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
 
 public class AggregatorOperator extends Operator {
 
 	private GroupBy groupBy;
 	private List<Every> aggregators;
 
-	private List<Scope> allIncoming;
-	private List<Scope> allOutgoing;
+	public AggregatorOperator(GroupBy groupBy, Every every, List<Operator> inputOps, FlowElementGraph flowGraph) {
 
-	public AggregatorOperator(GroupBy groupBy, Every every, List<Scope> incomingScopes, Scope groupByOutgoingScope,
-								Scope everyIncomingScope, Scope everyOutgoingScope, List<Operator> inputOps) {
-		super(inputOps, incomingScopes, groupByOutgoingScope);
+		super(inputOps, every, flowGraph);
 
 		this.groupBy = groupBy;
 		this.aggregators = new ArrayList<Every>();
 
-		allIncoming = new ArrayList<Scope>();
-		allIncoming.add(null);
-
-		allOutgoing = new ArrayList<Scope>();
-		allOutgoing.add(groupByOutgoingScope);
-
-		this.addAggregator(every, everyIncomingScope, everyOutgoingScope);
+		this.addAggregator(every);
 
 	}
 
-	public void addAggregator(Every every, Scope incomingScope, Scope outgoingScope) {
+	public void addAggregator(Every every) {
 
 		if(!every.isAggregator()) {
 			throw new RuntimeException("Every is not an aggregator");
 		}
 		this.aggregators.add(every);
 
-		// adapt and append outgoing scope
-		outgoing = outgoingScope;
-		allIncoming.add(incomingScope);
-		allOutgoing.add(outgoingScope);
-
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	@Override
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputSets, List<Operator> inputOps) {
 
-		// TODO: handle union
+		boolean first = true;
 
-		// build key extractor
-		Map<String, Fields> groupingKeys = groupBy.getKeySelectors();
-		Map<String, Fields> sortingKeys = groupBy.getSortingSelectors();
+		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
 
-		// TODO: remove this limitation
-		if(sortingKeys.size() > 0) {
-			throw new RuntimeException("Secondary Sort not yet supported");
+		for(int i=0; i<inputOps.size(); i++) {
+			Operator inOp = inputOps.get(i);
+			DataSet inSet = inputSets.get(i);
+
+			Fields groupByFields = groupBy.getKeySelectors().get(inOp.getOutgoingScope().getName());
+			Fields sortByFields = groupBy.getSortingSelectors().get(inOp.getOutgoingScope().getName());
+
+			// build key Extractor mapper
+			MapFunction keyExtractor = new KeyExtractor(
+					getIncomingScopeFor(groupBy).getOutValuesFields(),
+					groupByFields,
+					sortByFields);
+
+			if(first) {
+				mergedSets = inSet.map(keyExtractor).name("Key Extractor");
+				first = false;
+			} else {
+				mergedSets = mergedSets.union(inSet.map(keyExtractor).name("Key Extractor"));
+			}
 		}
-
-		// TODO: we need one key selector for each unioned input!
-		String incomingName = getIncomingScope().getName();
-		MapFunction keyExtractor = new KeyExtractor(
-				getIncomingScope().getOutValuesFields(),
-				groupBy.getKeySelectors().get("wc"),
-				groupBy.getSortingSelectors().get("wc"));
 
 		Every[] aggregatorsA = aggregators.toArray(new Every[aggregators.size()]);
 
 		Scope[] inA = new Scope[aggregators.size()];
 		for(int i=0; i<inA.length; i++) {
-			inA[i] = allIncoming.get(i+1);
+			inA[i] = this.getIncomingScopeFor(aggregatorsA[i]);
 		}
 
 		Scope[] outA = new Scope[aggregators.size()]; // these are the out scopes of all aggregators
 		for(int i=0; i<outA.length; i++) {
-			outA[i] = allOutgoing.get(i+1);
+			outA[i] = this.getOutgoingScopeFor(aggregatorsA[i]);
 		}
 		// build the group function
 		GroupReduceFunction aggregationReducer = new AggregatorsReducer(aggregatorsA, inA, outA);
-//		throw new RuntimeException("Implement AggregatorsReducer");
-//
-		return inputs.get(0)
-				.map(keyExtractor).name("KeyExtractor")
+
+		return mergedSets
 				.groupBy(0)
-				.reduceGroup(aggregationReducer).name("Aggregators"); // TODO set name
+				.reduceGroup(aggregationReducer).name("Aggregators");
 
-	}
-
-	private List<Scope> getOutgoingScopes(List<Operator> inputOps) {
-		List<Scope> scopes = new ArrayList<Scope>(inputOps.size());
-		for(Operator op : inputOps) {
-			scopes.add(op.getOutgoingScope());
-		}
-		return scopes;
 	}
 
 }

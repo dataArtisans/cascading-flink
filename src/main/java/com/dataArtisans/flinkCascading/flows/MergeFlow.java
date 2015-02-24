@@ -19,23 +19,37 @@
 package com.dataArtisans.flinkCascading.flows;
 
 import cascading.flow.FlowDef;
+import cascading.operation.aggregator.Count;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;
+import cascading.pipe.Every;
+import cascading.pipe.GroupBy;
+import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.tuple.Fields;
 
-public class TokenizeFlow {
+public class MergeFlow {
 
 	public static FlowDef getFlow() {
 
 		Fields token = new Fields( "token" );
 		Fields text = new Fields( "line" );
+
+		Pipe linePipe1 = new Pipe("line1");
+		Pipe linePipe2 = new Pipe("line2");
+
+		Merge mergedLines = new Merge("mergedLines", linePipe1, linePipe2);
+
 		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "[ \\[\\]\\(\\),.]" );
 		// only returns "token"
-		Pipe docPipe = new Each( "token", text, splitter, Fields.RESULTS );
+		Pipe docPipe = new Each( mergedLines, text, splitter, Fields.RESULTS );
+
+		Pipe wcPipe = new Pipe( "wc", docPipe );
+		wcPipe = new GroupBy( wcPipe, token );
+		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
 
 		FlowDef flowDef = FlowDef.flowDef().setName( "wc" )
-				.addTail( docPipe );
+				.addTail(wcPipe);
 
 		return flowDef;
 	}

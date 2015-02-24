@@ -22,7 +22,9 @@ import cascading.flow.FlowDef;
 import cascading.scheme.hadoop.TextLine;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
+import com.dataArtisans.flinkCascading.flows.MergeFlow;
 import com.dataArtisans.flinkCascading.flows.MultiAggregateFlow;
+import com.dataArtisans.flinkCascading.flows.MultiGroupByFlow;
 import com.dataArtisans.flinkCascading.flows.TokenizeFlow;
 import com.dataArtisans.flinkCascading.flows.WordCountFlow;
 import com.dataArtisans.flinkCascading.planning.FlinkConnector;
@@ -32,9 +34,11 @@ public class FlinkFlowRunner {
 
 	public static void main(String[] args) throws Exception {
 
-		FlowDef tokenizeFlow = TokenizeFlow.getTokenizeFlow();
-		FlowDef wcFlow = WordCountFlow.getWordCountFlow();
+		FlowDef tokenizeFlow = TokenizeFlow.getFlow();
+		FlowDef wcFlow = WordCountFlow.getFlow();
 		FlowDef aggFlow = MultiAggregateFlow.getFlow();
+		FlowDef mergeFlow = MergeFlow.getFlow();
+		FlowDef multiGroupByFlow = MultiGroupByFlow.getFlow();
 
 		FlowDef flow = aggFlow;
 
@@ -45,13 +49,18 @@ public class FlinkFlowRunner {
 
 	public static void runFlink(FlowDef flow) {
 
-		Tap docTap = new Hfs(new TextLine(), "file:///users/fhueske/Data/testFile");
+		Tap docTap1 = new Hfs(new TextLine(), "file:///users/fhueske/Data/testFile");
+		Tap docTap2 = new Hfs(new TextLine(), "file:///users/fhueske/Data/testFile2");
 		Tap wcTap = new Hfs(new TextLine(), "file:///users/fhueske/Data/wcResult");
 
 		flow
-			.addSource("token", docTap)
+			.addSource("token", docTap1)
 			.addSink("wc", wcTap);
 
+//		flow
+//				.addSource("line1", docTap1)
+//				.addSource("line2", docTap2)
+//				.addSink("wc", wcTap);
 
 		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
 		FlinkConnector fc = new FlinkConnector(env);
@@ -61,13 +70,16 @@ public class FlinkFlowRunner {
 
 	public static void runLocal(FlowDef flow) {
 
-		Tap docTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/Data/testFile");
+		Tap docTap1 = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/Data/testFile");
+		Tap docTap2 = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/Data/testFile2");
 		Tap wcTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), "/users/fhueske/Data/wcResult");
 
 		flow
-			.addSource( "token", docTap )
+			.addSource("token", docTap1)
 			.addSink("wc", wcTap);
-
+//				.addSource("line1", docTap1)
+//				.addSource("line2", docTap2)
+//				.addSink("wc", wcTap);
 
 		cascading.flow.local.LocalFlowConnector lfc = new cascading.flow.local.LocalFlowConnector();
 		lfc.connect(flow).complete();

@@ -18,20 +18,20 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
-import cascading.flow.planner.Scope;
+import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
 import cascading.tuple.Fields;
+import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading.exec.operators.KeyExtractor;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.tuple.Tuple3;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 
 public class BufferOperator extends Operator {
@@ -39,12 +39,8 @@ public class BufferOperator extends Operator {
 	private GroupBy groupBy;
 	private Every buffer;
 
-	private Scope bufferIncoming;
-	private Scope bufferOutgoing;
-
-	public BufferOperator(GroupBy groupBy, Every every, List<Scope> incomingScopes, Scope groupByOutgoingScope,
-							Scope everyIncomingScope, Scope everyOutgoingScope, List<Operator> inputOps) {
-		super(inputOps, incomingScopes, groupByOutgoingScope);
+	public BufferOperator(GroupBy groupBy, Every every, List<Operator> inputOps, FlowElementGraph flowGraph) {
+		super(inputOps, every, flowGraph);
 
 		if(!every.isBuffer()) {
 			throw new RuntimeException("Every is not a buffer");
@@ -53,46 +49,45 @@ public class BufferOperator extends Operator {
 		this.groupBy = groupBy;
 		this.buffer = every;
 
-		this.bufferIncoming = everyIncomingScope;
-		this.bufferOutgoing = everyOutgoingScope;
 	}
 
-	protected DataSet translateToFlink(ExecutionEnvironment env, List<DataSet> inputs) {
+	protected DataSet translateToFlink(ExecutionEnvironment env,
+										List<DataSet> inputSets, List<Operator> inputOps) {
 
-		// TODO: handle union
+		boolean first = true;
 
-		// build key extractor
-		Map<String, Fields> groupingKeys = groupBy.getKeySelectors();
-		Map<String, Fields> sortingKeys = groupBy.getSortingSelectors();
+		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
 
-		// TODO: remove this limitation
-		if(sortingKeys.size() > 0) {
-			throw new RuntimeException("Secondary Sort not yet supported");
+		for(int i=0; i<inputOps.size(); i++) {
+			Operator inOp = inputOps.get(i);
+			DataSet inSet = inputSets.get(i);
+
+			Fields groupByFields = groupBy.getKeySelectors().get(inOp.getOutgoingScope().getName());
+			Fields sortByFields = groupBy.getSortingSelectors().get(inOp.getOutgoingScope().getName());
+
+			// build key Extractor mapper
+			MapFunction keyExtractor = new KeyExtractor(
+					getIncomingScopeFor(groupBy).getOutValuesFields(),
+					groupByFields,
+					sortByFields);
+
+			if(first) {
+				mergedSets = inSet.map(keyExtractor).name("Key Extractor");
+				first = false;
+			} else {
+				mergedSets = mergedSets.union(inSet.map(keyExtractor).name("Key Extractor"));
+			}
 		}
-
-		// TODO: we need one key selector for each unioned input!
-		String incomingName = getIncomingScope().getName();
-		MapFunction keyExtractor = new KeyExtractor(
-				getIncomingScope().getOutValuesFields(),
-				groupBy.getKeySelectors().get("wc"),
-				groupBy.getSortingSelectors().get("wc"));
 
 		// build the group function
-		GroupReduceFunction bufferReducer = new BufferReducer(this.buffer, this.bufferIncoming, this.bufferOutgoing);
+		GroupReduceFunction bufferReducer =
+				new BufferReducer(this.buffer,
+						this.getIncomingScopeFor(buffer), this.getOutgoingScopeFor(buffer));
 
-				return inputs.get(0)
-				.map(keyExtractor).name("KeyExtractor")
-				.groupBy(0)
-				.reduceGroup(bufferReducer).name(buffer.getName());
+				return mergedSets
+							.groupBy(0)
+							.reduceGroup(bufferReducer).name(buffer.getName());
 
-	}
-
-	private List<Scope> getOutgoingScopes(List<Operator> inputOps) {
-		List<Scope> scopes = new ArrayList<Scope>(inputOps.size());
-		for(Operator op : inputOps) {
-			scopes.add(op.getOutgoingScope());
-		}
-		return scopes;
 	}
 
 }
