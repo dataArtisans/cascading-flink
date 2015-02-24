@@ -60,8 +60,8 @@ public class MultiAggregateFlow {
 //		wcPipe = new Each( wcPipe, num, new DoubleFunc(offset), Fields.ALL);
 		wcPipe = new Every( wcPipe, Fields.ALL, new Count(), Fields.ALL );
 		wcPipe = new Every( wcPipe, blubb, new Sum(num), Fields.ALL );
-		wcPipe = new Each( wcPipe, token, new TokenFilter());
-		wcPipe = new GroupBy( wcPipe, cnt);
+//		wcPipe = new Each( wcPipe, token, new TokenFilter());
+		wcPipe = new GroupBy( wcPipe, cnt, token);
 		wcPipe = new Every( wcPipe, cnt, new FirstNBuffer(2), Fields.REPLACE);
 
 		return FlowDef.flowDef().setName( "wc" )

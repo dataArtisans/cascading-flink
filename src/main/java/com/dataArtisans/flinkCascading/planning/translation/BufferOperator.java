@@ -27,6 +27,7 @@ import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading.exec.operators.KeyExtractor;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -55,6 +56,7 @@ public class BufferOperator extends Operator {
 										List<DataSet> inputSets, List<Operator> inputOps) {
 
 		boolean first = true;
+		boolean secondarySort = false;
 
 		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
 
@@ -64,10 +66,15 @@ public class BufferOperator extends Operator {
 
 			Fields groupByFields = groupBy.getKeySelectors().get(inOp.getOutgoingScope().getName());
 			Fields sortByFields = groupBy.getSortingSelectors().get(inOp.getOutgoingScope().getName());
+			Fields incomingFields = getIncomingScopeFor(groupBy).getOutGroupingFields();
+
+			if(sortByFields != null) {
+				secondarySort = true;
+			}
 
 			// build key Extractor mapper
 			MapFunction keyExtractor = new KeyExtractor(
-					getIncomingScopeFor(groupBy).getOutValuesFields(),
+					incomingFields,
 					groupByFields,
 					sortByFields);
 
@@ -84,10 +91,15 @@ public class BufferOperator extends Operator {
 				new BufferReducer(this.buffer,
 						this.getIncomingScopeFor(buffer), this.getOutgoingScopeFor(buffer));
 
-				return mergedSets
-							.groupBy(0)
-							.reduceGroup(bufferReducer).name(buffer.getName());
-
+		if(secondarySort) {
+			return 	mergedSets
+					.groupBy(0).sortGroup(1, Order.ASCENDING)
+					.reduceGroup(bufferReducer).name(buffer.getName());
+		} else {
+			return mergedSets
+					.groupBy(0)
+					.reduceGroup(bufferReducer).name(buffer.getName());
+		}
 	}
 
 }
