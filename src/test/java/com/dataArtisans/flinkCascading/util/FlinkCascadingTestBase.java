@@ -219,7 +219,7 @@ public abstract class FlinkCascadingTestBase {
 		File file = new File(path);
 		BufferedReader br = new BufferedReader(new FileReader(file));
 
-		while(!br.ready()) {
+		while(br.ready()) {
 			lines.add(br.readLine());
 		}
 

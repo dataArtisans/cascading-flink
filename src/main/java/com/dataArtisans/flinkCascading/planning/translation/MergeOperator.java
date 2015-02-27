@@ -28,7 +28,7 @@ import java.util.List;
 public class MergeOperator extends Operator {
 
 	public MergeOperator(Merge merge, List<Operator> inputOps, FlowElementGraph flowGraph) {
-		super(inputOps, merge, flowGraph);
+		super(inputOps, merge, merge, flowGraph);
 	}
 
 	@Override

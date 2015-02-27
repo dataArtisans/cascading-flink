@@ -32,23 +32,33 @@ public class EachOperator extends Operator {
 	private Each each;
 
 	public EachOperator(Each each, Operator inputOp, FlowElementGraph flowGraph) {
-		super(inputOp, each, flowGraph);
+		super(inputOp, each, each, flowGraph);
 		this.each = each;
 	}
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputs, List<Operator> inputOps) {
+										List<DataSet> inputSets, List<Operator> inputOps) {
+
+		if(inputOps.size() != 1) {
+			throw new IllegalArgumentException("Not exactly one input operator");
+		}
+		if(inputSets.size() != 1) {
+			throw new IllegalArgumentException("Not exactly one input set");
+		}
+
+		Operator inputOp = inputOps.get(0);
+		DataSet inputSet = inputSets.get(0);
 
 		// get map function
 		if(this.each.isFunction()) {
-			return inputs.get(0)
-					.mapPartition(new EachFunctionMapper(each, getIncomingScopeFor(each), getOutgoingScopeFor(each)))
+			return inputSet
+					.mapPartition(new EachFunctionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
 					.name(each.getName());
 		}
 		else if (this.each.isFilter()) {
-			return inputs.get(0)
-					.filter(new EachFilter(each, getIncomingScopeFor(each), getOutgoingScopeFor(each)))
+			return inputSet
+					.filter(new EachFilter(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
 					.name(each.getName());
 		}
 		else if (this.each.isValueAssertion()) {

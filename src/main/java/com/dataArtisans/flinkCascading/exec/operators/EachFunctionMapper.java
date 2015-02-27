@@ -28,6 +28,7 @@ import cascading.tuple.TupleEntry;
 import cascading.tuple.util.TupleBuilder;
 import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;

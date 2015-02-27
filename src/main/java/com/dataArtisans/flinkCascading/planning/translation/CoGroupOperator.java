@@ -20,12 +20,11 @@ package com.dataArtisans.flinkCascading.planning.translation;
 
 import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
-import cascading.pipe.Every;
-import cascading.pipe.GroupBy;
+import cascading.pipe.CoGroup;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
-import com.dataArtisans.flinkCascading.exec.operators.GroupByKeyExtractor;
+import com.dataArtisans.flinkCascading.exec.operators.CoGroupKeyExtractor;
+import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
@@ -35,74 +34,65 @@ import org.apache.flink.api.java.tuple.Tuple3;
 
 import java.util.List;
 
+public class CoGroupOperator extends Operator {
 
-public class BufferOperator extends Operator {
+	private CoGroup coGroup;
 
-	private GroupBy groupBy;
-	private Every buffer;
+	public CoGroupOperator(CoGroup coGroup, List<Operator> inputOps, FlowElementGraph flowGraph) {
+		super(inputOps, coGroup, coGroup, flowGraph);
 
-	public BufferOperator(GroupBy groupBy, Every every, List<Operator> inputOps, FlowElementGraph flowGraph) {
-		super(inputOps, groupBy, every, flowGraph);
-
-		if(!every.isBuffer()) {
-			throw new RuntimeException("Every is not a buffer");
-		}
-
-		this.groupBy = groupBy;
-		this.buffer = every;
-
+		this.coGroup = coGroup;
 	}
 
+	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
 										List<DataSet> inputSets, List<Operator> inputOps) {
 
-		boolean first = true;
-		boolean secondarySort = false;
+		if(inputOps.size() <= 1) {
+			throw new RuntimeException("CoGroup requires at least two inputs");
+		}
 
-		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
+		boolean first = true;
+
+		DataSet<Tuple3<Tuple, Integer, Tuple>> mergedSets = null;
+		Scope[] incomingScopes = new Scope[inputOps.size()];
 
 		for(int i=0; i<inputOps.size(); i++) {
 			Operator inOp = inputOps.get(i);
 			DataSet inSet = inputSets.get(i);
 
-			Scope incomingScope = getIncomingScopeFrom(inOp);
+			Scope incomingScope = this.getIncomingScopeFrom(inOp);
+			incomingScopes[i] = incomingScope;
 
-			Fields groupByFields = groupBy.getKeySelectors().get(incomingScope.getName());
-			Fields sortByFields = groupBy.getSortingSelectors().get(incomingScope.getName());
+			Fields groupByFields = coGroup.getKeySelectors().get(incomingScope.getName());
 			Fields incomingFields = incomingScope.getOutGroupingFields();
 
-			if(sortByFields != null) {
-				secondarySort = true;
-			}
-
 			// build key Extractor mapper
-			MapFunction keyExtractor = new GroupByKeyExtractor(
+			MapFunction keyExtractor = new CoGroupKeyExtractor(
 					incomingFields,
 					groupByFields,
-					sortByFields);
+					i);
+
+			// TODO: n-ary inner joins -> cascade of binary join operators
+			// TODO: n-ary outer joins -> cascade of binary co-group operators
 
 			if(first) {
-				mergedSets = inSet.map(keyExtractor).name("Key Extractor");
+				mergedSets = inSet.map(keyExtractor).name("CoGroup Key Extractor");
 				first = false;
 			} else {
-				mergedSets = mergedSets.union(inSet.map(keyExtractor).name("Key Extractor"));
+				mergedSets = mergedSets.union(inSet.map(keyExtractor).name("CoGroup Key Extractor"));
 			}
 		}
 
-		// build the group function
-		GroupReduceFunction bufferReducer =
-				new BufferReducer(this.buffer,
-						this.getScopeBetween(groupBy, buffer), this.getOutgoingScope());
+		GroupReduceFunction coGroupReducer = new CoGroupReducer(coGroup, incomingScopes, getOutgoingScope());
 
-		if(secondarySort) {
-			return 	mergedSets
-					.groupBy(0).sortGroup(1, Order.ASCENDING)
-					.reduceGroup(bufferReducer).name(buffer.getName());
-		} else {
-			return mergedSets
-					.groupBy(0)
-					.reduceGroup(bufferReducer).name(buffer.getName());
-		}
+		return mergedSets
+				.groupBy(0)
+				.sortGroup(1, Order.DESCENDING)
+				.reduceGroup(coGroupReducer).name("CoGroup Joiner");
+
+
 	}
+
 
 }

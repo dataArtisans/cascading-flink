@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.operators;
+package com.dataArtisans.flinkCascading.exec;
 
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;

@@ -16,18 +16,20 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.operators;
+package com.dataArtisans.flinkCascading.exec;
 
 import cascading.pipe.Operator;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
+import cascading.tuple.Tuples;
 import cascading.tuple.util.TupleBuilder;
 import cascading.tuple.util.TupleViews;
 
-import static cascading.tuple.util.TupleViews.createComposite;
 import static cascading.tuple.util.TupleViews.createNarrow;
+import static cascading.tuple.util.TupleViews.createComposite;
 import static cascading.tuple.util.TupleViews.createOverride;
+import static cascading.tuple.util.TupleViews.reset;
 
 public class TupleBuilderBuilder {
 
@@ -187,6 +189,95 @@ public class TupleBuilderBuilder {
 				TupleViews.reset( appended, input, output );
 
 				return result;
+			}
+		};
+	}
+
+	public static TupleBuilder createNarrowBuilder( final Fields incomingFields, final Fields narrowFields )
+	{
+		if( narrowFields.isNone() ) {
+			return new TupleBuilder() {
+				@Override
+				public Tuple makeResult(Tuple input, Tuple output) {
+					return Tuple.NULL;
+				}
+			};
+		}
+
+		if( incomingFields.isUnknown() ) {
+			return new TupleBuilder() {
+				@Override
+				public Tuple makeResult(Tuple input, Tuple output) {
+					return input.get(incomingFields, narrowFields);
+				}
+			};
+		}
+
+		if( narrowFields.isAll() ) { // dubious this is ever reached
+			return new TupleBuilder() {
+				@Override
+				public Tuple makeResult(Tuple input, Tuple output) {
+					return input;
+				}
+			};
+		}
+
+		return createDefaultNarrowBuilder( incomingFields, narrowFields );
+	}
+
+	private static TupleBuilder createDefaultNarrowBuilder( final Fields incomingFields, final Fields narrowFields )
+	{
+		return new TupleBuilder()
+		{
+			Tuple result = createNarrow( incomingFields.getPos( narrowFields ) );
+
+			@Override
+			public Tuple makeResult( Tuple input, Tuple output )
+			{
+				return reset( result, input );
+			}
+		};
+	}
+
+	public static TupleBuilder createNulledBuilder( final Fields incomingFields, final Fields keyField )
+	{
+		if( incomingFields.isUnknown() ) {
+			return new TupleBuilder() {
+				@Override
+				public Tuple makeResult(Tuple input, Tuple output) {
+					return Tuples.nulledCopy(incomingFields, input, keyField);
+				}
+			};
+		}
+
+		if( keyField.isNone() ) {
+			return new TupleBuilder() {
+				@Override
+				public Tuple makeResult(Tuple input, Tuple output) {
+					return input;
+				}
+			};
+		}
+
+		if( keyField.isAll() ) {
+			return new TupleBuilder() {
+				Tuple nullTuple = Tuple.size(incomingFields.size());
+
+				@Override
+				public Tuple makeResult(Tuple input, Tuple output) {
+					return nullTuple;
+				}
+			};
+		}
+
+		return new TupleBuilder()
+		{
+			Tuple nullTuple = Tuple.size( keyField.size() );
+			Tuple result = createOverride( incomingFields, keyField );
+
+			@Override
+			public Tuple makeResult( Tuple baseTuple, Tuple output ) {
+				return reset( result, baseTuple, nullTuple );
 			}
 		};
 	}

@@ -16,27 +16,34 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.planning.translation;
+package com.dataArtisans.flinkCascading.exec;
 
-import cascading.flow.planner.graph.FlowElementGraph;
-import cascading.pipe.Pipe;
-import org.apache.flink.api.java.DataSet;
-import org.apache.flink.api.java.ExecutionEnvironment;
+import cascading.tuple.Tuple;
+import org.apache.flink.api.java.tuple.Tuple3;
 
-import java.util.List;
+import java.util.Iterator;
 
-public class PipeOperator extends Operator {
+public class FlinkUnwrappingIterator<F1, F2> implements Iterator<Tuple> {
 
-	public PipeOperator(Pipe pipe, Operator inputOp, FlowElementGraph flowGraph) {
-		super(inputOp, pipe, pipe, flowGraph);
+	private Iterator<Tuple3<F1, F2, Tuple>> flinkIterator;
+
+
+	public FlinkUnwrappingIterator(Iterable<Tuple3<F1, F2, Tuple>> vals) {
+		this(vals.iterator());
+	}
+
+	public FlinkUnwrappingIterator(Iterator<Tuple3<F1, F2, Tuple>> vals) {
+		this.flinkIterator = vals;
 	}
 
 	@Override
-	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputs, List<Operator> inputOps) {
-
-		return inputs.get(0);
+	public boolean hasNext() {
+		return flinkIterator.hasNext();
 	}
 
+	@Override
+	public Tuple next() {
 
+		return flinkIterator.next().f2;
+	}
 }

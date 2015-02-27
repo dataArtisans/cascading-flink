@@ -36,7 +36,7 @@ public class DataSource extends Operator {
 	private Tap tap;
 
 	public DataSource(Tap tap, FlowElementGraph flowGraph) {
-		super(Collections.EMPTY_LIST, tap, flowGraph);
+		super(Collections.EMPTY_LIST, tap, tap, flowGraph);
 		this.tap = tap;
 
 	}

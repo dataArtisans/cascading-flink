@@ -31,26 +31,29 @@ import java.util.Set;
 
 public abstract class Operator {
 
-	private List<Operator> inputOps;
-	private FlowElement lastCOp;
-	private FlowElementGraph flowGraph;
+	private final List<Operator> inputOps;
+	private final FlowElement inPipe;
+	private FlowElement outPipe;
+	private final FlowElementGraph flowGraph;
 
 	private DataSet memo = null;
 
-	public Operator(Operator inputOp, FlowElement lastCOp, FlowElementGraph flowGraph) {
 
-		this(Collections.singletonList(inputOp), lastCOp, flowGraph);
+	public Operator(Operator inputOp, FlowElement inPipe, FlowElement outPipe, FlowElementGraph flowGraph) {
+
+		this(Collections.singletonList(inputOp), inPipe, outPipe, flowGraph);
 	}
 
-	public Operator(List<Operator> inputOps, FlowElement lastCOp, FlowElementGraph flowGraph) {
+	public Operator(List<Operator> inputOps, FlowElement inPipe, FlowElement outPipe, FlowElementGraph flowGraph) {
 
 		this.inputOps = inputOps;
-		this.lastCOp = lastCOp;
+		this.inPipe = inPipe;
+		this.outPipe = outPipe;
 		this.flowGraph = flowGraph;
 	}
 
-	protected void setLastCascadingOp(FlowElement lastCOp) {
-		this.lastCOp = lastCOp;
+	protected void setOutgoingPipe(FlowElement outPipe) {
+		this.outPipe = outPipe;
 	}
 
 	public DataSet getFlinkOperator(ExecutionEnvironment env) {
@@ -75,40 +78,61 @@ public abstract class Operator {
 	protected abstract DataSet translateToFlink(ExecutionEnvironment env,
 												List<DataSet> inputs, List<Operator> inputOps);
 
-	protected Scope getOutgoingScope() {
-		return getOutgoingScopeFor(this.lastCOp);
+//	protected Scope getOutgoingScope() {
+//		return getOutgoingScopeFor(this.outPipe);
+//	}
+
+//	protected Scope getOutgoingScopeFor(FlowElement e) {
+//		Set<Scope> outScopes = this.flowGraph.outgoingEdgesOf(e);
+//		if(outScopes.size() < 0) {
+//			throw new RuntimeException(this.outPipe +" has no outgoing scope");
+//		}
+//		else if(outScopes.size() > 1) {
+//			throw new RuntimeException(this.outPipe +" has more than one outgoing scope");
+//		}
+//
+//		return outScopes.iterator().next();
+//	}
+
+//	protected Scope getIncomingScopeFor(FlowElement e) {
+//		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
+//		if(inScopes.size() < 0) {
+//			throw new RuntimeException(this.outPipe +" has no outgoing scope");
+//		}
+//		else if(inScopes.size() > 1) {
+//			throw new RuntimeException(this.outPipe +" has more than one outgoing scope");
+//		}
+//
+//		return inScopes.iterator().next();
+//	}
+//
+//	protected Scope getAnyIncomingScopeFor(FlowElement e) {
+//		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
+//		if(inScopes.size() < 0) {
+//			throw new RuntimeException(this.outPipe +" has no outgoing scope");
+//		}
+//
+//		return inScopes.iterator().next();
+//	}
+
+	protected Scope getIncomingScopeFrom(Operator op) {
+		return this.flowGraph.getEdge(op.outPipe, this.inPipe);
 	}
 
-	protected Scope getOutgoingScopeFor(FlowElement e) {
-		Set<Scope> outScopes = this.flowGraph.outgoingEdgesOf(e);
-		if(outScopes.size() < 0) {
-			throw new RuntimeException(this.lastCOp+" has no outgoing scope");
-		}
-		else if(outScopes.size() > 1) {
-			throw new RuntimeException(this.lastCOp+" has more than one outgoing scope");
+	protected Scope getOutgoingScopeTo(Operator op) {
+		return this.flowGraph.getEdge(this.outPipe, op.inPipe);
+	}
+
+	protected Scope getScopeBetween(FlowElement source, FlowElement sink) {
+		return this.flowGraph.getEdge(source, sink);
+	}
+
+	protected Scope getOutgoingScope() {
+		Set<Scope> outScopes = this.flowGraph.outgoingEdgesOf(this.outPipe);
+		if(outScopes.size() != 1) {
+			throw new RuntimeException("Not exactly one outgoing scope");
 		}
 
 		return outScopes.iterator().next();
-	}
-
-	protected Scope getIncomingScopeFor(FlowElement e) {
-		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
-		if(inScopes.size() < 0) {
-			throw new RuntimeException(this.lastCOp+" has no outgoing scope");
-		}
-		else if(inScopes.size() > 1) {
-			throw new RuntimeException(this.lastCOp+" has more than one outgoing scope");
-		}
-
-		return inScopes.iterator().next();
-	}
-
-	protected Scope getAnyIncomingScopeFor(FlowElement e) {
-		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
-		if(inScopes.size() < 0) {
-			throw new RuntimeException(this.lastCOp+" has no outgoing scope");
-		}
-
-		return inScopes.iterator().next();
 	}
 }

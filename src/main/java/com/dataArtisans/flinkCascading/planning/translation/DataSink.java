@@ -34,7 +34,7 @@ public class DataSink extends Operator {
 	private Tap tap;
 
 	public DataSink(Tap tap, Operator inputOp, FlowElementGraph flowGraph) {
-		super(inputOp, tap, flowGraph);
+		super(inputOp, tap, tap, flowGraph);
 		this.tap = tap;
 	}
 

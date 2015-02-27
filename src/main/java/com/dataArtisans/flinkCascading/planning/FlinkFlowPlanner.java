@@ -29,6 +29,7 @@ import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.flow.planner.rule.RuleRegistrySet;
+import cascading.pipe.CoGroup;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
@@ -39,6 +40,7 @@ import cascading.tap.hadoop.Hfs;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
 import com.dataArtisans.flinkCascading.planning.translation.AggregatorOperator;
 import com.dataArtisans.flinkCascading.planning.translation.BufferOperator;
+import com.dataArtisans.flinkCascading.planning.translation.CoGroupOperator;
 import com.dataArtisans.flinkCascading.planning.translation.DataSource;
 import com.dataArtisans.flinkCascading.planning.translation.EachOperator;
 import com.dataArtisans.flinkCascading.planning.translation.MergeOperator;
@@ -211,6 +213,14 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 				MergeOperator mergeOp = new MergeOperator(merge, inOps, flowGraph);
 				memo.put(merge, mergeOp);
+			}
+			else if (e instanceof CoGroup) {
+
+				CoGroup coGroup = (CoGroup) e;
+				List<Operator> inOps = getInputOps(coGroup, flowGraph, memo);
+
+				CoGroupOperator coGroupOp = new CoGroupOperator(coGroup, inOps, flowGraph);
+				memo.put(coGroup, coGroupOp);
 			}
 			else if (e instanceof Pipe) {
 				// must stay last because it is super-class

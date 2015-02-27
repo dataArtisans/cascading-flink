@@ -25,7 +25,7 @@ import cascading.pipe.GroupBy;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
-import com.dataArtisans.flinkCascading.exec.operators.KeyExtractor;
+import com.dataArtisans.flinkCascading.exec.operators.GroupByKeyExtractor;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
@@ -43,7 +43,7 @@ public class AggregatorOperator extends Operator {
 
 	public AggregatorOperator(GroupBy groupBy, Every every, List<Operator> inputOps, FlowElementGraph flowGraph) {
 
-		super(inputOps, every, flowGraph);
+		super(inputOps, groupBy, every, flowGraph);
 
 		this.groupBy = groupBy;
 		this.aggregators = new ArrayList<Every>();
@@ -58,7 +58,7 @@ public class AggregatorOperator extends Operator {
 			throw new RuntimeException("Every is not an aggregator");
 		}
 		this.aggregators.add(every);
-
+		this.setOutgoingPipe(every);
 	}
 
 	@Override
@@ -74,16 +74,18 @@ public class AggregatorOperator extends Operator {
 			Operator inOp = inputOps.get(i);
 			DataSet inSet = inputSets.get(i);
 
-			Fields groupByFields = groupBy.getKeySelectors().get(inOp.getOutgoingScope().getName());
-			Fields sortByFields = groupBy.getSortingSelectors().get(inOp.getOutgoingScope().getName());
-			Fields incomingFields = getAnyIncomingScopeFor(groupBy).getOutGroupingFields();
+			Scope incomingScope = getIncomingScopeFrom(inOp);
+
+			Fields groupByFields = groupBy.getKeySelectors().get(incomingScope.getName());
+			Fields sortByFields = groupBy.getSortingSelectors().get(incomingScope.getName());
+			Fields incomingFields = incomingScope.getOutGroupingFields();
 
 			if(sortByFields != null) {
 				secondarySort = true;
 			}
 
 			// build key Extractor mapper
-			MapFunction keyExtractor = new KeyExtractor(
+			MapFunction keyExtractor = new GroupByKeyExtractor(
 					incomingFields,
 					groupByFields,
 					sortByFields);
@@ -99,14 +101,17 @@ public class AggregatorOperator extends Operator {
 		Every[] aggregatorsA = aggregators.toArray(new Every[aggregators.size()]);
 
 		Scope[] inA = new Scope[aggregators.size()];
-		for(int i=0; i<inA.length; i++) {
-			inA[i] = this.getIncomingScopeFor(aggregatorsA[i]);
+		inA[0] = this.getScopeBetween(groupBy, aggregatorsA[0]);
+		for(int i=1; i<inA.length; i++) {
+			inA[i] = this.getScopeBetween(aggregatorsA[i-1],aggregatorsA[i]);
 		}
 
 		Scope[] outA = new Scope[aggregators.size()]; // these are the out scopes of all aggregators
-		for(int i=0; i<outA.length; i++) {
-			outA[i] = this.getOutgoingScopeFor(aggregatorsA[i]);
+		for(int i=0; i<outA.length-1; i++) {
+			outA[i] = this.getScopeBetween(aggregatorsA[i], aggregatorsA[i+1]);
 		}
+		outA[outA.length-1] = this.getOutgoingScope();
+
 		// build the group function
 		GroupReduceFunction aggregationReducer = new AggregatorsReducer(aggregatorsA, inA, outA);
 

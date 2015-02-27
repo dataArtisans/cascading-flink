@@ -29,6 +29,7 @@ import cascading.tuple.util.TupleBuilder;
 import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.PassOnCollector;
+import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderCollector;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple3;

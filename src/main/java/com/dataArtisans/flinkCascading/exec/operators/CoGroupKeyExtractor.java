@@ -24,44 +24,37 @@ import cascading.tuple.util.TupleBuilder;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 
-public class KeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, Tuple, Tuple>> {
+public class CoGroupKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
 
 	private Fields inputFields;
 	private Fields groupingKeys;
-	private Fields sortingKeys;
+	private int inputId;
 
 	private transient TupleBuilder groupKeyBuilder;
-	private transient TupleBuilder sortKeyBuilder;
-	private Tuple3<Tuple, Tuple, Tuple> outT;
+	private Tuple3<Tuple, Integer, Tuple> outT;
 
-	public KeyExtractor() {}
+	public CoGroupKeyExtractor() {}
 
-	public KeyExtractor(Fields inputFields, Fields groupingKeys, Fields sortingKeys) {
+	public CoGroupKeyExtractor(Fields inputFields, Fields groupingKeys, int inputId) {
 		this.inputFields = inputFields;
 		this.groupingKeys = groupingKeys;
-		this.sortingKeys = sortingKeys;
+		this.inputId = inputId;
 	}
 
 	@Override
 	public void open(org.apache.flink.configuration.Configuration parameters) throws Exception {
 
 		this.groupKeyBuilder = getTupleBuilder(inputFields, groupingKeys);
-		if(sortingKeys != null) {
-			this.sortKeyBuilder = getTupleBuilder(inputFields, sortingKeys);
-		}
-		else {
-			this.sortKeyBuilder = getNullTupleBuilder();
-		}
 
-		outT = new Tuple3<Tuple, Tuple, Tuple>();
+		outT = new Tuple3<Tuple, Integer, Tuple>();
+		outT.f1 = inputId;
 
 	}
 
 	@Override
-	public Tuple3<Tuple, Tuple, Tuple> map(Tuple inT) throws Exception {
+	public Tuple3<Tuple, Integer, Tuple> map(Tuple inT) throws Exception {
 
 		outT.f0 = this.groupKeyBuilder.makeResult(inT, null);
-		outT.f1 = this.sortKeyBuilder.makeResult(inT, null);
 		outT.f2 = inT;
 
 		return outT;
