@@ -38,8 +38,7 @@ import cascading.pipe.Pipe;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
-import com.dataArtisans.flinkCascading.planning.translation.AggregatorOperator;
-import com.dataArtisans.flinkCascading.planning.translation.BufferOperator;
+import com.dataArtisans.flinkCascading.planning.translation.GroupByOperator;
 import com.dataArtisans.flinkCascading.planning.translation.CoGroupOperator;
 import com.dataArtisans.flinkCascading.planning.translation.DataSource;
 import com.dataArtisans.flinkCascading.planning.translation.EachOperator;
@@ -143,66 +142,36 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				Operator inOp = getInputOp(each, flowGraph, memo);
 
 				EachOperator eachOp = new EachOperator(each, inOp, flowGraph );
-
 				memo.put(e, eachOp);
 			}
 			else if (e instanceof GroupBy) {
+
 				GroupBy groupBy = (GroupBy) e;
 				List<Operator> inOps = getInputOps(groupBy, flowGraph, memo);
 
-				FlowElement groupOperation = it.next();
-
-				if(groupOperation instanceof Every) {
-
-					Every every = (Every)groupOperation;
-
-					if(every.isAggregator()) {
-
-						AggregatorOperator aggOp = new AggregatorOperator(groupBy, every, inOps, flowGraph);
-						memo.put(every, aggOp);
-					}
-					else if(every.isBuffer()) {
-
-						BufferOperator bufOp = new BufferOperator(groupBy, every, inOps, flowGraph);
-						memo.put(every, bufOp);
-					}
-					else if(every.isGroupAssertion()) {
-						throw new RuntimeException("GroupAssertion not yet supported");
-					}
-					else {
-						throw new RuntimeException("Unknown Every type");
-					}
-
-				}
-
+				GroupByOperator groupByOp = new GroupByOperator(groupBy, inOps, flowGraph);
+				memo.put(groupBy, groupByOp);
 			}
 			else if (e instanceof Every) {
 				Every every = (Every) e;
 
-				if(every.isAggregator()) {
-					// check if we can append to existing aggregation
+				List<Operator> inputOps = getInputOps(every, flowGraph, memo);
+				if(inputOps.size() != 1) {
+					throw new RuntimeException("Every accepts only a single input.");
+				}
+				Operator inputOp = inputOps.get(0);
 
-					List<Operator> inputOps = getInputOps(every, flowGraph, memo);
-					if(inputOps.size() != 1) {
-						throw new RuntimeException("Every accepts only a single input.");
-					}
-					Operator inputOp = inputOps.get(0);
-					if(!(inputOp instanceof AggregatorOperator)) {
-						// TODO: can also be a Every after a CoGroup...
-						throw new RuntimeException("Aggregation Every can only be appended to other Aggregations");
-					}
-					((AggregatorOperator) inputOp).addAggregator(every);
+				if(inputOp instanceof GroupByOperator) {
 
+					((GroupByOperator) inputOp).addEvery(every);
 					// add to memo
 					memo.put(every, inputOp);
-
 				}
-				else if(every.isBuffer()) {
-					throw new RuntimeException("Buffer without grouping not possible");
-					// TODO: check for CoGroup...
+				else if(inputOp instanceof CoGroupOperator) {
+					throw new RuntimeException("Every on CoGroup not supported yet");
 				}
 				else {
-					throw new RuntimeException("Can not handle abandoned Every.");
+					throw new RuntimeException("Every can only be chained to GroupBy or CoGroup");
 				}
 
 			}

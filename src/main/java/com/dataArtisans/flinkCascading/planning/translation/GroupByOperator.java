@@ -25,7 +25,9 @@ import cascading.pipe.GroupBy;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
+import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading.exec.operators.GroupByKeyExtractor;
+import com.dataArtisans.flinkCascading.exec.operators.IdentityReducer;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
@@ -36,28 +38,39 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AggregatorOperator extends Operator {
+public class GroupByOperator extends Operator {
 
 	private GroupBy groupBy;
-	private List<Every> aggregators;
+	private List<Every> everies;
 
-	public AggregatorOperator(GroupBy groupBy, Every every, List<Operator> inputOps, FlowElementGraph flowGraph) {
+	public GroupByOperator(GroupBy groupBy, List<Operator> inputOps, FlowElementGraph flowGraph) {
 
-		super(inputOps, groupBy, every, flowGraph);
+		super(inputOps, groupBy, groupBy, flowGraph);
 
 		this.groupBy = groupBy;
-		this.aggregators = new ArrayList<Every>();
-
-		this.addAggregator(every);
+		this.everies = new ArrayList<Every>();
 
 	}
 
-	public void addAggregator(Every every) {
+	public void addEvery(Every every) {
 
-		if(!every.isAggregator()) {
-			throw new RuntimeException("Every is not an aggregator");
+		if(every.isGroupAssertion()) {
+			throw new RuntimeException("GroupAssertion not supported yet.");
 		}
-		this.aggregators.add(every);
+
+		if(everies.size() > 0) {
+			if(everies.get(0).isBuffer()) {
+				throw new RuntimeException("GroupBy already closed by Buffer.");
+			}
+			else if(everies.get(0).isGroupAssertion()) {
+				throw new RuntimeException("GroupBy already closed by GroupAssertion.");
+			}
+			else if(everies.get(0).isAggregator() && !every.isAggregator()) {
+				throw new RuntimeException("Only Aggregator may be added to a GroupBy with Aggregators.");
+			}
+		}
+
+		this.everies.add(every);
 		this.setOutgoingPipe(every);
 	}
 
@@ -98,34 +111,49 @@ public class AggregatorOperator extends Operator {
 			}
 		}
 
-		Every[] aggregatorsA = aggregators.toArray(new Every[aggregators.size()]);
+		GroupReduceFunction reduceFunction = null;
 
-		Scope[] inA = new Scope[aggregators.size()];
-		inA[0] = this.getScopeBetween(groupBy, aggregatorsA[0]);
-		for(int i=1; i<inA.length; i++) {
-			inA[i] = this.getScopeBetween(aggregatorsA[i-1],aggregatorsA[i]);
+		if(everies.size() == 0) {
+			// use identity reducer
+			reduceFunction = new IdentityReducer();
 		}
+		else if(everies.get(0).isAggregator()) {
 
-		Scope[] outA = new Scope[aggregators.size()]; // these are the out scopes of all aggregators
-		for(int i=0; i<outA.length-1; i++) {
-			outA[i] = this.getScopeBetween(aggregatorsA[i], aggregatorsA[i+1]);
+			Every[] aggregatorsA = everies.toArray(new Every[everies.size()]);
+
+			Scope[] inA = new Scope[everies.size()];
+			inA[0] = this.getScopeBetween(groupBy, aggregatorsA[0]);
+			for (int i = 1; i < inA.length; i++) {
+				inA[i] = this.getScopeBetween(aggregatorsA[i - 1], aggregatorsA[i]);
+			}
+
+			Scope[] outA = new Scope[everies.size()]; // these are the out scopes of all aggregators
+			for (int i = 0; i < outA.length - 1; i++) {
+				outA[i] = this.getScopeBetween(aggregatorsA[i], aggregatorsA[i + 1]);
+			}
+			outA[outA.length - 1] = this.getOutgoingScope();
+
+			// build the group function
+			reduceFunction = new AggregatorsReducer(aggregatorsA, inA, outA);
 		}
-		outA[outA.length-1] = this.getOutgoingScope();
+		else if(everies.get(0).isBuffer()) {
+			Every buffer = everies.get(0);
 
-		// build the group function
-		GroupReduceFunction aggregationReducer = new AggregatorsReducer(aggregatorsA, inA, outA);
+			reduceFunction = new BufferReducer(buffer,
+							this.getScopeBetween(groupBy, buffer), this.getOutgoingScope());
+		}
 
 		if(secondarySort) {
 			return mergedSets
 					.groupBy(0)
 					.sortGroup(1, Order.ASCENDING)
-					.reduceGroup(aggregationReducer).name("Aggregators");
+					.reduceGroup(reduceFunction).name("GroupBy "+groupBy.getName());
 
 		} else {
 
 			return mergedSets
 					.groupBy(0)
-					.reduceGroup(aggregationReducer).name("Aggregators");
+					.reduceGroup(reduceFunction).name("GroupBy "+groupBy.getName());
 		}
 	}
 
