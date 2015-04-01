@@ -25,16 +25,27 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
+import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 
 import java.util.List;
 
 public class CoGroupOperator extends Operator {
+
+	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
+
+	TypeInformation<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>> groupingSortingType =
+			new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>>(
+					tupleType, BasicTypeInfo.INT_TYPE_INFO, tupleType
+			);
 
 	private CoGroup coGroup;
 
@@ -77,10 +88,16 @@ public class CoGroupOperator extends Operator {
 			// TODO: n-ary outer joins -> cascade of binary co-group operators
 
 			if(first) {
-				mergedSets = inSet.map(keyExtractor).name("CoGroup Key Extractor");
+				mergedSets = inSet
+						.map(keyExtractor)
+						.returns(groupingSortingType)
+						.name("CoGroup Key Extractor");
 				first = false;
 			} else {
-				mergedSets = mergedSets.union(inSet.map(keyExtractor).name("CoGroup Key Extractor"));
+				mergedSets = mergedSets.union(inSet
+						.map(keyExtractor)
+						.returns(groupingSortingType)
+						.name("CoGroup Key Extractor"));
 			}
 		}
 
@@ -89,7 +106,9 @@ public class CoGroupOperator extends Operator {
 		return mergedSets
 				.groupBy(0)
 				.sortGroup(1, Order.DESCENDING)
-				.reduceGroup(coGroupReducer).name("CoGroup Joiner");
+				.reduceGroup(coGroupReducer)
+				.returns(tupleType)
+				.name("CoGroup Joiner");
 
 
 	}

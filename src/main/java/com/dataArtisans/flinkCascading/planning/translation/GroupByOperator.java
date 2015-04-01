@@ -28,18 +28,28 @@ import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
 import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading.exec.operators.GroupByKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.IdentityReducer;
+import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class GroupByOperator extends Operator {
+
+	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
+
+	TypeInformation<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType =
+			new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
+					tupleType, tupleType, tupleType
+			);
 
 	private GroupBy groupBy;
 	private List<Every> everies;
@@ -106,10 +116,15 @@ public class GroupByOperator extends Operator {
 					sortByFields);
 
 			if(first) {
-				mergedSets = inSet.map(keyExtractor).name("Key Extractor");
+				mergedSets = inSet.map(keyExtractor)
+						.returns(groupingSortingType)
+						.name("Key Extractor");
 				first = false;
 			} else {
-				mergedSets = mergedSets.union(inSet.map(keyExtractor).name("Key Extractor"));
+				mergedSets = mergedSets.union(inSet
+						.map(keyExtractor)
+						.returns(groupingSortingType)
+						.name("Key Extractor"));
 			}
 		}
 
@@ -149,13 +164,17 @@ public class GroupByOperator extends Operator {
 			return mergedSets
 					.groupBy(0)
 					.sortGroup(1, Order.ASCENDING)
-					.reduceGroup(reduceFunction).name("GroupBy "+groupBy.getName());
+					.reduceGroup(reduceFunction)
+					.returns(tupleType)
+					.name("GroupBy "+groupBy.getName());
 
 		} else {
 
 			return mergedSets
 					.groupBy(0)
-					.reduceGroup(reduceFunction).name("GroupBy "+groupBy.getName());
+					.reduceGroup(reduceFunction)
+					.returns(tupleType)
+					.name("GroupBy "+groupBy.getName());
 		}
 	}
 

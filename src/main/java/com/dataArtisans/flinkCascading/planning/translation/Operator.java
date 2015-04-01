@@ -78,43 +78,6 @@ public abstract class Operator {
 	protected abstract DataSet translateToFlink(ExecutionEnvironment env,
 												List<DataSet> inputs, List<Operator> inputOps);
 
-//	protected Scope getOutgoingScope() {
-//		return getOutgoingScopeFor(this.outPipe);
-//	}
-
-//	protected Scope getOutgoingScopeFor(FlowElement e) {
-//		Set<Scope> outScopes = this.flowGraph.outgoingEdgesOf(e);
-//		if(outScopes.size() < 0) {
-//			throw new RuntimeException(this.outPipe +" has no outgoing scope");
-//		}
-//		else if(outScopes.size() > 1) {
-//			throw new RuntimeException(this.outPipe +" has more than one outgoing scope");
-//		}
-//
-//		return outScopes.iterator().next();
-//	}
-
-//	protected Scope getIncomingScopeFor(FlowElement e) {
-//		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
-//		if(inScopes.size() < 0) {
-//			throw new RuntimeException(this.outPipe +" has no outgoing scope");
-//		}
-//		else if(inScopes.size() > 1) {
-//			throw new RuntimeException(this.outPipe +" has more than one outgoing scope");
-//		}
-//
-//		return inScopes.iterator().next();
-//	}
-//
-//	protected Scope getAnyIncomingScopeFor(FlowElement e) {
-//		Set<Scope> inScopes = this.flowGraph.incomingEdgesOf(e);
-//		if(inScopes.size() < 0) {
-//			throw new RuntimeException(this.outPipe +" has no outgoing scope");
-//		}
-//
-//		return inScopes.iterator().next();
-//	}
-
 	protected Scope getIncomingScopeFrom(Operator op) {
 		return this.flowGraph.getEdge(op.outPipe, this.inPipe);
 	}

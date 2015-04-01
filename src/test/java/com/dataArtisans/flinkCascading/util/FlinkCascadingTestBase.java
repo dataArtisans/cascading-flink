@@ -22,6 +22,7 @@ import cascading.flow.FlowDef;
 import cascading.flow.local.LocalFlowConnector;
 import cascading.tap.Tap;
 import cascading.tap.local.FileTap;
+import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.planning.FlinkConnector;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.junit.After;
@@ -163,6 +164,7 @@ public abstract class FlinkCascadingTestBase {
 
 		for(String outPipe: localOutPipePathMap.keySet()) {
 			String path = localOutPipePathMap.get(outPipe);
+//			Tap sinkTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(new Fields("num, line"), new Fields("count", "ip")), path);
 			Tap sinkTap = new cascading.tap.local.FileTap(new cascading.scheme.local.TextLine(), path);
 
 			flow.addSink(outPipe, sinkTap);
@@ -184,6 +186,7 @@ public abstract class FlinkCascadingTestBase {
 
 		for(String outPipe: flinkOutPipePathMap.keySet()) {
 			String path = flinkOutPipePathMap.get(outPipe);
+//			Tap sinkTap = new FileTap(new cascading.scheme.local.TextLine(new Fields("num, line"), new Fields("count", "ip")), path);
 			Tap sinkTap = new FileTap(new cascading.scheme.local.TextLine(), path);
 
 			flow.addSink(outPipe, sinkTap);
