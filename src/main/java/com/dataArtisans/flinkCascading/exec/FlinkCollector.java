@@ -30,8 +30,16 @@ public class FlinkCollector extends TupleBuilderCollector {
 
 	private Collector<Tuple> wrappedCollector;
 
+	public FlinkCollector(TupleBuilder builder, Fields declaredFields) {
+		super(builder, declaredFields);
+	}
+
 	public FlinkCollector(Collector<Tuple> wrappedCollector, TupleBuilder builder, Fields declaredFields) {
 		super(builder, declaredFields);
+		this.wrappedCollector = wrappedCollector;
+	}
+
+	public void setWrappedCollector(Collector<Tuple> wrappedCollector) {
 		this.wrappedCollector = wrappedCollector;
 	}
 

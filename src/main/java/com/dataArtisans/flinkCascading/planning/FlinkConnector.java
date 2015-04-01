@@ -19,12 +19,9 @@
 package com.dataArtisans.flinkCascading.planning;
 
 import cascading.flow.FlowConnector;
-import cascading.flow.local.planner.LocalRuleRegistry;
 import cascading.flow.planner.FlowPlanner;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.flow.planner.rule.RuleRegistrySet;
-import cascading.flow.planner.rule.annotator.BlockingHashJoinAnnotator;
-import cascading.flow.planner.rule.annotator.HashJoinBlockingHashJoinAnnotator;
 import cascading.flow.planner.rule.assertion.BufferAfterEveryAssert;
 import cascading.flow.planner.rule.assertion.EveryAfterBufferAssert;
 import cascading.flow.planner.rule.assertion.LoneGroupAssert;
@@ -77,9 +74,6 @@ public class FlinkConnector extends FlowConnector {
 
 			addRule( new ApplyAssertionLevelTransformer() );
 			addRule( new ApplyDebugLevelTransformer() );
-
-//			addRule( new BlockingHashJoinAnnotator() );
-//			addRule( new HashJoinBlockingHashJoinAnnotator() );
 
 			addRule( new WholeGraphStepPartitioner() );
 

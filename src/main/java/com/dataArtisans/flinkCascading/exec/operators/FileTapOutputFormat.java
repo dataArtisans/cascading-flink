@@ -27,8 +27,6 @@ import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.configuration.Configuration;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.Properties;
 
 public class FileTapOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMaster {

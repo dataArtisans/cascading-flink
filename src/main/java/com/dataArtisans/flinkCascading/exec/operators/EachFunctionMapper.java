@@ -29,14 +29,14 @@ import cascading.tuple.util.TupleBuilder;
 import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
-import org.apache.flink.api.common.functions.RichMapPartitionFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
 /**
  * Mapper that processes a single Cascading Function
  */
-public class EachFunctionMapper extends RichMapPartitionFunction<Tuple, Tuple> {
+public class EachFunctionMapper extends RichFlatMapFunction<Tuple, Tuple> {
 
 	private Each each;
 	private Scope outgoingScope;
@@ -48,6 +48,9 @@ public class EachFunctionMapper extends RichMapPartitionFunction<Tuple, Tuple> {
 	private TupleBuilder outgoingBuilder;
 	private transient ConcreteCall call;
 	private FlinkFlowProcess ffp;
+
+	private transient boolean first;
+	private transient FlinkCollector collectorWrapper;
 
 	public EachFunctionMapper() {}
 
@@ -78,22 +81,24 @@ public class EachFunctionMapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		call.setArguments( argumentsEntry );
 
+		this.first = true;
+		this.collectorWrapper = new FlinkCollector(this.outgoingBuilder, outgoingScope.getOperationDeclaredFields() );
+		this.call.setOutputCollector(this.collectorWrapper);
+
 	}
 
 	@Override
-	public void mapPartition(Iterable<Tuple> tuples, Collector<Tuple> collector) throws Exception {
+	public void flatMap(Tuple tuple, Collector<Tuple> collector) throws Exception {
 
-		FlinkCollector wrappedCollector = new FlinkCollector(collector, this.outgoingBuilder, outgoingScope.getOperationDeclaredFields() );
-		call.setOutputCollector(wrappedCollector);
-
-		this.function.prepare(ffp, call);
-
-		for(Tuple t : tuples) {
-
-			wrappedCollector.setInTuple(t);
-			argumentsEntry.setTuple( argumentsBuilder.makeResult( t, null ) );
-			function.operate(ffp, call); // adds results to collector
+		if(first) {
+			this.collectorWrapper.setWrappedCollector(collector);
+			this.function.prepare(ffp, call);
+			first = false;
 		}
+
+		collectorWrapper.setInTuple(tuple);
+		argumentsEntry.setTuple( argumentsBuilder.makeResult( tuple, null ) );
+		function.operate(ffp, call); // adds results to collector
 	}
 
 

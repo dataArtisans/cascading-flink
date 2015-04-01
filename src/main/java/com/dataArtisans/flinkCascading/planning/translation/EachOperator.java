@@ -54,7 +54,7 @@ public class EachOperator extends Operator {
 		// get map function
 		if(this.each.isFunction()) {
 			return inputSet
-					.mapPartition(new EachFunctionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
+					.flatMap(new EachFunctionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
 					.returns(new CascadingTupleTypeInfo())
 					.name(each.getName());
 		}

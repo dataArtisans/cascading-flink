@@ -21,6 +21,7 @@ package com.dataArtisans.flinkCascading.types;
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeutils.TypeComparator;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.typeutils.GenericTypeInfo;
 
 import java.util.Comparator;
@@ -36,6 +37,11 @@ public class CascadingTupleTypeInfo extends GenericTypeInfo<Tuple> {
 	public CascadingTupleTypeInfo(Comparator[] comparators) {
 		super(Tuple.class);
 		this.comparators = comparators;
+	}
+
+	@Override
+	public TypeSerializer<Tuple> createSerializer(ExecutionConfig config) {
+		return new CascadingTupleSerializer(config);
 	}
 
 	@Override

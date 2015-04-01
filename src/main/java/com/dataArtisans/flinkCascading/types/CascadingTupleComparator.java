@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.types;
 
+import cascading.tuple.Hasher;
 import cascading.tuple.Tuple;
 import cascading.tuple.util.TupleHasher;
 import org.apache.flink.api.common.typeutils.TypeComparator;
@@ -27,6 +28,7 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.MemorySegment;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Comparator;
 
 public class CascadingTupleComparator extends TypeComparator<Tuple> {
@@ -51,7 +53,7 @@ public class CascadingTupleComparator extends TypeComparator<Tuple> {
 		this.ascending = ascending;
 		this.comparators = comparators;
 		if(comparators != null) {
-			this.hasher = new TupleHasher(null, comparators);
+			this.hasher = new TupleHasher(new DefaultObjectHasher(), comparators);
 		}
 		else {
 			this.hasher = null;
@@ -176,6 +178,20 @@ public class CascadingTupleComparator extends TypeComparator<Tuple> {
 	@Override
 	public TypeComparator[] getFlatComparators() {
 		return new TypeComparator[]{this};
+	}
+
+	public static class DefaultObjectHasher implements Comparator<Object>, Hasher<Object>, Serializable {
+
+		@Override
+		public int hashCode( Object value )
+		{
+			return value.hashCode();
+		}
+
+		@Override
+		public int compare(Object o1, Object o2) {
+			throw new UnsupportedOperationException();
+		}
 	}
 
 }

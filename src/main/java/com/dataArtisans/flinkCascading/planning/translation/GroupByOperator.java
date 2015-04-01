@@ -32,7 +32,6 @@ import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -45,11 +44,6 @@ import java.util.List;
 public class GroupByOperator extends Operator {
 
 	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
-
-	TypeInformation<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType =
-			new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
-					tupleType, tupleType, tupleType
-			);
 
 	private GroupBy groupBy;
 	private List<Every> everies;
@@ -108,6 +102,19 @@ public class GroupByOperator extends Operator {
 			if(sortByFields != null) {
 				secondarySort = true;
 			}
+
+			CascadingTupleTypeInfo keyTupleInfo;
+			if(groupByFields.getComparators() != null) {
+				keyTupleInfo = new CascadingTupleTypeInfo(groupByFields.getComparators());
+			}
+			else {
+				keyTupleInfo = tupleType;
+			}
+
+			TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType =
+				new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
+						keyTupleInfo, tupleType, tupleType
+				);
 
 			// build key Extractor mapper
 			MapFunction keyExtractor = new GroupByKeyExtractor(
