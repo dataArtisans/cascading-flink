@@ -21,21 +21,27 @@ package com.dataArtisans.flinkCascading.planning.translation;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
+import cascading.tap.local.FileTap;
+import cascading.tuple.Fields;
+import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.List;
+import java.util.Properties;
 
 
 public class DataSink extends Operator {
 
 	private Tap tap;
+	private Fields tapFields;
 
 	public DataSink(Tap tap, Operator inputOp, FlowElementGraph flowGraph) {
 		super(inputOp, tap, tap, flowGraph);
 		this.tap = tap;
+		tapFields = flowGraph.incomingEdgesOf(tap).iterator().next().getIncomingTapFields();
 	}
 
 	@Override
@@ -46,20 +52,31 @@ public class DataSink extends Operator {
 			throw new RuntimeException("Each requires exactly one input");
 		}
 
+		DataSet tail = inputs.get(0);
+
 		if (tap instanceof Hfs) {
 
 			Hfs hfs = (Hfs) tap;
 			Configuration conf = new Configuration();
 
-			inputs.get(0)
-					.output(new HfsOutputFormat(hfs, conf))
+			tail
+					.output(new HfsOutputFormat(hfs, tapFields, conf))
 					.setParallelism(1);
+		}
+		else if(tap instanceof FileTap) {
 
-			return null;
-		} else {
-			throw new RuntimeException("Right now, only Hfs taps are supported.");
+			FileTap fileTap = (FileTap) tap;
+			Properties props = new Properties();
+
+			tail
+					.output(new FileTapOutputFormat(fileTap, tapFields, props))
+					.setParallelism(1);
+		}
+		else {
+			throw new RuntimeException("Unsupported Tap");
 		}
 
+		return null; // DataSink is not a DataSet
 	}
 
 }

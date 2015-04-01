@@ -21,6 +21,7 @@ package com.dataArtisans.flinkCascading.planning;
 import cascading.flow.FlowDef;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowStep;
+import cascading.flow.local.planner.LocalRuleRegistry;
 import cascading.flow.planner.FlowPlanner;
 import cascading.flow.planner.PlatformInfo;
 import cascading.flow.planner.Scope;
@@ -29,6 +30,9 @@ import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.flow.planner.rule.RuleRegistrySet;
+import cascading.flow.planner.rule.RuleResult;
+import cascading.flow.planner.rule.RuleSetExec;
+import cascading.flow.planner.rule.util.TraceWriter;
 import cascading.pipe.CoGroup;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
@@ -38,8 +42,10 @@ import cascading.pipe.Pipe;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tap.local.FileTap;
+import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
+import com.dataArtisans.flinkCascading.planning.translation.DataSink;
 import com.dataArtisans.flinkCascading.planning.translation.GroupByOperator;
 import com.dataArtisans.flinkCascading.planning.translation.CoGroupOperator;
 import com.dataArtisans.flinkCascading.planning.translation.DataSource;
@@ -102,22 +108,35 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	// 2. translate the graph as a second step
 
 	@Override
-	public FlinkFlow buildFlow( FlowDef flow, RuleRegistrySet ruleRegistrySet ) {
+	public FlinkFlow buildFlow( FlowDef flowDef, RuleRegistrySet ruleRegistrySet ) {
 
 		Map<FlowElement, Operator> memo =
 				new HashMap<FlowElement, Operator>();
 
-		Pipe[] tailsA = flow.getTailsArray();
-		FlowElementGraph flowGraph = createFlowElementGraph(flow, tailsA);
+		FlinkFlow flow = createFlow(flowDef);
+
+		Pipe[] tailsA = flowDef.getTailsArray();
+		FlowElementGraph initFlowGraph = createFlowElementGraph(flowDef, tailsA);
+
+		TraceWriter traceWriter = new TraceWriter( flow );
+		RuleSetExec ruleSetExec = new RuleSetExec( traceWriter, this, flow, ruleRegistrySet, flowDef, initFlowGraph );
+
+		RuleResult ruleResult = ruleSetExec.exec();
+
+		FlowElementGraph flowGraph = ruleResult.getAssemblyGraph();
+
 		flowGraph.resolveFields();
 
 		TopologicalOrderIterator<FlowElement, Scope> it = flowGraph.getTopologicalIterator();
 		Collection<Tap> sources = flowGraph.getSources();
 		Collection<Tap> sinks = flowGraph.getSinks();
+
 		Set<FlowElement> tails = new HashSet<FlowElement>();
 		for(Pipe t : tailsA) {
 			tails.add(t);
 		}
+
+		Set<DataSink> flinkSinks = new HashSet<DataSink>();
 
 		while (it.hasNext()) {
 
@@ -137,7 +156,10 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				memo.put(e, source);
 			}
 			else if (e instanceof Tap && sinks.contains(e)) {
-				// do nothing
+
+				Operator inOp = getInputOp(e, flowGraph, memo);
+
+				flinkSinks.add(new DataSink((Tap)e, inOp, flowGraph));
 			}
 			else if (e instanceof Each) {
 
@@ -207,21 +229,18 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			}
 		}
 
-		Map<String, Tap> sinkMap = flowGraph.getSinkMap();
-		for(FlowElement tail : tails) {
-			Operator tailOp = memo.get(tail);
-			DataSet flinkTail = tailOp.getFlinkOperator(env);
-			attachSink(flinkTail, (Pipe) tail, sinkMap);
+		for(DataSink s : flinkSinks) {
+			s.getFlinkOperator(env);
 		}
 
-		return new FlinkFlow(env, getPlatformInfo(), flow);
+		return new FlinkFlow(env, getPlatformInfo(), flowDef);
 
 	}
 
 
-	private Operator getInputOp(Pipe pipe, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
+	private Operator getInputOp(FlowElement flowElement, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
 
-		List<Operator> inputOps = getInputOps(pipe, flowGraph, memo);
+		List<Operator> inputOps = getInputOps(flowElement, flowGraph, memo);
 
 		if(inputOps.size() > 1) {
 			throw new RuntimeException("Operator with a single input has multiple inputs.");
@@ -232,67 +251,26 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	}
 
-	private List<Operator> getInputOps(Pipe pipe, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
-
-		FlowElement[] inputs = pipe.getPrevious();
-		if(inputs == null || inputs.length == 0) {
-			// try to get source
-			FlowElement source = flowGraph.getSourceMap().get(pipe.getName());
-			if(source != null) {
-				inputs = new FlowElement[]{source};
-			} else {
-				return null;
-			}
-		}
+	private List<Operator> getInputOps(FlowElement flowElement, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
 
 		List<Operator> inputOps = new ArrayList<Operator>();
-		for(FlowElement e : inputs) {
-			Operator op = memo.get(e);
-			if(op == null) {
-				throw new RuntimeException("Could not find flink operator for input flow element.");
-			}
-			inputOps.add(memo.get(e));
-		}
 
-		return inputOps;
-
-	}
-
-
-	private void attachSink(DataSet tail, Pipe p, Map<String, Tap> sinkMap) {
-
-		Tap sink = sinkMap.get(p.getName());
-
-		if (sink instanceof Hfs) {
-
-			Hfs hfs = (Hfs) sink;
-			Configuration conf = new Configuration();
-
-			tail
-					.output(new HfsOutputFormat(hfs, conf))
-					.setParallelism(1);
-		}
-		else if(sink instanceof FileTap) {
-
-			FileTap fileTap = (FileTap) sink;
-			Properties props = new Properties();
-
-			tail
-					.output(new FileTapOutputFormat(fileTap, props))
-					.setParallelism(1);
+		Set<Scope> incomingEdges = flowGraph.incomingEdgesOf(flowElement);
+		if((incomingEdges == null || incomingEdges.size() == 0)) {
+			throw new RuntimeException("Operator does not have inputs.");
 		}
 		else {
-			throw new RuntimeException("Unsupported Tap");
+
+			for (Scope s : incomingEdges) {
+				FlowElement e = flowGraph.getEdgeSource(s);
+				Operator op = memo.get(e);
+				if (op == null) {
+					throw new RuntimeException("Could not find flink operator for input flow element.");
+				}
+				inputOps.add(op);
+			}
 		}
-
+		return inputOps;
 	}
-
-	private Scope getSingleScope(Set<Scope> scopes) {
-		if(scopes.size() != 1) {
-			throw new RuntimeException("Not exactly one scope.");
-		}
-		return scopes.iterator().next();
-	}
-
 
 }

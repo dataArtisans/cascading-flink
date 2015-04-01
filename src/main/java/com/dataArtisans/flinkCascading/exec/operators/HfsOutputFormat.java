@@ -19,6 +19,7 @@
 package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.tap.hadoop.Hfs;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
@@ -37,14 +38,16 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 	private static final long serialVersionUID = 1L;
 
 	private Hfs hfsTap;
+	private Fields tapFields;
 	private JobConf jobConf;
 
 	private transient TupleEntryCollector tupleEntryCollector;
 
 
-	public HfsOutputFormat(Hfs hfs, org.apache.hadoop.conf.Configuration config) {
+	public HfsOutputFormat(Hfs hfs, Fields tapFields, org.apache.hadoop.conf.Configuration config) {
 		super();
 		this.hfsTap = hfs;
+		this.tapFields = tapFields;
 		this.jobConf = asJobConfInstance( config );
 	}
 
@@ -75,6 +78,10 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 		FlinkFlowProcess ffp = new FlinkFlowProcess(jobConf, numTasks, taskNumber );
 
 		this.tupleEntryCollector = this.hfsTap.openForWrite(ffp, null);
+		if( this.hfsTap.getSinkFields().isAll() )
+		{
+			this.tupleEntryCollector.setFields(tapFields);
+		}
 	}
 
 	@Override
@@ -110,12 +117,14 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 
 	private void writeObject(ObjectOutputStream out) throws IOException {
 		out.writeObject(this.hfsTap);
+		out.writeObject(this.tapFields);
 		jobConf.write(out);
 	}
 
 	@SuppressWarnings("unchecked")
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		this.hfsTap = (Hfs)in.readObject();
+		this.tapFields = (Fields)in.readObject();
 		if(jobConf == null) {
 			jobConf = new JobConf();
 		}

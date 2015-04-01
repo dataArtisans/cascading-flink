@@ -20,6 +20,7 @@ package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.flow.local.LocalFlowProcess;
 import cascading.tap.local.FileTap;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryCollector;
 import org.apache.flink.api.common.io.OutputFormat;
@@ -35,14 +36,16 @@ public class FileTapOutputFormat implements OutputFormat<Tuple> { // , FinalizeO
 	private static final long serialVersionUID = 1L;
 
 	private FileTap fileTap;
+	private Fields tapFields;
 	private Properties props;
 
 	private transient TupleEntryCollector tupleEntryCollector;
 
 
-	public FileTapOutputFormat(FileTap fileTap, Properties props) {
+	public FileTapOutputFormat(FileTap fileTap, Fields tapFields, Properties props) {
 		super();
 		this.fileTap = fileTap;
+		this.tapFields = tapFields;
 		this.props = props;
 	}
 
@@ -67,6 +70,10 @@ public class FileTapOutputFormat implements OutputFormat<Tuple> { // , FinalizeO
 		LocalFlowProcess fp = new LocalFlowProcess();
 
 		this.tupleEntryCollector = this.fileTap.openForWrite(fp, null);
+		if( this.fileTap.getSinkFields().isAll() )
+		{
+			this.tupleEntryCollector.setFields(tapFields);
+		}
 	}
 
 	@Override
@@ -80,19 +87,6 @@ public class FileTapOutputFormat implements OutputFormat<Tuple> { // , FinalizeO
 	@Override
 	public void close() throws IOException {
 		this.tupleEntryCollector.close();
-	}
-
-	// --------------------------------------------------------------------------------------------
-	//  Custom serialization methods
-	// --------------------------------------------------------------------------------------------
-
-	private void writeObject(ObjectOutputStream out) throws IOException {
-		out.writeObject(this.fileTap);
-	}
-
-	@SuppressWarnings("unchecked")
-	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-		this.fileTap = (FileTap)in.readObject();
 	}
 
 }

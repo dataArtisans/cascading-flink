@@ -19,8 +19,22 @@
 package com.dataArtisans.flinkCascading.planning;
 
 import cascading.flow.FlowConnector;
+import cascading.flow.local.planner.LocalRuleRegistry;
 import cascading.flow.planner.FlowPlanner;
+import cascading.flow.planner.rule.RuleRegistry;
 import cascading.flow.planner.rule.RuleRegistrySet;
+import cascading.flow.planner.rule.annotator.BlockingHashJoinAnnotator;
+import cascading.flow.planner.rule.annotator.HashJoinBlockingHashJoinAnnotator;
+import cascading.flow.planner.rule.assertion.BufferAfterEveryAssert;
+import cascading.flow.planner.rule.assertion.EveryAfterBufferAssert;
+import cascading.flow.planner.rule.assertion.LoneGroupAssert;
+import cascading.flow.planner.rule.assertion.MissingGroupAssert;
+import cascading.flow.planner.rule.assertion.SplitBeforeEveryAssert;
+import cascading.flow.planner.rule.partitioner.WholeGraphNodePartitioner;
+import cascading.flow.planner.rule.partitioner.WholeGraphStepPartitioner;
+import cascading.flow.planner.rule.transformer.ApplyAssertionLevelTransformer;
+import cascading.flow.planner.rule.transformer.ApplyDebugLevelTransformer;
+import cascading.flow.planner.rule.transformer.RemoveNoOpPipeTransformer;
 import cascading.scheme.Scheme;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
@@ -44,7 +58,33 @@ public class FlinkConnector extends FlowConnector {
 
 	@Override
 	protected RuleRegistrySet createDefaultRuleRegistrySet() {
-		return new RuleRegistrySet();
+
+		return new RuleRegistrySet(new FlinkRuleRegistry());
+	}
+
+	public static class FlinkRuleRegistry extends RuleRegistry
+	{
+		public FlinkRuleRegistry()
+		{
+			addRule( new LoneGroupAssert() );
+			addRule( new MissingGroupAssert() );
+
+			addRule( new BufferAfterEveryAssert() );
+			addRule( new EveryAfterBufferAssert() );
+			addRule( new SplitBeforeEveryAssert() );
+
+			addRule( new RemoveNoOpPipeTransformer() );
+
+			addRule( new ApplyAssertionLevelTransformer() );
+			addRule( new ApplyDebugLevelTransformer() );
+
+//			addRule( new BlockingHashJoinAnnotator() );
+//			addRule( new HashJoinBlockingHashJoinAnnotator() );
+
+			addRule( new WholeGraphStepPartitioner() );
+
+			addRule( new WholeGraphNodePartitioner() );
+		}
 	}
 
 }
