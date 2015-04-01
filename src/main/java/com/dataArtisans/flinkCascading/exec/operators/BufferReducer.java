@@ -40,8 +40,10 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 	private Every every;
 	private Scope outgoingScope;
 	private Scope incomingScope;
+	private Fields groupingFields;
 
 	private transient Buffer buffer;
+	private transient TupleEntry groupEntry;
 	private transient TupleEntry argumentsEntry;
 	private transient TupleBuilder argumentsBuilder;
 	private transient TupleBuilder outgoingBuilder;
@@ -49,11 +51,12 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 	private transient FlinkFlowProcess ffp;
 
 
-	public BufferReducer(Every every, Scope incoming, Scope outgoing) {
+	public BufferReducer(Every every, Scope incoming, Scope outgoing, Fields groupingFields) {
 
 		this.every = every;
 		this.incomingScope = incoming;
 		this.outgoingScope = outgoing;
+		this.groupingFields = groupingFields;
 	}
 
 	@Override
@@ -63,6 +66,8 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 		this.buffer = this.every.getBuffer();
 
 		this.call = new ConcreteCall(outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields());
+
+		this.groupEntry = new TupleEntry(this.groupingFields);
 
 		Fields argumentsSelector = outgoingScope.getArgumentsSelector();
 		Fields remainderFields = outgoingScope.getRemainderPassThroughFields();
@@ -90,8 +95,10 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 
 		call.setArgumentsIterator( argIt );
 
+		this.groupEntry.setTuple(argIt.getKey());
+		call.setGroup( this.groupEntry );
 		call.setOutputCollector( flinkCollector );
-		call.setGroup( new TupleEntry(argIt.getKey()) );
+
 
 		buffer.operate( ffp, call );
 

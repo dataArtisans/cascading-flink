@@ -19,17 +19,23 @@
 package com.dataArtisans.flinkCascading.planning;
 
 import cascading.flow.BaseFlow;
+import cascading.flow.FlowDef;
 import cascading.flow.FlowProcess;
+import cascading.flow.planner.PlatformInfo;
+import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class FlinkFlow extends BaseFlow<Configuration> {
 
 	private ExecutionEnvironment flinkEnv;
 
-	public FlinkFlow(ExecutionEnvironment env) {
+	public FlinkFlow(ExecutionEnvironment env, PlatformInfo platformInfo, FlowDef flowDef) {
+
+		super(platformInfo, new HashMap<Object, Object>(), new Configuration(), flowDef);
 
 		this.flinkEnv = env;
 //		initializeNewJobsMap();
@@ -120,7 +126,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	@Override
 	public FlowProcess getFlowProcess() {
 		// not sure what to do here...
-		throw new UnsupportedOperationException();
+		return new FlinkFlowProcess();
 	}
 
 	@Override

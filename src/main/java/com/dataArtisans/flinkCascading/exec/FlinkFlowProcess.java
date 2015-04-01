@@ -22,6 +22,7 @@ import cascading.flow.FlowProcess;
 import cascading.tap.Tap;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
+import cascading.tuple.TupleEntrySchemeIteratorProps;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.hadoop.conf.Configuration;
 
@@ -83,6 +84,12 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public Object getProperty( String key ) {
+
+		// TODO
+		if(key.equals(TupleEntrySchemeIteratorProps.PERMITTED_EXCEPTIONS)) {
+			return null;
+		}
+
 		return this.conf.get(key);
 	}
 

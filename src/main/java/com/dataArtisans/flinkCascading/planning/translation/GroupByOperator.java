@@ -36,6 +36,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class GroupByOperator extends Operator {
@@ -82,6 +83,7 @@ public class GroupByOperator extends Operator {
 		boolean secondarySort = false;
 
 		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
+		Fields groupByFields = null;
 
 		for(int i=0; i<inputOps.size(); i++) {
 			Operator inOp = inputOps.get(i);
@@ -89,9 +91,9 @@ public class GroupByOperator extends Operator {
 
 			Scope incomingScope = getIncomingScopeFrom(inOp);
 
-			Fields groupByFields = groupBy.getKeySelectors().get(incomingScope.getName());
+			groupByFields = groupBy.getKeySelectors().get(incomingScope.getName());
 			Fields sortByFields = groupBy.getSortingSelectors().get(incomingScope.getName());
-			Fields incomingFields = incomingScope.getOutGroupingFields();
+			Fields incomingFields = groupBy.outgoingScopeFor(Collections.singleton(incomingScope)).getOutValuesFields();
 
 			if(sortByFields != null) {
 				secondarySort = true;
@@ -134,13 +136,13 @@ public class GroupByOperator extends Operator {
 			outA[outA.length - 1] = this.getOutgoingScope();
 
 			// build the group function
-			reduceFunction = new AggregatorsReducer(aggregatorsA, inA, outA);
+			reduceFunction = new AggregatorsReducer(aggregatorsA, inA, outA, groupByFields);
 		}
 		else if(everies.get(0).isBuffer()) {
 			Every buffer = everies.get(0);
 
 			reduceFunction = new BufferReducer(buffer,
-							this.getScopeBetween(groupBy, buffer), this.getOutgoingScope());
+							this.getScopeBetween(groupBy, buffer), this.getOutgoingScope(), groupByFields);
 		}
 
 		if(secondarySort) {

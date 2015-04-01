@@ -37,6 +37,8 @@ import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
+import cascading.tap.local.FileTap;
+import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
 import com.dataArtisans.flinkCascading.planning.translation.GroupByOperator;
 import com.dataArtisans.flinkCascading.planning.translation.CoGroupOperator;
@@ -56,6 +58,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 
@@ -81,7 +84,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	@Override
 	protected FlinkFlow createFlow(FlowDef flowDef) {
 
-		return new FlinkFlow(env);
+		return new FlinkFlow(env, this.getPlatformInfo(), flowDef);
 	}
 
 	@Override
@@ -133,7 +136,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				DataSource source = new DataSource((Tap)e, flowGraph);
 				memo.put(e, source);
 			}
-			else if (e instanceof Hfs && sinks.contains(e)) {
+			else if (e instanceof Tap && sinks.contains(e)) {
 				// do nothing
 			}
 			else if (e instanceof Each) {
@@ -211,7 +214,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			attachSink(flinkTail, (Pipe) tail, sinkMap);
 		}
 
-		return new FlinkFlow(env);
+		return new FlinkFlow(env, getPlatformInfo(), flow);
 
 	}
 
@@ -268,7 +271,17 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			tail
 					.output(new HfsOutputFormat(hfs, conf))
 					.setParallelism(1);
-		} else {
+		}
+		else if(sink instanceof FileTap) {
+
+			FileTap fileTap = (FileTap) sink;
+			Properties props = new Properties();
+
+			tail
+					.output(new FileTapOutputFormat(fileTap, props))
+					.setParallelism(1);
+		}
+		else {
 			throw new RuntimeException("Unsupported Tap");
 		}
 

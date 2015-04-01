@@ -29,6 +29,7 @@ import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
 import cascading.pipe.Pipe;
+import cascading.pipe.assembly.Unique;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;
 import com.dataArtisans.flinkCascading.util.TestData;

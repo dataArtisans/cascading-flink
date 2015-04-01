@@ -130,7 +130,7 @@ public abstract class Operator {
 	protected Scope getOutgoingScope() {
 		Set<Scope> outScopes = this.flowGraph.outgoingEdgesOf(this.outPipe);
 		if(outScopes.size() != 1) {
-			throw new RuntimeException("Not exactly one outgoing scope");
+			// throw new RuntimeException("Not exactly one outgoing scope");
 		}
 
 		return outScopes.iterator().next();

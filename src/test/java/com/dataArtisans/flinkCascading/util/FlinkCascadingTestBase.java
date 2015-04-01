@@ -20,9 +20,8 @@ package com.dataArtisans.flinkCascading.util;
 
 import cascading.flow.FlowDef;
 import cascading.flow.local.LocalFlowConnector;
-import cascading.scheme.hadoop.TextLine;
 import cascading.tap.Tap;
-import cascading.tap.hadoop.Hfs;
+import cascading.tap.local.FileTap;
 import com.dataArtisans.flinkCascading.planning.FlinkConnector;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.junit.After;
@@ -138,7 +137,7 @@ public abstract class FlinkCascadingTestBase {
 		FlowDef flinkFlow = getFlinkCascadingFlow();
 
 		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
-		env.setDegreeOfParallelism(4);
+		env.setParallelism(4);
 		FlinkConnector fc = new FlinkConnector(env);
 		fc.connect(flinkFlow).complete();
 	}
@@ -178,26 +177,25 @@ public abstract class FlinkCascadingTestBase {
 
 		for(String inPipe: inPipePathMap.keySet()) {
 			String path = inPipePathMap.get(inPipe);
-			Tap sourceTap = new Hfs(new TextLine(), "file://"+path);
+			Tap sourceTap = new FileTap(new cascading.scheme.local.TextLine(), path);
 
 			flow.addSource(inPipe, sourceTap);
 		}
 
 		for(String outPipe: flinkOutPipePathMap.keySet()) {
 			String path = flinkOutPipePathMap.get(outPipe);
-			Tap sinkTap = new Hfs(new TextLine(), "file://"+path);
+			Tap sinkTap = new FileTap(new cascading.scheme.local.TextLine(), path);
 
 			flow.addSink(outPipe, sinkTap);
 		}
 
 		return flow;
-
 	}
 
 	private void compareOutputs(String pipe, String localPath, String flinkPath) throws IOException {
 
 		List<String> localLines = readLines(localPath);
-		List<String> flinkLines = readLines(flinkPath+"/part-00001");
+		List<String> flinkLines = readLines(flinkPath);
 
 		assertEquals("Cascading Local and Cascading Flink compute results of different sizes for pipe "+pipe+": "
 						+localLines.size()+" vs. "+flinkLines.size(),

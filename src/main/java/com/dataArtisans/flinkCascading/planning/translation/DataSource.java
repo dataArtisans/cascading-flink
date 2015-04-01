@@ -19,16 +19,21 @@
 package com.dataArtisans.flinkCascading.planning.translation;
 
 import cascading.flow.planner.graph.FlowElementGraph;
+import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
+import cascading.tap.local.FileTap;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsInputFormat;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 
 
 public class DataSource extends Operator {
@@ -46,22 +51,70 @@ public class DataSource extends Operator {
 										List<DataSet> inputs, List<Operator> inputOps) {
 
 		if(tap instanceof Hfs) {
-			Hfs hfs = (Hfs) tap;
-
-			Configuration conf = new Configuration();
-			hfs.getScheme().sourceConfInit(null, hfs, conf);
-			conf.set("mapreduce.input.fileinputformat.inputdir", hfs.getPath().toString());
-
-			DataSet<Tuple> src = env
-					.createInput(new HfsInputFormat(hfs, conf))
-					.name(tap.getIdentifier());
-
-			return src;
-
+			return translateHfsSource((Hfs) tap, env);
+		}
+		else if(tap instanceof FileTap) {
+			return translateFileTapSource((FileTap) tap, env);
+		}
+		else if(tap instanceof MultiSourceTap) {
+			return translateMultiSourceTap((MultiSourceTap) tap, env);
 		} else {
-			throw new RuntimeException("Right now, only Hfs taps are supported.");
+			throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
 		}
 
+	}
+
+	private DataSet translateHfsSource(Hfs tap, ExecutionEnvironment env) {
+		Configuration conf = new Configuration();
+		tap.getScheme().sourceConfInit(null, tap, conf);
+		conf.set("mapreduce.input.fileinputformat.inputdir", tap.getPath().toString());
+
+		DataSet<Tuple> src = env
+				.createInput(new HfsInputFormat(tap, conf))
+				.name(tap.getIdentifier());
+
+		return src;
+	}
+
+	private DataSet translateFileTapSource(FileTap tap, ExecutionEnvironment env) {
+
+		Properties conf = new Properties();
+		tap.getScheme().sourceConfInit(null, tap, conf);
+
+		DataSet<Tuple> src = env
+				.createInput(new FileTapInputFormat(tap, conf))
+				.name(tap.getIdentifier())
+				.setParallelism(1);
+
+		return src;
+	}
+
+	private DataSet translateMultiSourceTap(MultiSourceTap tap, ExecutionEnvironment env) {
+		Iterator<Tap> childTaps = ((MultiSourceTap)tap).getChildTaps();
+
+		DataSet cur = null;
+		while(childTaps.hasNext()) {
+			Tap childTap = childTaps.next();
+			DataSet source;
+			if(childTap instanceof Hfs) {
+				source = translateHfsSource((Hfs)childTap, env);
+			}
+			else if(childTap instanceof FileTap) {
+				source = translateFileTapSource((FileTap)childTap, env);
+			}
+			else {
+				throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
+			}
+
+			if(cur == null) {
+				cur = source;
+			}
+			else {
+				cur = cur.union(source);
+			}
+		}
+
+		return cur;
 	}
 
 }

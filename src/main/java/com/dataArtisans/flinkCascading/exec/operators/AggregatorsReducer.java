@@ -41,8 +41,10 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 	private Every[] everies;
 	private Scope[] outgoingScopes;
 	private Scope[] incomingScopes;
+	private Fields groupingFields;
 
 	private transient Aggregator[] aggregators;
+	private transient TupleEntry groupEntry;
 	private transient TupleEntry[] argumentsEntries;
 	private transient TupleBuilder[] argumentsBuilders;
 	private transient TupleBuilder[] outgoingBuilders;
@@ -50,7 +52,7 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 	private transient FlinkFlowProcess[] ffps;
 
 
-	public AggregatorsReducer(Every[] everies, Scope[] incomings, Scope[] outgoings) {
+	public AggregatorsReducer(Every[] everies, Scope[] incomings, Scope[] outgoings, Fields groupingFields) {
 
 		if(everies.length != outgoings.length) {
 			throw new IllegalArgumentException("Number of everies and outgoing scopes must be equal.");
@@ -59,6 +61,7 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 		this.everies = everies;
 		this.incomingScopes = incomings;
 		this.outgoingScopes = outgoings;
+		this.groupingFields = groupingFields;
 	}
 
 	@Override
@@ -72,6 +75,8 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 		this.outgoingBuilders = new TupleBuilder[num];
 		this.calls = new ConcreteCall[num];
 		this.ffps = new FlinkFlowProcess[num];
+
+		this.groupEntry = new TupleEntry(groupingFields);
 
 		for (int i=0; i<everies.length; i++) {
 
@@ -115,7 +120,8 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 				if (first) {
 					// start group
 
-					calls[i].setGroup(new TupleEntry(key)); // set group key
+					groupEntry.setTuple(key);
+					calls[i].setGroup(groupEntry); // set group key
 					calls[i].setArguments(null);  // zero it out
 					calls[i].setOutputCollector(null); // zero it out
 
