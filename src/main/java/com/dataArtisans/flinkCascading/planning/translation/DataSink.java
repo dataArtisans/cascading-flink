@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
+import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
@@ -25,6 +26,8 @@ import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
+import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
@@ -36,12 +39,12 @@ import java.util.Properties;
 public class DataSink extends Operator {
 
 	private Tap tap;
-	private Fields tapFields;
+	private Scope incomingScope;
 
 	public DataSink(Tap tap, Operator inputOp, FlowElementGraph flowGraph) {
 		super(inputOp, tap, tap, flowGraph);
 		this.tap = tap;
-		tapFields = flowGraph.incomingEdgesOf(tap).iterator().next().getIncomingTapFields();
+		this.incomingScope = flowGraph.incomingEdgesOf(tap).iterator().next();
 	}
 
 	@Override
@@ -54,13 +57,28 @@ public class DataSink extends Operator {
 
 		DataSet tail = inputs.get(0);
 
+		if(!tap.getSinkFields().isAll()) {
+
+			Fields tapFields = tap.getSinkFields();
+			Fields tailFields = incomingScope.getOutValuesFields();
+
+			// check if we need to project
+			if(!tapFields.equalsFields(tailFields)) {
+				// add projection mapper
+				tail = tail
+						.map(new ProjectionMapper(tailFields, tapFields))
+						.returns(new CascadingTupleTypeInfo())
+						.name("Tap Projection Mapper");
+			}
+		}
+
 		if (tap instanceof Hfs) {
 
 			Hfs hfs = (Hfs) tap;
 			Configuration conf = new Configuration();
 
 			tail
-					.output(new HfsOutputFormat(hfs, tapFields, conf))
+					.output(new HfsOutputFormat(hfs, incomingScope.getIncomingTapFields(), conf))
 					.setParallelism(1);
 		}
 		else if(tap instanceof FileTap) {
@@ -69,7 +87,7 @@ public class DataSink extends Operator {
 			Properties props = new Properties();
 
 			tail
-					.output(new FileTapOutputFormat(fileTap, tapFields, props))
+					.output(new FileTapOutputFormat(fileTap, incomingScope.getIncomingTapFields(), props))
 					.setParallelism(1);
 		}
 		else {
