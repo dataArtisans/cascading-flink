@@ -22,7 +22,6 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.util.TupleBuilder;
 import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.java.tuple.Tuple3;
 
 public class ProjectionMapper extends RichMapFunction<Tuple, Tuple> {
 

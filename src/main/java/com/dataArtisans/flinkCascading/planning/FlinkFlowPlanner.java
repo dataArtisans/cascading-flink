@@ -51,7 +51,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
 import org.jgrapht.traverse.TopologicalOrderIterator;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -245,13 +245,12 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	private List<Operator> getInputOps(FlowElement flowElement, FlowElementGraph flowGraph, Map<FlowElement, Operator> memo) {
 
-		List<Operator> inputOps = new ArrayList<Operator>();
-
 		Set<Scope> incomingEdges = flowGraph.incomingEdgesOf(flowElement);
 		if((incomingEdges == null || incomingEdges.size() == 0)) {
 			throw new RuntimeException("Operator does not have inputs.");
 		}
 		else {
+			Operator[] inputOps = new Operator[incomingEdges.size()];
 
 			for (Scope s : incomingEdges) {
 				FlowElement e = flowGraph.getEdgeSource(s);
@@ -259,10 +258,10 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				if (op == null) {
 					throw new RuntimeException("Could not find flink operator for input flow element.");
 				}
-				inputOps.add(op);
+				inputOps[s.getOrdinal()] = op;
 			}
+			return Arrays.asList(inputOps);
 		}
-		return inputOps;
 	}
 
 }
