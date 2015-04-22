@@ -31,13 +31,14 @@ import com.dataArtisans.flinkCascading.exec.FlinkCoGroupClosure;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
+import org.apache.flink.api.java.functions.FunctionAnnotation;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
 import java.util.Iterator;
 
-public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
+public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple3<Tuple, Tuple, Tuple>> {
 
 	private CoGroup coGroup;
 	private Scope[] incomingScopes;
@@ -60,7 +61,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 	private transient FlinkCoGroupClosure closure;
 
 
-	public CoGroupReducer(CoGroup coGroup, Scope[] incomings, Scope outgoing) {
+	public CoGroupReducerForEvery(CoGroup coGroup, Scope[] incomings, Scope outgoing) {
 
 		this.coGroup = coGroup;
 		this.incomingScopes = incomings;
@@ -106,12 +107,14 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 	}
 
 	@Override
-	public void reduce(Iterable<Tuple3<Tuple, Integer, Tuple>> vals, Collector<Tuple> collector) throws Exception {
+	public void reduce(Iterable<Tuple3<Tuple, Integer, Tuple>> vals, Collector<Tuple3<Tuple, Tuple, Tuple>> collector) throws Exception {
+
+		Tuple3<Tuple, Tuple, Tuple> outT = new Tuple3<Tuple, Tuple, Tuple>();
+		outT.f1 = new Tuple(); // not needed
 
 		// HadoopGroupGate.accept
 
 		closure.reset( vals.iterator() );
-
 		Iterator<Tuple> joinedTuples = null;
 
 		// Buffer is using JoinerClosure directly
@@ -125,10 +128,11 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 		}
 
 		keyEntry.setTuple( closure.getGroupTuple( closure.getGrouping() ) );
+		outT.f0 = keyEntry.getTuple(); // set grouping key
 
 		while(joinedTuples.hasNext()) {
-			Tuple r = joinedTuples.next();
-			collector.collect(r);
+			outT.f2 = joinedTuples.next();
+			collector.collect(outT);
 		}
 
 	}

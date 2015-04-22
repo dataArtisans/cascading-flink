@@ -21,10 +21,14 @@ package com.dataArtisans.flinkCascading.planning.translation;
 import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.CoGroup;
+import cascading.pipe.Every;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
+import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
+import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducerForEvery;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -36,32 +40,53 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CoGroupOperator extends Operator {
 
 	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
 
-	TypeInformation<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>> groupingSortingType =
+	TypeInformation<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>> groupingAggregationType =
 			new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>>(
-					tupleType, BasicTypeInfo.INT_TYPE_INFO, tupleType
+					tupleType, tupleType, tupleType
 			);
 
 	private CoGroup coGroup;
+	private List<Every> everies;
 
 	public CoGroupOperator(CoGroup coGroup, List<Operator> inputOps, FlowElementGraph flowGraph) {
 		super(inputOps, coGroup, coGroup, flowGraph);
 
 		this.coGroup = coGroup;
+		this.everies = new ArrayList<Every>();
+	}
+
+	public void addEvery(Every every) {
+
+		if(every.isGroupAssertion()) {
+			throw new RuntimeException("GroupAssertion not supported yet.");
+		}
+
+		if(everies.size() > 0) {
+			if(everies.get(0).isBuffer()) {
+				throw new RuntimeException("CoGroup already closed by Buffer.");
+			}
+			else if(everies.get(0).isGroupAssertion()) {
+				throw new RuntimeException("CoGroup already closed by GroupAssertion.");
+			}
+			else if(everies.get(0).isAggregator() && !every.isAggregator()) {
+				throw new RuntimeException("Only Aggregator may be added to a CoGroup with Aggregators.");
+			}
+		}
+
+		this.everies.add(every);
+		this.setOutgoingPipe(every);
 	}
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
 										List<DataSet> inputSets, List<Operator> inputOps) {
-
-		if(inputOps.size() <= 1) {
-			throw new RuntimeException("CoGroup requires at least two inputs");
-		}
 
 		boolean first = true;
 
@@ -79,11 +104,25 @@ public class CoGroupOperator extends Operator {
 			Fields incomingFields = incomingScope.getOutGroupingFields();
 
 			// build key Extractor mapper
-			MapFunction keyExtractor = new CoGroupKeyExtractor(
+			CoGroupKeyExtractor keyExtractor = new CoGroupKeyExtractor(
 					incomingFields,
 					groupByFields,
 					i);
 
+			CascadingTupleTypeInfo keyTupleInfo;
+			if(groupByFields.getComparators() != null) {
+				keyTupleInfo = new CascadingTupleTypeInfo(groupByFields.getComparators());
+			}
+			else {
+				keyTupleInfo = tupleType;
+			}
+
+			TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType =
+					new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
+							keyTupleInfo, BasicTypeInfo.INT_TYPE_INFO, tupleType
+					);
+
+			// TODO: self-joins + custom joins -> single reduce
 			// TODO: n-ary inner joins -> cascade of binary join operators
 			// TODO: n-ary outer joins -> cascade of binary co-group operators
 
@@ -101,14 +140,65 @@ public class CoGroupOperator extends Operator {
 			}
 		}
 
-		GroupReduceFunction coGroupReducer = new CoGroupReducer(coGroup, incomingScopes, getOutgoingScope());
+		if(everies.size() == 0) {
 
-		return mergedSets
-				.groupBy(0)
-				.sortGroup(1, Order.DESCENDING)
-				.reduceGroup(coGroupReducer)
-				.returns(tupleType)
-				.name("CoGroup Joiner");
+			GroupReduceFunction coGroupReducer = new CoGroupReducer(coGroup, incomingScopes, getOutgoingScope());
+
+			return mergedSets
+					.groupBy(0)
+					.sortGroup(1, Order.DESCENDING)
+					.reduceGroup(coGroupReducer)
+					.returns(tupleType)
+					.name("CoGroup Joiner");
+		}
+		else {
+
+			GroupReduceFunction coGroupReducer = new CoGroupReducerForEvery(coGroup, incomingScopes, getScopeBetween(coGroup, everies.get(0)));
+
+			DataSet<Tuple3<Tuple, Tuple, Tuple>> joinedSet = mergedSets
+					.groupBy(0)
+					.sortGroup(1, Order.DESCENDING)
+					.reduceGroup(coGroupReducer)
+					.returns(groupingAggregationType)
+					.withForwardedFields("f0")
+					.name("CoGroup Join "+coGroup.getName());
+
+			GroupReduceFunction reduceFunction = null;
+			Fields groupByFields = coGroup.getKeySelectors().get(getIncomingScopeFrom(inputOps.get(0)).getName());
+
+			if(everies.get(0).isAggregator()) {
+
+				Every[] aggregatorsA = everies.toArray(new Every[everies.size()]);
+
+				Scope[] inA = new Scope[everies.size()];
+				inA[0] = this.getScopeBetween(coGroup, aggregatorsA[0]);
+				for (int i = 1; i < inA.length; i++) {
+					inA[i] = this.getScopeBetween(aggregatorsA[i - 1], aggregatorsA[i]);
+				}
+
+				Scope[] outA = new Scope[everies.size()]; // these are the out scopes of all aggregators
+				for (int i = 0; i < outA.length - 1; i++) {
+					outA[i] = this.getScopeBetween(aggregatorsA[i], aggregatorsA[i + 1]);
+				}
+				outA[outA.length - 1] = this.getOutgoingScope();
+
+				// build the group function
+				reduceFunction = new AggregatorsReducer(aggregatorsA, inA, outA, groupByFields);
+			}
+			else if(everies.get(0).isBuffer()) {
+				Every buffer = everies.get(0);
+
+				reduceFunction = new BufferReducer(buffer,
+						this.getScopeBetween(coGroup, buffer), this.getOutgoingScope(), groupByFields);
+			}
+
+			return joinedSet
+					.groupBy(0)
+					.reduceGroup(reduceFunction)
+					.returns(tupleType)
+					.name("CoGroup Every "+coGroup.getName());
+
+		}
 
 
 	}

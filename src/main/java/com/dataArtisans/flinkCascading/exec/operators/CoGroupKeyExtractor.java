@@ -44,7 +44,12 @@ public class CoGroupKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, In
 	@Override
 	public void open(org.apache.flink.configuration.Configuration parameters) throws Exception {
 
-		this.groupKeyBuilder = getTupleBuilder(inputFields, groupingKeys);
+		if(!groupingKeys.isNone()) {
+			this.groupKeyBuilder = getTupleBuilder(inputFields, groupingKeys);
+		}
+		else {
+			this.groupKeyBuilder = getNullTupleBuilder();
+		}
 
 		outT = new Tuple3<Tuple, Integer, Tuple>();
 		outT.f1 = inputId;

@@ -181,11 +181,12 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				if(inputOp instanceof GroupByOperator) {
 
 					((GroupByOperator) inputOp).addEvery(every);
-					// add to memo
 					memo.put(every, inputOp);
 				}
 				else if(inputOp instanceof CoGroupOperator) {
-					throw new RuntimeException("Every on CoGroup not supported yet");
+
+					((CoGroupOperator) inputOp).addEvery(every);
+					memo.put(every, inputOp);
 				}
 				else {
 					throw new RuntimeException("Every can only be chained to GroupBy or CoGroup");
