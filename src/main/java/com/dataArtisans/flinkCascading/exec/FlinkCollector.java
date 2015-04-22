@@ -47,7 +47,6 @@ public class FlinkCollector extends TupleBuilderCollector {
 	protected void collect(TupleEntry outTupleE) throws IOException {
 
 		Tuple outgoing = buildTuple(outTupleE.getTuple());
-		// TODO: remove additional Tuple instantiation (Kryo serialization problem)
-		this.wrappedCollector.collect(new Tuple(outgoing));
+		this.wrappedCollector.collect(outgoing);
 	}
 }

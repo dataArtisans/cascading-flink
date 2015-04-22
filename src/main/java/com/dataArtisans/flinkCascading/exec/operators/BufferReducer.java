@@ -45,6 +45,7 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 	private transient Buffer buffer;
 	private transient TupleEntry groupEntry;
 	private transient TupleEntry argumentsEntry;
+	private transient TupleEntry passThroughEntry;
 	private transient TupleBuilder argumentsBuilder;
 	private transient TupleBuilder outgoingBuilder;
 	private transient ConcreteCall call;
@@ -76,6 +77,11 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 		argumentsEntry = new TupleEntry(outgoingScope.getArgumentsDeclarator(), true);
 		argumentsBuilder = TupleBuilderBuilder.createArgumentsBuilder(
 				incomingScope.getIncomingBufferArgumentFields(), argumentsSelector);
+
+		Fields passThroughFields = outgoingScope.getIncomingAggregatorPassThroughFields();
+		passThroughEntry = new TupleEntry(passThroughFields, false);
+		passThroughEntry.setTuple(new Tuple(new Object[passThroughFields.size()]));
+
 		outgoingBuilder = TupleBuilderBuilder.createOutgoingBuilder(
 				every, incomingScope.getIncomingBufferPassThroughFields(), argumentsSelector,
 				remainderFields, outgoingScope.getOperationDeclaredFields(), outgoingSelector);
@@ -95,10 +101,16 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 
 		call.setArgumentsIterator( argIt );
 
+		// init pass-through values with grouping key
+		if(passThroughEntry.getFields().contains(this.groupingFields)) {
+			// TODO: Check what happens if only a subset of the grouping keys is in the pass-through fields
+			passThroughEntry.setTuple(this.groupingFields, argIt.getKey());
+		}
+		flinkCollector.setInTuple(passThroughEntry.getTuple());
+
 		this.groupEntry.setTuple(argIt.getKey());
 		call.setGroup( this.groupEntry );
 		call.setOutputCollector( flinkCollector );
-
 
 		buffer.operate( ffp, call );
 

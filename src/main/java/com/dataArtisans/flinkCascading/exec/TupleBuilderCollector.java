@@ -26,9 +26,7 @@ import org.apache.flink.util.Collector;
 
 public abstract class TupleBuilderCollector extends TupleEntryCollector {
 
-	private Collector<Tuple> wrappedCollector;
 	private TupleBuilder builder;
-
 	private Tuple inTuple;
 
 	public TupleBuilderCollector(TupleBuilder builder, Fields declaredFields) {
