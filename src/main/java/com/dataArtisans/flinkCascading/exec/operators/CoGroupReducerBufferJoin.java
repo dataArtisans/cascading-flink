@@ -20,7 +20,10 @@ package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.flow.planner.Scope;
 import cascading.flow.stream.duct.Grouping;
+import cascading.operation.Buffer;
+import cascading.operation.ConcreteCall;
 import cascading.pipe.CoGroup;
+import cascading.pipe.Every;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
@@ -28,24 +31,28 @@ import cascading.tuple.TupleEntry;
 import cascading.tuple.TupleEntryIterator;
 import cascading.tuple.util.TupleBuilder;
 import com.dataArtisans.flinkCascading.exec.FlinkCoGroupClosure;
+import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
-import org.apache.flink.api.java.functions.FunctionAnnotation;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
 import java.util.Iterator;
 
-public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple3<Tuple, Tuple, Tuple>> {
+public class CoGroupReducerBufferJoin extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
 
 	private CoGroup coGroup;
+	private Every bufferJoiner;
 	private Scope[] incomingScopes;
 	private Scope outgoingScope;
+	private Scope bufferOutScope;
 
 	private int numInputs;
 
+	private transient Buffer buffer;
+	private transient ConcreteCall call;
 	private transient FlinkFlowProcess ffp;
 
 	private transient Fields[] keyFields;
@@ -57,15 +64,16 @@ public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple
 	private transient Grouping<TupleEntry, TupleEntryIterator> grouping;
 	private transient TupleEntry keyEntry;
 
-//	private transient Collector collector;
 	private transient FlinkCoGroupClosure closure;
 
 
-	public CoGroupReducerForEvery(CoGroup coGroup, Scope[] incomings, Scope outgoing) {
+	public CoGroupReducerBufferJoin(CoGroup coGroup, Every bufferJoiner, Scope[] incomings, Scope outgoing, Scope bufferOutScope) {
 
 		this.coGroup = coGroup;
+		this.bufferJoiner = bufferJoiner;
 		this.incomingScopes = incomings;
 		this.outgoingScope = outgoing;
+		this.bufferOutScope = bufferOutScope;
 		this.numInputs = incomings.length;
 	}
 
@@ -73,8 +81,9 @@ public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple
 	public void open(Configuration config) {
 
 		this.ffp = new FlinkFlowProcess(this.getRuntimeContext());
+		this.buffer = this.bufferJoiner.getBuffer();
 
-		/// Duct.initialize
+		this.call = new ConcreteCall(outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields());
 
 		keyFields = new Fields[ numInputs ];
 		valuesFields = new Fields[ numInputs ];
@@ -99,36 +108,27 @@ public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple
 		grouping = new Grouping();
 		grouping.key = keyEntry;
 
-		//// Duct.prepare()
-
 		closure = new FlinkCoGroupClosure( ffp, coGroup.getNumSelfJoins(), keyFields, valuesFields );
 		grouping.joinerClosure = closure;
 
 	}
 
 	@Override
-	public void reduce(Iterable<Tuple3<Tuple, Integer, Tuple>> vals, Collector<Tuple3<Tuple, Tuple, Tuple>> collector) throws Exception {
+	public void reduce(Iterable<Tuple3<Tuple, Integer, Tuple>> vals, Collector<Tuple> collector) throws Exception {
 
-		Tuple3<Tuple, Tuple, Tuple> outT = new Tuple3<Tuple, Tuple, Tuple>();
-		outT.f1 = new Tuple(); // not needed
+		FlinkCollector flinkCollector = new FlinkCollector(collector, new TupleBuilder() {
+			@Override
+			public Tuple makeResult(Tuple input, Tuple output) {
+				return output;
+			}
+		}, bufferOutScope.getOperationDeclaredFields());
 
 		closure.reset( vals.iterator() );
-		Iterator<Tuple> joinedTuples = null;
 
-		if( !( coGroup.getJoiner() instanceof BufferJoin) ) {
-			joinedTuples = coGroup.getJoiner().getIterator(closure);
-		}
-		else {
-			throw new RuntimeException("BufferJoin encountered.");
-		}
+		call.setJoinerClosure(closure);
+		call.setOutputCollector(flinkCollector);
 
-		keyEntry.setTuple( closure.getGroupTuple( closure.getGrouping() ) );
-		outT.f0 = keyEntry.getTuple(); // set grouping key
-
-		while(joinedTuples.hasNext()) {
-			outT.f2 = joinedTuples.next();
-			collector.collect(outT);
-		}
+		buffer.operate( ffp, call );
 
 	}
 

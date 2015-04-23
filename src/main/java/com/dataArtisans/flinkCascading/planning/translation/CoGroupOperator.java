@@ -22,12 +22,14 @@ import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.CoGroup;
 import cascading.pipe.Every;
+import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
 import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
+import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducerBufferJoin;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducerForEvery;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
@@ -151,6 +153,18 @@ public class CoGroupOperator extends Operator {
 					.returns(tupleType)
 					.name("CoGroup Joiner");
 		}
+		else if(everies.size() == 1 && everies.get(0).isBuffer() && this.coGroup.getJoiner() instanceof BufferJoin) {
+
+			GroupReduceFunction coGroupReducer = new CoGroupReducerBufferJoin(coGroup, everies.get(0), incomingScopes,
+					getScopeBetween(coGroup, everies.get(0)), getOutgoingScope());
+
+			return mergedSets
+					.groupBy(0)
+					.sortGroup(1, Order.DESCENDING)
+					.reduceGroup(coGroupReducer)
+					.returns(tupleType)
+					.name("CoGroup Joiner");
+		}
 		else {
 
 			GroupReduceFunction coGroupReducer = new CoGroupReducerForEvery(coGroup, incomingScopes, getScopeBetween(coGroup, everies.get(0)));
@@ -164,7 +178,7 @@ public class CoGroupOperator extends Operator {
 					.name("CoGroup Join "+coGroup.getName());
 
 			GroupReduceFunction reduceFunction = null;
-			Fields groupByFields = coGroup.getKeySelectors().get(getIncomingScopeFrom(inputOps.get(0)).getName());
+			Fields groupByFields = getScopeBetween(coGroup, everies.get(0)).getOutGroupingFields();
 
 			if(everies.get(0).isAggregator()) {
 

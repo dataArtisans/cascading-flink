@@ -108,20 +108,15 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 	@Override
 	public void reduce(Iterable<Tuple3<Tuple, Integer, Tuple>> vals, Collector<Tuple> collector) throws Exception {
 
-		// HadoopGroupGate.accept
-
 		closure.reset( vals.iterator() );
 
 		Iterator<Tuple> joinedTuples = null;
 
-		// Buffer is using JoinerClosure directly
 		if( !( coGroup.getJoiner() instanceof BufferJoin) ) {
-
 			joinedTuples = coGroup.getJoiner().getIterator(closure);
 		}
 		else {
-			throw new UnsupportedOperationException("Buffer Joins not supported yet");
-			// tupleEntryIterator.reset( vals ); // TODO: !!!
+			throw new RuntimeException("BufferJoin encountered.");
 		}
 
 		keyEntry.setTuple( closure.getGroupTuple( closure.getGrouping() ) );
