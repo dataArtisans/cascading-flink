@@ -89,7 +89,7 @@ public class HashJoinOperator extends Operator {
 					i);
 
 			CascadingTupleTypeInfo keyTupleInfo;
-			if(groupByFields.getComparators() != null) {
+			if(groupByFields.hasComparators()) {
 				keyTupleInfo = new CascadingTupleTypeInfo(groupByFields.getComparators());
 			}
 			else {
