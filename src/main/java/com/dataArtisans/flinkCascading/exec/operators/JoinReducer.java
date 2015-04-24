@@ -22,6 +22,7 @@ import cascading.flow.planner.Scope;
 import cascading.flow.stream.duct.Grouping;
 import cascading.pipe.CoGroup;
 import cascading.pipe.joiner.BufferJoin;
+import cascading.pipe.joiner.Joiner;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
@@ -37,9 +38,10 @@ import org.apache.flink.util.Collector;
 
 import java.util.Iterator;
 
-public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
+public class JoinReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
 
-	private CoGroup coGroup;
+	private Joiner joiner;
+	private int getNumSelfJoins;
 	private Scope[] incomingScopes;
 	private Scope outgoingScope;
 
@@ -60,12 +62,13 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 	private transient FlinkCoGroupClosure closure;
 
 
-	public CoGroupReducer(CoGroup coGroup, Scope[] incomings, Scope outgoing) {
+	public JoinReducer(Joiner joiner, int numSelfJoins, Scope[] incomings, Scope outgoing) {
 
-		this.coGroup = coGroup;
+		this.joiner = joiner;
 		this.incomingScopes = incomings;
 		this.outgoingScope = outgoing;
 		this.numInputs = incomings.length;
+		this.getNumSelfJoins = numSelfJoins;
 	}
 
 	@Override
@@ -100,7 +103,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 
 		//// Duct.prepare()
 
-		closure = new FlinkCoGroupClosure( ffp, coGroup.getNumSelfJoins(), keyFields, valuesFields );
+		closure = new FlinkCoGroupClosure( ffp, getNumSelfJoins, keyFields, valuesFields );
 		grouping.joinerClosure = closure;
 
 	}
@@ -112,8 +115,8 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 
 		Iterator<Tuple> joinedTuples = null;
 
-		if( !( coGroup.getJoiner() instanceof BufferJoin) ) {
-			joinedTuples = coGroup.getJoiner().getIterator(closure);
+		if( !( joiner instanceof BufferJoin) ) {
+			joinedTuples = joiner.getIterator(closure);
 		}
 		else {
 			throw new RuntimeException("BufferJoin encountered.");

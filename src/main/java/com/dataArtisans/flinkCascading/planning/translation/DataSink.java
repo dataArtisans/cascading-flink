@@ -39,12 +39,10 @@ import java.util.Properties;
 public class DataSink extends Operator {
 
 	private Tap tap;
-	private Scope incomingScope;
 
 	public DataSink(Tap tap, Operator inputOp, FlowElementGraph flowGraph) {
 		super(inputOp, tap, tap, flowGraph);
 		this.tap = tap;
-		this.incomingScope = flowGraph.incomingEdgesOf(tap).iterator().next();
 	}
 
 	@Override
@@ -57,10 +55,12 @@ public class DataSink extends Operator {
 
 		DataSet tail = inputs.get(0);
 
-		if(!tap.getSinkFields().isAll()) {
+		Fields tapFields = tap.getSinkFields();
 
-			Fields tapFields = tap.getSinkFields();
-			Fields tailFields = incomingScope.getOutValuesFields();
+		if(!tapFields.isAll()) {
+
+			Scope scope = getIncomingScopeFrom(inputOps.get(0));
+			Fields tailFields = scope.getIncomingTapFields();
 
 			// check if we need to project
 			if(!tapFields.equalsFields(tailFields)) {
@@ -78,7 +78,7 @@ public class DataSink extends Operator {
 			Configuration conf = new Configuration();
 
 			tail
-					.output(new HfsOutputFormat(hfs, incomingScope.getIncomingTapFields(), conf))
+					.output(new HfsOutputFormat(hfs, tapFields, conf))
 					.setParallelism(1);
 		}
 		else if(tap instanceof FileTap) {
@@ -87,7 +87,7 @@ public class DataSink extends Operator {
 			Properties props = new Properties();
 
 			tail
-					.output(new FileTapOutputFormat(fileTap, incomingScope.getIncomingTapFields(), props))
+					.output(new FileTapOutputFormat(fileTap, tapFields, props))
 					.setParallelism(1);
 		}
 		else {

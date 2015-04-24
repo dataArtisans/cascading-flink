@@ -24,7 +24,7 @@ import cascading.tuple.util.TupleBuilder;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 
-public class CoGroupKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
+public class JoinKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
 
 	private Fields inputFields;
 	private Fields groupingKeys;
@@ -33,9 +33,9 @@ public class CoGroupKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, In
 	private transient TupleBuilder groupKeyBuilder;
 	private Tuple3<Tuple, Integer, Tuple> outT;
 
-	public CoGroupKeyExtractor() {}
+	public JoinKeyExtractor() {}
 
-	public CoGroupKeyExtractor(Fields inputFields, Fields groupingKeys, int inputId) {
+	public JoinKeyExtractor(Fields inputFields, Fields groupingKeys, int inputId) {
 		this.inputFields = inputFields;
 		this.groupingKeys = groupingKeys;
 		this.inputId = inputId;

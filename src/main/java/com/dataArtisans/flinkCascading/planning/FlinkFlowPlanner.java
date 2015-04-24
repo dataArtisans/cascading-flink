@@ -36,6 +36,7 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
+import cascading.pipe.HashJoin;
 import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.tap.Tap;
@@ -44,6 +45,7 @@ import com.dataArtisans.flinkCascading.planning.translation.GroupByOperator;
 import com.dataArtisans.flinkCascading.planning.translation.CoGroupOperator;
 import com.dataArtisans.flinkCascading.planning.translation.DataSource;
 import com.dataArtisans.flinkCascading.planning.translation.EachOperator;
+import com.dataArtisans.flinkCascading.planning.translation.HashJoinOperator;
 import com.dataArtisans.flinkCascading.planning.translation.MergeOperator;
 import com.dataArtisans.flinkCascading.planning.translation.Operator;
 import com.dataArtisans.flinkCascading.planning.translation.PipeOperator;
@@ -208,6 +210,15 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 				CoGroupOperator coGroupOp = new CoGroupOperator(coGroup, inOps, flowGraph);
 				memo.put(coGroup, coGroupOp);
+			}
+			else if (e instanceof HashJoin) {
+
+				HashJoin join = (HashJoin) e;
+				List<Operator> inOps = getInputOps(join, flowGraph, memo);
+
+				HashJoinOperator hashJoinOp = new HashJoinOperator(join, inOps, flowGraph);
+				memo.put(join, hashJoinOp);
+
 			}
 			else if (e instanceof Pipe) {
 				// must stay last because it is super-class
