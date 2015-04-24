@@ -22,6 +22,7 @@ import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Each;
 import com.dataArtisans.flinkCascading.exec.operators.EachFilter;
 import com.dataArtisans.flinkCascading.exec.operators.EachFunctionMapper;
+import com.dataArtisans.flinkCascading.exec.operators.EachValueAssertionMapper;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -65,10 +66,13 @@ public class EachOperator extends Operator {
 					.name(each.getName());
 		}
 		else if (this.each.isValueAssertion()) {
-			throw new UnsupportedOperationException("ValueAssertion not supported yet!");
+			return inputSet
+					.map(new EachValueAssertionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
+					.returns(new CascadingTupleTypeInfo())
+					.name(each.getName());
 		}
 		else {
-			throw new UnsupportedOperationException("Unsupported Each!");
+			throw new UnsupportedOperationException("Unsupported Each type encountered.");
 		}
 
 	}
