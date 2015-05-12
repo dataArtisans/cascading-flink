@@ -52,7 +52,7 @@ public class PassOnCollector extends TupleBuilderCollector {
 		// set tuple as new in tuple in following collector
 		followingCollector.setInTuple(outgoing);
 
-		// call aggregator complete
+		// call aggregator complete to emit result tuple into following collector
 		followingAgg.complete(ffp, call);
 	}
 }

@@ -33,11 +33,13 @@ import com.dataArtisans.flinkCascading.exec.PassOnCollector;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderCollector;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
+import org.apache.flink.api.java.functions.FunctionAnnotation;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
-public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tuple>, Tuple> {
+@FunctionAnnotation.ForwardedFields("*")
+public class GroupAssertionReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tuple>, Tuple3<Tuple,Tuple,Tuple>> {
 
 	private Every[] everies;
 	private Scope[] outgoingScopes;
@@ -46,15 +48,13 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 
 	private transient TupleEntry groupEntry;
 
-	private transient Aggregator[] aggregators;
+	private transient GroupAssertion[] assertions;
 	private transient TupleEntry[] argumentsEntries;
 	private transient TupleBuilder[] argumentsBuilders;
-	private transient TupleBuilder[] outgoingBuilders;
 	private transient ConcreteCall[] calls;
 	private transient FlinkFlowProcess[] ffps;
 
-
-	public AggregatorsReducer(Every[] everies, Scope[] incomings, Scope[] outgoings, Fields groupingFields) {
+	public GroupAssertionReducer(Every[] everies, Scope[] incomings, Scope[] outgoings, Fields groupingFields) {
 
 		if(everies.length != outgoings.length) {
 			throw new IllegalArgumentException("Number of everies and outgoing scopes must be equal.");
@@ -73,11 +73,10 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 
 		this.groupEntry = new TupleEntry(groupingFields);
 
-		// initialize aggregations
-		this.aggregators = new Aggregator[num];
+		// initialize assertions
+		this.assertions = new GroupAssertion[num];
 		this.argumentsEntries = new TupleEntry[num];
 		this.argumentsBuilders = new TupleBuilder[num];
-		this.outgoingBuilders = new TupleBuilder[num];
 		this.calls = new ConcreteCall[num];
 		this.ffps = new FlinkFlowProcess[num];
 		for (int i=0; i<num; i++) {
@@ -86,28 +85,23 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 			this.calls[i] = new ConcreteCall(outgoingScopes[i].getArgumentsDeclarator(), outgoingScopes[i].getOperationDeclaredFields());
 
 			Fields argumentsSelector = outgoingScopes[i].getArgumentsSelector();
-			Fields remainderFields = outgoingScopes[i].getRemainderPassThroughFields();
-			Fields outgoingSelector = outgoingScopes[i].getOutGroupingSelector();
 
 			argumentsEntries[i] = new TupleEntry(outgoingScopes[i].getArgumentsDeclarator(), true);
 			argumentsBuilders[i] = TupleBuilderBuilder.createArgumentsBuilder(
 					incomingScopes[i].getIncomingAggregatorArgumentFields(), argumentsSelector);
-			outgoingBuilders[i] = TupleBuilderBuilder.createOutgoingBuilder(
-					everies[i], incomingScopes[i].getIncomingAggregatorPassThroughFields(), argumentsSelector,
-					remainderFields, outgoingScopes[i].getOperationDeclaredFields(), outgoingSelector);
 
 			calls[i].setArguments(argumentsEntries[i]);
-			this.aggregators[i] = this.everies[i].getAggregator();
-			this.aggregators[i].prepare(ffps[i], calls[i]);
+			this.assertions[i] = this.everies[i].getGroupAssertion();
+			this.assertions[i].prepare(ffps[i], calls[i]);
 		}
 
 	}
 
 	@Override
-	public void reduce(Iterable<Tuple3<Tuple, Tuple, Tuple>> vals, Collector<Tuple> collector) throws Exception {
+	public void reduce(Iterable<Tuple3<Tuple, Tuple, Tuple>> vals, Collector<Tuple3<Tuple, Tuple, Tuple>> collector) throws Exception {
 
 		boolean first = true;
-		Tuple key = null;
+		Tuple key;
 		Tuple val;
 
 		for(Tuple3<Tuple, Tuple, Tuple> v : vals) {
@@ -115,8 +109,8 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 			key = v.f0;
 			val = v.f2;
 
-			// process aggregations
-			for(int i=0; i<this.aggregators.length; i++) {
+			// process assertions
+			for(int i=0; i<this.assertions.length; i++) {
 
 				// start group
 				if (first) {
@@ -126,36 +120,21 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 					calls[i].setArguments(null);  // zero it out
 					calls[i].setOutputCollector(null); // zero it out
 
-					aggregators[i].start(ffps[i], calls[i]);
+					assertions[i].start(ffps[i], calls[i]);
 				}
 
 				argumentsEntries[i].setTuple(argumentsBuilders[i].makeResult(val, null));
 				calls[i].setArguments(argumentsEntries[i]);
-				aggregators[i].aggregate(ffps[i], calls[i]);
+				assertions[i].aggregate(ffps[i], calls[i]);
+
+				collector.collect(v);
 			}
 			first = false;
-
 		}
 
-		// starting from last aggregator
-		int i = this.aggregators.length-1;
-
-		TupleBuilderCollector tupleBuilderCollector =
-				new FlinkCollector(collector, this.outgoingBuilders[i], outgoingScopes[i].getOperationDeclaredFields() );
-		calls[i].setOutputCollector(tupleBuilderCollector);
-		calls[i].setArguments(null);
-		for(i=this.aggregators.length-1; i > 0; i--) {
-			// chain collectors
-			tupleBuilderCollector =
-					new PassOnCollector(aggregators[i], tupleBuilderCollector, ffps[i], calls[i], outgoingBuilders[i-1], outgoingScopes[i-1].getOperationDeclaredFields() );
-			calls[i-1].setOutputCollector(tupleBuilderCollector);
-			calls[i-1].setArguments(null);
+		for(int i=0; i < this.assertions.length; i++) {
+			this.assertions[i].doAssert(ffps[i], calls[i]);
 		}
-
-		// finish group
-		tupleBuilderCollector.setInTuple(key);
-		aggregators[0].complete(ffps[0], calls[0]);
-
 	}
 
 }

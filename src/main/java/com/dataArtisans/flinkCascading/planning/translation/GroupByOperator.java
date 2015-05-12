@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.planning.translation;
 
+import cascading.flow.FlowElement;
 import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Every;
@@ -26,6 +27,7 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
 import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
+import com.dataArtisans.flinkCascading.exec.operators.GroupAssertionReducer;
 import com.dataArtisans.flinkCascading.exec.operators.GroupByKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.IdentityReducer;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
@@ -39,56 +41,99 @@ import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 public class GroupByOperator extends Operator {
 
+	public static enum EveryType {
+		NONE,
+		AGGREGATION,
+		BUFFER
+	}
+
 	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
 
 	private GroupBy groupBy;
-	private List<Every> everies;
+	private List<Every> functions;
+	private List<Every> assertions;
+
+	private FlowElement lastAdded;
+	private HashMap<FlowElement, Scope> incomingScopes;
+	private HashMap<FlowElement, Scope> outgoingScopes;
+
+	private EveryType type;
 
 	public GroupByOperator(GroupBy groupBy, List<Operator> inputOps, FlowElementGraph flowGraph) {
 
 		super(inputOps, groupBy, groupBy, flowGraph);
 
 		this.groupBy = groupBy;
-		this.everies = new ArrayList<Every>();
+		this.type = EveryType.NONE;
+		this.functions = new ArrayList<Every>();
+		this.assertions = new ArrayList<Every>();
+
+		this.incomingScopes = new HashMap<FlowElement, Scope>();
+		this.outgoingScopes = new HashMap<FlowElement, Scope>();
+		this.lastAdded = groupBy;
 
 	}
 
 	public void addEvery(Every every) {
 
 		if(every.isGroupAssertion()) {
-			throw new RuntimeException("GroupAssertion not supported yet.");
+			switch(this.type) {
+				case NONE:
+					break;
+			}
+			this.assertions.add(every);
+		}
+		else if(every.isBuffer()) {
+			switch(this.type) {
+				case NONE:
+					this.type = EveryType.BUFFER;
+					this.functions.add(every);
+					break;
+				case BUFFER:
+					throw new RuntimeException("Only one Buffer allowed after a GroupBy.");
+				case AGGREGATION:
+					throw new RuntimeException("A Buffer may not be added to a GroupBy with Aggregators.");
+			}
+		}
+		else if(every.isAggregator()) {
+			switch(this.type) {
+				case NONE:
+				case AGGREGATION:
+					this.type = EveryType.AGGREGATION;
+					this.functions.add(every);
+					break;
+				case BUFFER:
+					throw new RuntimeException("GroupBy already closed by Buffer.");
+			}
 		}
 
-		if(everies.size() > 0) {
-			if(everies.get(0).isBuffer()) {
-				throw new RuntimeException("GroupBy already closed by Buffer.");
-			}
-			else if(everies.get(0).isGroupAssertion()) {
-				throw new RuntimeException("GroupBy already closed by GroupAssertion.");
-			}
-			else if(everies.get(0).isAggregator() && !every.isAggregator()) {
-				throw new RuntimeException("Only Aggregator may be added to a GroupBy with Aggregators.");
-			}
-		}
+		incomingScopes.put(every, this.getScopeBetween(lastAdded, every));
+		outgoingScopes.put(lastAdded, this.getScopeBetween(lastAdded, every));
 
-		this.everies.add(every);
 		this.setOutgoingPipe(every);
+		this.lastAdded = every;
 	}
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputSets, List<Operator> inputOps) {
+									   List<DataSet> inputSets, List<Operator> inputOps) {
+
+		// add latest outgoing scope
+		this.outgoingScopes.put(lastAdded, this.getOutgoingScope());
 
 		boolean first = true;
 		boolean secondarySort = false;
 
 		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
 		Fields groupByFields = null;
+		TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType = null;
 
+		// get unioned input for group-by
 		for(int i=0; i<inputOps.size(); i++) {
 			Operator inOp = inputOps.get(i);
 			DataSet inSet = inputSets.get(i);
@@ -111,10 +156,9 @@ public class GroupByOperator extends Operator {
 				keyTupleInfo = tupleType;
 			}
 
-			TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType =
-				new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
-						keyTupleInfo, tupleType, tupleType
-				);
+			groupingSortingType = new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
+							keyTupleInfo, tupleType, tupleType
+					);
 
 			// build key Extractor mapper
 			MapFunction keyExtractor = new GroupByKeyExtractor(
@@ -135,53 +179,102 @@ public class GroupByOperator extends Operator {
 			}
 		}
 
-		GroupReduceFunction reduceFunction = null;
-
-		if(everies.size() == 0) {
-			// use identity reducer
-			reduceFunction = new IdentityReducer();
-		}
-		else if(everies.get(0).isAggregator()) {
-
-			Every[] aggregatorsA = everies.toArray(new Every[everies.size()]);
-
-			Scope[] inA = new Scope[everies.size()];
-			inA[0] = this.getScopeBetween(groupBy, aggregatorsA[0]);
-			for (int i = 1; i < inA.length; i++) {
-				inA[i] = this.getScopeBetween(aggregatorsA[i - 1], aggregatorsA[i]);
+		// build assertion reducer
+		GroupReduceFunction reduceAssertion = null;
+		if(this.assertions.size() > 0) {
+			Every[] assertionsA = new Every[assertions.size()];
+			for(int i=0;i<this.assertions.size(); i++) {
+				assertionsA[i] = this.assertions.get(i);
 			}
 
-			Scope[] outA = new Scope[everies.size()]; // these are the out scopes of all aggregators
-			for (int i = 0; i < outA.length - 1; i++) {
-				outA[i] = this.getScopeBetween(aggregatorsA[i], aggregatorsA[i + 1]);
+			Scope[] inA = new Scope[assertions.size()];
+			for (int i = 0; i < inA.length; i++) {
+				inA[i] = this.incomingScopes.get(assertionsA[i]);
 			}
-			outA[outA.length - 1] = this.getOutgoingScope();
+
+			Scope[] outA = new Scope[assertions.size()];
+			for (int i = 0; i < outA.length; i++) {
+					outA[i] = this.outgoingScopes.get(assertionsA[i]);
+			}
 
 			// build the group function
-			reduceFunction = new AggregatorsReducer(aggregatorsA, inA, outA, groupByFields);
+			reduceAssertion = new GroupAssertionReducer(assertionsA, inA, outA, groupByFields);
 		}
-		else if(everies.get(0).isBuffer()) {
-			Every buffer = everies.get(0);
 
-			reduceFunction = new BufferReducer(buffer,
-							this.getScopeBetween(groupBy, buffer), this.getOutgoingScope(), groupByFields);
+		// build function reducer
+		GroupReduceFunction reduceFunction = null;
+		switch(this.type) {
+			case NONE:
+				// use identity reducer
+				reduceFunction = new IdentityReducer();
+				break;
+			case AGGREGATION:
+
+				Every[] aggregatorsA = functions.toArray(new Every[functions.size()]);
+
+				Scope[] inA = new Scope[functions.size()];
+				for (int i = 0; i < inA.length; i++) {
+					inA[i] = this.incomingScopes.get(aggregatorsA[i]);
+				}
+
+				Scope[] outA = new Scope[functions.size()];
+				for (int i = 0; i < outA.length; i++) {
+					outA[i] = this.outgoingScopes.get(aggregatorsA[i]);
+				}
+
+				// build the group function
+				reduceFunction = new AggregatorsReducer(aggregatorsA, inA, outA, groupByFields);
+				break;
+			case BUFFER:
+				Every buffer = functions.get(0);
+
+				reduceFunction = new BufferReducer(buffer,
+						this.incomingScopes.get(buffer), this.outgoingScopes.get(buffer), groupByFields);
+				break;
 		}
 
 		if(secondarySort) {
-			return mergedSets
-					.groupBy(0)
-					.sortGroup(1, Order.ASCENDING)
-					.reduceGroup(reduceFunction)
-					.returns(tupleType)
-					.name("GroupBy "+groupBy.getName());
+
+			if(reduceAssertion == null) {
+				return mergedSets
+						.groupBy(0)
+						.sortGroup(1, Order.ASCENDING)
+						.reduceGroup(reduceFunction)
+						.returns(tupleType)
+						.name("GroupBy " + groupBy.getName());
+			}
+			else {
+				return mergedSets
+						.groupBy(0)
+						.sortGroup(1, Order.ASCENDING)
+						.reduceGroup(reduceAssertion)
+						.returns(groupingSortingType)
+						.groupBy(0)
+						.sortGroup(1, Order.ASCENDING)
+						.reduceGroup(reduceFunction)
+						.returns(tupleType)
+						.name("GroupBy " + groupBy.getName());
+			}
 
 		} else {
 
-			return mergedSets
-					.groupBy(0)
-					.reduceGroup(reduceFunction)
-					.returns(tupleType)
-					.name("GroupBy "+groupBy.getName());
+			if(reduceAssertion == null) {
+				return mergedSets
+						.groupBy(0)
+						.reduceGroup(reduceFunction)
+						.returns(tupleType)
+						.name("GroupBy " + groupBy.getName());
+			}
+			else {
+				return mergedSets
+						.groupBy(0)
+						.reduceGroup(reduceAssertion)
+						.returns(groupingSortingType)
+						.groupBy(0)
+						.reduceGroup(reduceFunction)
+						.returns(tupleType)
+						.name("GroupBy " + groupBy.getName());
+			}
 		}
 	}
 

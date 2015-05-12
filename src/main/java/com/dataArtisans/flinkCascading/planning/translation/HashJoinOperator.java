@@ -80,7 +80,7 @@ public class HashJoinOperator extends Operator {
 			incomingScopes[i] = incomingScope;
 
 			Fields groupByFields = hashJoin.getKeySelectors().get(incomingScope.getName());
-			Fields incomingFields = incomingScope.getOutValuesFields();
+			Fields incomingFields = incomingScope.getIncomingTapFields(); // TODO: need to distinguish whether predecessor is splice or not
 
 			// build key Extractor mapper
 			JoinKeyExtractor keyExtractor = new JoinKeyExtractor(

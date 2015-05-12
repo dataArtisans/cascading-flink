@@ -20,6 +20,7 @@ package com.dataArtisans.flinkCascading.planning;
 
 import cascading.flow.BaseFlow;
 import cascading.flow.FlowDef;
+import cascading.flow.FlowException;
 import cascading.flow.FlowProcess;
 import cascading.flow.planner.PlatformInfo;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
@@ -60,13 +61,8 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	protected void internalStart() {
-		// not sure what to do here...
 
-		try {
-			flinkEnv.execute();
-		} catch(Exception e) {
-			throw new RuntimeException("Flink Execution failed...", e);
-		}
+		// setup stuff: delete output files if overwrite, etc.
 
 	}
 
@@ -85,7 +81,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 			flinkEnv.execute();
 		} catch(Exception e) {
-			e.printStackTrace();
+			throw new FlowException("Flow execution failed", e);
 		}
 	}
 

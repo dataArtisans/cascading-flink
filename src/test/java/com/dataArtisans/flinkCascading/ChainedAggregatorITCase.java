@@ -20,12 +20,14 @@ package com.dataArtisans.flinkCascading;
 
 import cascading.flow.FlowDef;
 import cascading.flow.FlowProcess;
+import cascading.operation.AssertionLevel;
 import cascading.operation.Function;
 import cascading.operation.FunctionCall;
 import cascading.operation.OperationCall;
 import cascading.operation.aggregator.Average;
 import cascading.operation.aggregator.Count;
 import cascading.operation.aggregator.Sum;
+import cascading.operation.assertion.AssertGroupSizeMoreThan;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
