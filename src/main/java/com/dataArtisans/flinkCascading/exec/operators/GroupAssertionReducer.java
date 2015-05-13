@@ -77,7 +77,7 @@ public class GroupAssertionReducer extends RichGroupReduceFunction<Tuple3<Tuple,
 		this.ffps = new FlinkFlowProcess[num];
 		for (int i=0; i<num; i++) {
 
-			this.ffps[i] = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
+			this.ffps[i] = new FlinkFlowProcess(config, this.getRuntimeContext());
 			this.calls[i] = new ConcreteCall(outgoingScopes[i].getArgumentsDeclarator(), outgoingScopes[i].getOperationDeclaredFields());
 
 			Fields argumentsSelector = outgoingScopes[i].getArgumentsSelector();

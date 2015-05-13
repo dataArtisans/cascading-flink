@@ -35,6 +35,7 @@ import cascading.flow.planner.rule.transformer.RemoveNoOpPipeTransformer;
 import cascading.scheme.Scheme;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class FlinkConnector extends FlowConnector {
@@ -42,7 +43,7 @@ public class FlinkConnector extends FlowConnector {
 	private ExecutionEnvironment env;
 
 	public FlinkConnector(ExecutionEnvironment env) {
-		this.env = env;
+		this(env, new HashMap<Object, Object>());
 	}
 
 	public FlinkConnector(ExecutionEnvironment env, Map<Object, Object> properties) {

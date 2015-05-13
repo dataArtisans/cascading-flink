@@ -22,6 +22,7 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.util.TupleBuilder;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.configuration.Configuration;
 
 public class ProjectionMapper extends RichMapFunction<Tuple, Tuple> {
 
@@ -38,7 +39,7 @@ public class ProjectionMapper extends RichMapFunction<Tuple, Tuple> {
 	}
 
 	@Override
-	public void open(org.apache.flink.configuration.Configuration parameters) throws Exception {
+	public void open(Configuration parameters) throws Exception {
 
 		this.outputBuilder = new TupleBuilder() {
 

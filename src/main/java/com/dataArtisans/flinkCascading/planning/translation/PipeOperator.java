@@ -22,6 +22,7 @@ import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Pipe;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.List;
 
@@ -33,7 +34,8 @@ public class PipeOperator extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputs, List<Operator> inputOps) {
+										List<DataSet> inputs, List<Operator> inputOps,
+										Configuration config) {
 
 		return inputs.get(0);
 	}

@@ -18,11 +18,11 @@
 
 package com.dataArtisans.flinkCascading.exec.operators;
 
+import cascading.flow.hadoop.HadoopFlowProcess;
 import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryCollector;
-import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.configuration.Configuration;
 import org.apache.hadoop.mapred.JobConf;
@@ -74,10 +74,11 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 	public void open(int taskNumber, int numTasks) throws IOException {
 
 		this.jobConf.setInt("mapred.task.partition", taskNumber + 1);
+		this.jobConf.setNumMapTasks(numTasks);
 
-		FlinkFlowProcess ffp = new FlinkFlowProcess(jobConf, numTasks, taskNumber );
+		HadoopFlowProcess hfp = new HadoopFlowProcess(jobConf);
 
-		this.tupleEntryCollector = this.hfsTap.openForWrite(ffp, null);
+		this.tupleEntryCollector = this.hfsTap.openForWrite(hfp, null);
 		if( this.hfsTap.getSinkFields().isAll() )
 		{
 			this.tupleEntryCollector.setFields(tapFields);

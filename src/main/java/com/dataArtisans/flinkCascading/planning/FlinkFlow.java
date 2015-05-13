@@ -22,13 +22,13 @@ import cascading.flow.BaseFlow;
 import cascading.flow.FlowDef;
 import cascading.flow.FlowException;
 import cascading.flow.FlowProcess;
-import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.flink.configuration.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class FlinkFlow extends BaseFlow<Configuration> {
@@ -53,7 +53,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 			return;
 		}
 
-		config = HadoopUtil.copyJobConf(parentConfig); // prevent local values from being shared
+		config = parentConfig.clone();
 	}
 
 
@@ -64,12 +64,12 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 			return;
 		}
 
-		config.set( key.toString(), value.toString() );
+		config.setString(key.toString(), value.toString());
 	}
 
 	@Override
 	protected Configuration newConfig(Configuration defaultConfig) {
-		return defaultConfig == null ? new JobConf() : HadoopUtil.copyJobConf( defaultConfig );
+		return defaultConfig == null ? new Configuration() : defaultConfig.clone();
 	}
 
 	@Override
@@ -111,7 +111,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	@Override
 	public Configuration getConfig() {
 		if( config == null ) {
-			initConfig(null, new JobConf());
+			initConfig(null, new Configuration());
 		}
 
 		return config;
@@ -119,23 +119,30 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	public Configuration getConfigCopy() {
-		return HadoopUtil.copyJobConf( getConfig() );
+		return getConfig().clone();
 	}
 
 	@Override
 	public Map<Object, Object> getConfigAsProperties() {
-		return HadoopUtil.createProperties( getConfig() );
+		Map<Object, Object> props = new HashMap<Object, Object>();
+
+		Configuration conf = getConfig();
+		for(String key : conf.keySet()) {
+			props.put(key, conf.getString(key, null));
+		}
+
+		return props;
 	}
 
 	@Override
 	public String getProperty(String key) {
-		return getConfig().get( key );
+		return getConfig().getString(key, null);
 
 	}
 
 	@Override
 	public FlowProcess getFlowProcess() {
-		return new FlinkFlowProcess(this.getConfig());
+		return new FlinkFlowProcess(new Configuration()); // TODO!!!
 	}
 
 	@Override

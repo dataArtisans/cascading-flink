@@ -44,6 +44,7 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -123,7 +124,8 @@ public class CoGroupOperator extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputSets, List<Operator> inputOps) {
+										List<DataSet> inputSets, List<Operator> inputOps,
+										Configuration config) {
 
 		// add latest outgoing scope
 		this.outgoingScopes.put(lastAdded, this.getOutgoingScope());
@@ -217,6 +219,7 @@ public class CoGroupOperator extends Operator {
 							.groupBy(0)
 							.sortGroup(1, Order.DESCENDING)
 							.reduceGroup(coGroupReducer)
+							.withParameters(config)
 							.returns(tupleType)
 							.name("CoGrouper " + coGroup.getName());
 				}
@@ -228,11 +231,13 @@ public class CoGroupOperator extends Operator {
 							.groupBy(0)
 							.sortGroup(1, Order.DESCENDING)
 							.reduceGroup(coGroupReducer)
+							.withParameters(config)
 							.returns(groupingAggregationType)
 							.withForwardedFields("f0")
 							.name("CoGrouper " + coGroup.getName())
 							.groupBy(0)
 							.reduceGroup(reduceAssertion)
+							.withParameters(config)
 							.returns(groupingAggregationType)
 							.groupBy(0)
 							.reduceGroup(new IdentityReducer())
@@ -248,6 +253,7 @@ public class CoGroupOperator extends Operator {
 						.groupBy(0)
 						.sortGroup(1, Order.DESCENDING)
 						.reduceGroup(coGroupReducer)
+						.withParameters(config)
 						.returns(groupingAggregationType)
 						.withForwardedFields("f0")
 						.name("CoGrouper " + coGroup.getName());
@@ -286,6 +292,7 @@ public class CoGroupOperator extends Operator {
 					return joinedSet
 							.groupBy(0)
 							.reduceGroup(reduceFunction)
+							.withParameters(config)
 							.returns(tupleType)
 							.name("CoGroup Every " + coGroup.getName());
 
@@ -295,9 +302,11 @@ public class CoGroupOperator extends Operator {
 					return joinedSet
 							.groupBy(0)
 							.reduceGroup(reduceAssertion)
+							.withParameters(config)
 							.returns(groupingAggregationType)
 							.groupBy(0)
 							.reduceGroup(reduceFunction)
+							.withParameters(config)
 							.returns(tupleType)
 							.name("CoGroup Every " + coGroup.getName());
 				}
@@ -318,6 +327,7 @@ public class CoGroupOperator extends Operator {
 						.groupBy(0)
 						.sortGroup(1, Order.DESCENDING)
 						.reduceGroup(coGroupReducer)
+						.withParameters(config)
 						.returns(tupleType)
 						.name("CoGrouper " + coGroup.getName());
 			}

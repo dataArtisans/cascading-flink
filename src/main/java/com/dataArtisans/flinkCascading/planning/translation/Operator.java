@@ -23,6 +23,7 @@ import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,7 +57,7 @@ public abstract class Operator {
 		this.outPipe = outPipe;
 	}
 
-	public DataSet getFlinkOperator(ExecutionEnvironment env) {
+	public DataSet getFlinkOperator(ExecutionEnvironment env, Configuration config) {
 
 		// check if already translated
 		if(this.memo == null) {
@@ -64,19 +65,20 @@ public abstract class Operator {
 			// get all inputs
 			List<DataSet> inputs = new ArrayList<DataSet>();
 			for (Operator inOp : inputOps) {
-				DataSet input = inOp.getFlinkOperator(env);
+				DataSet input = inOp.getFlinkOperator(env, config);
 				inputs.add(input);
 			}
 
 			// translate this operator
-			this.memo = translateToFlink(env, inputs, inputOps);
+			this.memo = translateToFlink(env, inputs, inputOps, config);
 		}
 
 		return this.memo;
 	}
 
 	protected abstract DataSet translateToFlink(ExecutionEnvironment env,
-												List<DataSet> inputs, List<Operator> inputOps);
+												List<DataSet> inputs, List<Operator> inputOps,
+												Configuration config);
 
 	protected Scope getIncomingScopeFrom(Operator op) {
 		return this.flowGraph.getEdge(op.outPipe, this.inPipe);

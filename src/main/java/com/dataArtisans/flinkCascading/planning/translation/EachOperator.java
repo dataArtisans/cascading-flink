@@ -26,6 +26,7 @@ import com.dataArtisans.flinkCascading.exec.operators.EachValueAssertionMapper;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.List;
 
@@ -40,7 +41,8 @@ public class EachOperator extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputSets, List<Operator> inputOps) {
+										List<DataSet> inputSets, List<Operator> inputOps,
+										Configuration config) {
 
 		if(inputOps.size() != 1) {
 			throw new IllegalArgumentException("Not exactly one input operator");
@@ -56,18 +58,21 @@ public class EachOperator extends Operator {
 		if(this.each.isFunction()) {
 			return inputSet
 					.flatMap(new EachFunctionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
+					.withParameters(config)
 					.returns(new CascadingTupleTypeInfo())
 					.name(each.getName());
 		}
 		else if (this.each.isFilter()) {
 			return inputSet
 					.filter(new EachFilter(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
+					.withParameters(config)
 					.returns(new CascadingTupleTypeInfo())
 					.name(each.getName());
 		}
 		else if (this.each.isValueAssertion()) {
 			return inputSet
 					.map(new EachValueAssertionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
+					.withParameters(config)
 					.returns(new CascadingTupleTypeInfo())
 					.name(each.getName());
 		}

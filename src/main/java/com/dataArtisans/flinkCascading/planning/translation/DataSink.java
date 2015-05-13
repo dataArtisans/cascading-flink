@@ -30,7 +30,7 @@ import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.List;
 import java.util.Properties;
@@ -47,7 +47,8 @@ public class DataSink extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputs, List<Operator> inputOps) {
+										List<DataSet> inputs, List<Operator> inputOps,
+										Configuration config) {
 
 		if(inputs.size() != 1) {
 			throw new RuntimeException("Each requires exactly one input");
@@ -75,7 +76,7 @@ public class DataSink extends Operator {
 		if (tap instanceof Hfs) {
 
 			Hfs hfs = (Hfs) tap;
-			Configuration conf = new Configuration();
+			org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
 
 			tail
 					.output(new HfsOutputFormat(hfs, tapFields, conf))

@@ -71,7 +71,7 @@ public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(config, this.getRuntimeContext());
 
 		/// Duct.initialize
 

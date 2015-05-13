@@ -29,7 +29,7 @@ import com.dataArtisans.flinkCascading.exec.operators.HfsInputFormat;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -49,7 +49,8 @@ public class DataSource extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputs, List<Operator> inputOps) {
+										List<DataSet> inputs, List<Operator> inputOps,
+										Configuration config) {
 
 		if(tap instanceof Hfs) {
 			return translateHfsSource((Hfs) tap, env);
@@ -66,7 +67,7 @@ public class DataSource extends Operator {
 	}
 
 	private DataSet translateHfsSource(Hfs tap, ExecutionEnvironment env) {
-		Configuration conf = new Configuration();
+		org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
 		tap.getScheme().sourceConfInit(null, tap, conf);
 		conf.set("mapreduce.input.fileinputformat.inputdir", tap.getPath().toString());
 

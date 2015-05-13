@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.planning;
 
+import cascading.flow.FlowConnector;
 import cascading.flow.FlowDef;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowStep;
@@ -50,7 +51,8 @@ import com.dataArtisans.flinkCascading.planning.translation.MergeOperator;
 import com.dataArtisans.flinkCascading.planning.translation.Operator;
 import com.dataArtisans.flinkCascading.planning.translation.PipeOperator;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.mapred.JobConf;
 import org.jgrapht.traverse.TopologicalOrderIterator;
 
 import java.util.Arrays;
@@ -59,6 +61,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 
@@ -73,8 +76,41 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	}
 
 	@Override
+	public void initialize( FlowConnector flowConnector, Map<Object, Object> properties ) {
+		super.initialize(flowConnector, properties);
+
+		// copy properties into configuration
+		Set<Object> keys = new HashSet<Object>( properties.keySet() );
+		// keys will only be grabbed if both key/value are String, so keep orig keys
+		if(properties instanceof Properties) {
+			keys.addAll(((Properties) properties).stringPropertyNames());
+		}
+
+		for( Object key : keys ) {
+			Object value = properties.get( key );
+
+			if( value == null && properties instanceof Properties && key instanceof String ) {
+				value = ((Properties) properties).getProperty((String) key);
+			}
+
+			if( value == null ) {
+				// don't stuff null values
+				continue;
+			}
+
+			// don't let these objects pass, even though toString is called below.
+			if( value instanceof Class || value instanceof JobConf) {
+				continue;
+			}
+
+			this.defaultConfig.setString(key.toString(), value.toString());
+		}
+
+	}
+
+	@Override
 	public Configuration getDefaultConfig() {
-		return null;
+		return defaultConfig;
 	}
 
 	@Override
@@ -98,10 +134,6 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		// not required for Flink
 		return null;
 	}
-
-	// TODO: REWRITE TO A GRAPH OF FLINK OPERATOR NODES:
-	// 1. check flow, choose which pipes to process in one operator, and build a graph from that
-	// 2. translate the graph as a second step
 
 	@Override
 	public FlinkFlow buildFlow( FlowDef flowDef, RuleRegistrySet ruleRegistrySet ) {
@@ -236,7 +268,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		}
 
 		for(DataSink s : flinkSinks) {
-			s.getFlinkOperator(env);
+			s.getFlinkOperator(env, this.getDefaultConfig());
 		}
 
 		return new FlinkFlow(env, getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());

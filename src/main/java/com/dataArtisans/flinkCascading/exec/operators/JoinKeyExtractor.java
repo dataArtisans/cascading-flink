@@ -23,6 +23,7 @@ import cascading.tuple.Tuple;
 import cascading.tuple.util.TupleBuilder;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.configuration.Configuration;
 
 public class JoinKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
 
@@ -42,7 +43,7 @@ public class JoinKeyExtractor extends RichMapFunction<Tuple, Tuple3<Tuple, Integ
 	}
 
 	@Override
-	public void open(org.apache.flink.configuration.Configuration parameters) throws Exception {
+	public void open(Configuration parameters) throws Exception {
 
 		if(!groupingKeys.isNone()) {
 			this.groupKeyBuilder = getTupleBuilder(inputFields, groupingKeys);

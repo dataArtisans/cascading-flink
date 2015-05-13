@@ -58,7 +58,7 @@ public class EachValueAssertionMapper extends RichMapFunction<Tuple, Tuple> {
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(config, this.getRuntimeContext());
 		this.assertion = each.getValueAssertion();
 
 		call = new ConcreteCall( outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields() );

@@ -28,8 +28,6 @@ import cascading.tuple.Tuples;
 import cascading.tuple.collect.Spillable;
 import cascading.tuple.collect.SpillableTupleList;
 import cascading.tuple.collect.TupleCollectionFactory;
-import cascading.tuple.hadoop.collect.HadoopTupleCollectionFactory;
-import cascading.tuple.util.TupleBuilder;
 import cascading.tuple.util.TupleViews;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.hadoop.conf.Configuration;
@@ -64,7 +62,7 @@ public class FlinkCoGroupClosure extends JoinerClosure {
 		this.emptyTuple = Tuple.size( joinFields[0].size() );
 		FactoryLoader loader = FactoryLoader.getInstance();
 
-		this.tupleCollectionFactory = loader.loadFactoryFrom( flowProcess, TUPLE_COLLECTION_FACTORY, HadoopTupleCollectionFactory.class );
+		this.tupleCollectionFactory = loader.loadFactoryFrom( flowProcess, TUPLE_COLLECTION_FACTORY, FlinkTupleCollectionFactory.class );
 
 		initLists();
 	}

@@ -20,18 +20,17 @@ package com.dataArtisans.flinkCascading.exec;
 
 import cascading.CascadingException;
 import cascading.flow.FlowProcess;
-import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.tap.Tap;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.InstantiationUtil;
-import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -87,15 +86,12 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public Object getProperty( String key ) {
-		return this.conf.get(key);
+		return this.conf.getString(key, null);
 	}
 
 	@Override
 	public Collection<String> getPropertyKeys() {
-		Set<String> keys = new HashSet<String>();
-
-		for(Map.Entry<String, String> entry : conf)
-			keys.add( entry.getKey() );
+		Set<String> keys = conf.keySet();
 
 		return Collections.unmodifiableSet( keys );
 	}
@@ -168,22 +164,42 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public Configuration getConfigCopy() {
-		return HadoopUtil.copyJobConf(conf);
+		return this.conf.clone();
 	}
 
 	@Override
 	public <C> C copyConfig(C conf) {
-		return HadoopUtil.copyJobConf(conf);
+		return (C)((Configuration)conf).clone();
 	}
 
 	@Override
 	public <C> Map<String, String> diffConfigIntoMap(C defaultConfig, C updatedConfig) {
-		return HadoopUtil.getConfig( (Configuration) defaultConfig, (Configuration) updatedConfig );
+
+		Map<String, String> newConf = new HashMap<String, String>();
+		for(String key : ((Configuration)updatedConfig).keySet()) {
+			String val = ((Configuration) updatedConfig).getString(key, null);
+			String defaultVal = ((Configuration)defaultConfig).getString(key, null);
+
+			// add keys that are different from default
+			if((val == null && defaultVal == null) || val.equals(defaultVal)) {
+				continue;
+			}
+			else {
+				newConf.put(key, val);
+			}
+		}
+
+		return newConf;
 	}
 
 	@Override
 	public Configuration mergeMapIntoConfig(Configuration defaultConfig, Map<String, String> map) {
-		return HadoopUtil.mergeConf( defaultConfig, map, false );
+
+		Configuration mergedConf = defaultConfig.clone();
+		for(String key : map.keySet()) {
+			mergedConf.setString(key, map.get(key));
+		}
+		return mergedConf;
 	}
 
 }

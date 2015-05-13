@@ -35,6 +35,7 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.List;
 
@@ -57,7 +58,8 @@ public class HashJoinOperator extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputSets, List<Operator> inputOps) {
+										List<DataSet> inputSets, List<Operator> inputOps,
+										Configuration config) {
 
 		boolean first = true;
 
@@ -119,6 +121,7 @@ public class HashJoinOperator extends Operator {
 					.groupBy(0)
 					.sortGroup(1, Order.DESCENDING)
 					.reduceGroup(coGroupReducer)
+					.withParameters(config)
 					.returns(tupleType)
 					.name("Joiner");
 		}

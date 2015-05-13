@@ -38,6 +38,7 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -121,7 +122,8 @@ public class GroupByOperator extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-										List<DataSet> inputSets, List<Operator> inputOps) {
+										List<DataSet> inputSets, List<Operator> inputOps,
+										Configuration config) {
 
 		// add latest outgoing scope
 		this.outgoingScopes.put(lastAdded, this.getOutgoingScope());
@@ -240,6 +242,7 @@ public class GroupByOperator extends Operator {
 						.groupBy(0)
 						.sortGroup(1, Order.ASCENDING)
 						.reduceGroup(reduceFunction)
+						.withParameters(config)
 						.returns(tupleType)
 						.name("GroupBy " + groupBy.getName());
 			}
@@ -248,10 +251,12 @@ public class GroupByOperator extends Operator {
 						.groupBy(0)
 						.sortGroup(1, Order.ASCENDING)
 						.reduceGroup(reduceAssertion)
+						.withParameters(config)
 						.returns(groupingSortingType)
 						.groupBy(0)
 						.sortGroup(1, Order.ASCENDING)
 						.reduceGroup(reduceFunction)
+						.withParameters(config)
 						.returns(tupleType)
 						.name("GroupBy " + groupBy.getName());
 			}
@@ -262,6 +267,7 @@ public class GroupByOperator extends Operator {
 				return mergedSets
 						.groupBy(0)
 						.reduceGroup(reduceFunction)
+						.withParameters(config)
 						.returns(tupleType)
 						.name("GroupBy " + groupBy.getName());
 			}
@@ -269,9 +275,11 @@ public class GroupByOperator extends Operator {
 				return mergedSets
 						.groupBy(0)
 						.reduceGroup(reduceAssertion)
+						.withParameters(config)
 						.returns(groupingSortingType)
 						.groupBy(0)
 						.reduceGroup(reduceFunction)
+						.withParameters(config)
 						.returns(tupleType)
 						.name("GroupBy " + groupBy.getName());
 			}

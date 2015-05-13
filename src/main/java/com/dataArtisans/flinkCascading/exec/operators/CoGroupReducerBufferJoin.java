@@ -77,7 +77,7 @@ public class CoGroupReducerBufferJoin extends RichGroupReduceFunction<Tuple3<Tup
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(config, this.getRuntimeContext());
 		this.buffer = this.bufferJoiner.getBuffer();
 
 		this.call = new ConcreteCall(outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields());

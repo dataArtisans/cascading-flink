@@ -99,8 +99,8 @@ public class FlinkTestPlatform extends TestPlatform {
 	}
 
 	@Override
-	public FlowConnector getFlowConnector(Map<Object, Object> map) {
-		return new FlinkConnector(ExecutionEnvironment.createLocalEnvironment());
+	public FlowConnector getFlowConnector(Map<Object, Object> properties) {
+		return new FlinkConnector(ExecutionEnvironment.createLocalEnvironment(), properties);
 	}
 
 	@Override
