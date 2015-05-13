@@ -22,41 +22,54 @@ import cascading.flow.BaseFlow;
 import cascading.flow.FlowDef;
 import cascading.flow.FlowException;
 import cascading.flow.FlowProcess;
+import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapred.JobConf;
 
-import java.util.HashMap;
 import java.util.Map;
 
 public class FlinkFlow extends BaseFlow<Configuration> {
 
 	private ExecutionEnvironment flinkEnv;
+	private Configuration config;
 
-	public FlinkFlow(ExecutionEnvironment env, PlatformInfo platformInfo, FlowDef flowDef) {
+	public FlinkFlow(ExecutionEnvironment env, PlatformInfo platformInfo, FlowDef flowDef, Map<Object, Object> properties, Configuration defaultConfig) {
 
-		super(platformInfo, new HashMap<Object, Object>(), new Configuration(), flowDef);
-
+		super(platformInfo, properties, defaultConfig, flowDef);
 		this.flinkEnv = env;
-//		initializeNewJobsMap();
 	}
 
 	@Override
-	protected void initConfig(Map map, Configuration o) {
-		// nothing to do
+	protected void initConfig(Map<Object, Object> properties, Configuration parentConfig) {
+		if( properties != null ) {
+			parentConfig = createConfig( properties, parentConfig );
+		}
+
+		if( parentConfig == null ) {
+		// this is ok, getJobConf will pass a default parent in
+			return;
+		}
+
+		config = HadoopUtil.copyJobConf(parentConfig); // prevent local values from being shared
 	}
 
 
 	@Override
 	protected void setConfigProperty(Configuration config, Object key, Object value) {
-		throw new UnsupportedOperationException();
+		// don't let these objects pass, even though toString is called below.
+		if( value instanceof Class || value instanceof JobConf || value instanceof Configuration) {
+			return;
+		}
+
+		config.set( key.toString(), value.toString() );
 	}
 
 	@Override
-	protected Configuration newConfig(Configuration o) {
-
-		return new Configuration();
+	protected Configuration newConfig(Configuration defaultConfig) {
+		return defaultConfig == null ? new JobConf() : HadoopUtil.copyJobConf( defaultConfig );
 	}
 
 	@Override
@@ -74,55 +87,55 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	public void complete() {
-		// TODO!!! (overrides superclass method)
+		// TODO: Overrides superclass method and requires some more work
 		try {
 
 //			System.out.println(flinkEnv.getExecutionPlan());
 
 			flinkEnv.execute();
 		} catch(Exception e) {
-			throw new FlowException("Flow execution failed", e);
+			throw new FlowException("FlinkFlow execution failed", e);
 		}
 	}
 
 	@Override
-	protected int getMaxNumParallelSteps() {
-		return flinkEnv.getDegreeOfParallelism();
+	protected void internalShutdown() {
+		// nothing to do?
 	}
 
 	@Override
-	protected void internalShutdown() {
-		// TODO
+	protected int getMaxNumParallelSteps() {
+		return flinkEnv.getParallelism();
 	}
 
 	@Override
 	public Configuration getConfig() {
-		return null;
-//		return new Configuration();
+		if( config == null ) {
+			initConfig(null, new JobConf());
+		}
+
+		return config;
 	}
 
 	@Override
 	public Configuration getConfigCopy() {
-		return null;
-//		return new Configuration();
+		return HadoopUtil.copyJobConf( getConfig() );
 	}
 
 	@Override
 	public Map<Object, Object> getConfigAsProperties() {
-		return null;
+		return HadoopUtil.createProperties( getConfig() );
 	}
 
 	@Override
-	public String getProperty(String s) {
-		// not sure what to do here...
-		throw new UnsupportedOperationException();
+	public String getProperty(String key) {
+		return getConfig().get( key );
 
 	}
 
 	@Override
 	public FlowProcess getFlowProcess() {
-		// not sure what to do here...
-		return new FlinkFlowProcess();
+		return new FlinkFlowProcess(this.getConfig());
 	}
 
 	@Override

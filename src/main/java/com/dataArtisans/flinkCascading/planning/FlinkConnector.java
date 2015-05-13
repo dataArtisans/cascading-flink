@@ -35,6 +35,8 @@ import cascading.flow.planner.rule.transformer.RemoveNoOpPipeTransformer;
 import cascading.scheme.Scheme;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
+import java.util.Map;
+
 public class FlinkConnector extends FlowConnector {
 
 	private ExecutionEnvironment env;
@@ -43,9 +45,14 @@ public class FlinkConnector extends FlowConnector {
 		this.env = env;
 	}
 
+	public FlinkConnector(ExecutionEnvironment env, Map<Object, Object> properties) {
+		super(properties);
+		this.env = env;
+	}
+
 	@Override
 	protected Class<? extends Scheme> getDefaultIntermediateSchemeClass() {
-		return null;
+		return null; // not required for Flink
 	}
 
 	@Override

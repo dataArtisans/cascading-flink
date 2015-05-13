@@ -65,9 +65,11 @@ import java.util.Set;
 public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	public ExecutionEnvironment env;
+	public Configuration defaultConfig;
 
 	public FlinkFlowPlanner(ExecutionEnvironment env) {
 		this.env = env;
+		this.defaultConfig = new Configuration();
 	}
 
 	@Override
@@ -77,23 +79,23 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	@Override
 	public PlatformInfo getPlatformInfo() {
-
 		return new PlatformInfo("Apache Flink", "data Artisans GmbH", "0.1");
 	}
 
 	@Override
 	protected FlinkFlow createFlow(FlowDef flowDef) {
-
-		return new FlinkFlow(env, this.getPlatformInfo(), flowDef);
+		return new FlinkFlow(env, getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());
 	}
 
 	@Override
 	public FlowStep<Configuration> createFlowStep(ElementGraph elementGraph, FlowNodeGraph flowNodeGraph) {
+		// not required for Flink?
 		return null;
 	}
 
 	@Override
 	protected Tap makeTempTap(String s, String s1) {
+		// not required for Flink
 		return null;
 	}
 
@@ -237,7 +239,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			s.getFlinkOperator(env);
 		}
 
-		return new FlinkFlow(env, getPlatformInfo(), flowDef);
+		return new FlinkFlow(env, getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());
 
 	}
 
