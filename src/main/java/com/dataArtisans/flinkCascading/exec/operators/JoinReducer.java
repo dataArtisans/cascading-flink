@@ -20,7 +20,6 @@ package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.flow.planner.Scope;
 import cascading.flow.stream.duct.Grouping;
-import cascading.pipe.CoGroup;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.pipe.joiner.Joiner;
 import cascading.tuple.Fields;
@@ -74,7 +73,7 @@ public class JoinReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, 
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 
 		/// Duct.initialize
 

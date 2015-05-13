@@ -24,7 +24,6 @@ import cascading.operation.Buffer;
 import cascading.operation.ConcreteCall;
 import cascading.pipe.CoGroup;
 import cascading.pipe.Every;
-import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
@@ -38,8 +37,6 @@ import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
-
-import java.util.Iterator;
 
 public class CoGroupReducerBufferJoin extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
 
@@ -80,7 +77,7 @@ public class CoGroupReducerBufferJoin extends RichGroupReduceFunction<Tuple3<Tup
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 		this.buffer = this.bufferJoiner.getBuffer();
 
 		this.call = new ConcreteCall(outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields());

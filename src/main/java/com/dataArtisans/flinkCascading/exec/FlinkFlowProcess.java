@@ -18,12 +18,14 @@
 
 package com.dataArtisans.flinkCascading.exec;
 
+import cascading.CascadingException;
 import cascading.flow.FlowProcess;
+import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.tap.Tap;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
-import cascading.tuple.TupleEntrySchemeIteratorProps;
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.util.InstantiationUtil;
 import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
@@ -35,12 +37,11 @@ import java.util.Set;
 
 public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
+
 	private transient RuntimeContext runtimeContext;
-
-	Configuration conf;
-
-	int numTasks;
-	int taskId;
+	private Configuration conf;
+	private int numTasks = -1;
+	private int taskId = -1;
 
 	public FlinkFlowProcess() {}
 
@@ -52,13 +53,8 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 		this(conf);
 		this.runtimeContext = runtimeContext;
-
 		this.numTasks = runtimeContext.getNumberOfParallelSubtasks();
 		this.taskId = runtimeContext.getIndexOfThisSubtask();
-	}
-
-	public FlinkFlowProcess(RuntimeContext runtimeContext) {
-		this(new Configuration(), runtimeContext);
 	}
 
 	public FlinkFlowProcess(Configuration conf, int numTasks, int taskId) {
@@ -67,9 +63,11 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 		this.taskId = taskId;
 	}
 
-	@Override
-	public FlowProcess copyWith(Configuration entries) {
-		return new FlinkFlowProcess(entries);
+	public FlinkFlowProcess(Configuration conf, FlinkFlowProcess process) {
+		this(conf);
+		this.runtimeContext = process.runtimeContext;
+		this.numTasks = process.numTasks;
+		this.taskId = process.taskId;
 	}
 
 	@Override
@@ -83,13 +81,12 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	}
 
 	@Override
+	public FlowProcess copyWith(Configuration config) {
+		return new FlinkFlowProcess(config, this);
+	}
+
+	@Override
 	public Object getProperty( String key ) {
-
-		// TODO
-		if(key.equals(TupleEntrySchemeIteratorProps.PERMITTED_EXCEPTIONS)) {
-			return null;
-		}
-
 		return this.conf.get(key);
 	}
 
@@ -97,31 +94,46 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	public Collection<String> getPropertyKeys() {
 		Set<String> keys = new HashSet<String>();
 
-		for( Map.Entry<String, String> entry : this.conf )
+		for(Map.Entry<String, String> entry : conf)
 			keys.add( entry.getKey() );
 
-		return Collections.unmodifiableSet(keys);
+		return Collections.unmodifiableSet( keys );
 	}
 
 	@Override
-	public Object newInstance(String s) {
-		// create instance with class loader
-		return null;
+	public Object newInstance(String className) {
+		if(className == null || className.isEmpty()) {
+			return null;
+		}
+
+		try {
+			Class clazz = Class.forName(className);
+			return InstantiationUtil.instantiate(clazz);
+		}
+		catch( ClassNotFoundException exception ) {
+			throw new CascadingException( "unable to load class: " + className.toString(), exception );
+		}
 	}
 
 	@Override
 	public void keepAlive() {
+		// Hadoop reports progress
 		// Tez doesn't do anything here either...
 	}
 
 	@Override
-	public void increment(Enum anEnum, long l) {
-		// incr. counter
+	public void increment(Enum e, long l) {
+		throw new UnsupportedOperationException("Enum counters not supported.");
 	}
 
 	@Override
-	public void increment(String s, String s1, long l) {
-		// incr. counter
+	public void increment(String group, String counter, long l) {
+		if(this.runtimeContext == null) {
+			throw new RuntimeException("RuntimeContext has not been set.");
+		}
+		else {
+			this.runtimeContext.getLongCounter(group+"."+counter).add(l);
+		}
 	}
 
 	@Override
@@ -131,7 +143,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public boolean isCounterStatusInitialized() {
-		return false; // should be fine
+		return this.runtimeContext != null;
 	}
 
 	@Override
@@ -146,32 +158,32 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public TupleEntryCollector openTrapForWrite(Tap tap) throws IOException {
-		return null; // not sure what this is for
+		return null; // not sure if required for Flink
 	}
 
 	@Override
 	public TupleEntryCollector openSystemIntermediateForWrite() throws IOException {
-		return null; // Tez does nothing either
+		return null; // Not required for Flink
 	}
 
 	@Override
 	public Configuration getConfigCopy() {
-		return new Configuration(conf); // TODO
+		return HadoopUtil.copyJobConf(conf);
 	}
 
 	@Override
-	public <C> C copyConfig(C c) {
-		return (C)new Configuration(conf); // TODO;
+	public <C> C copyConfig(C conf) {
+		return HadoopUtil.copyJobConf(conf);
 	}
 
 	@Override
-	public <C> Map<String, String> diffConfigIntoMap(C c, C c1) {
-		return null;
+	public <C> Map<String, String> diffConfigIntoMap(C defaultConfig, C updatedConfig) {
+		return HadoopUtil.getConfig( (Configuration) defaultConfig, (Configuration) updatedConfig );
 	}
 
 	@Override
-	public Configuration mergeMapIntoConfig(Configuration entries, Map<String, String> map) {
-		return null;
+	public Configuration mergeMapIntoConfig(Configuration defaultConfig, Map<String, String> map) {
+		return HadoopUtil.mergeConf( defaultConfig, map, false );
 	}
 
 }

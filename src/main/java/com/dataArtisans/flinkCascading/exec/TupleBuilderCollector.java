@@ -22,7 +22,6 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.util.TupleBuilder;
-import org.apache.flink.util.Collector;
 
 public abstract class TupleBuilderCollector extends TupleEntryCollector {
 

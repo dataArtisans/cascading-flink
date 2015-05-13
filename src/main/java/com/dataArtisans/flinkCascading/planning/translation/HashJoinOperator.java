@@ -20,30 +20,22 @@ package com.dataArtisans.flinkCascading.planning.translation;
 
 import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.FlowElementGraph;
-import cascading.pipe.Every;
 import cascading.pipe.HashJoin;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.operators.AggregatorsReducer;
-import com.dataArtisans.flinkCascading.exec.operators.BufferReducer;
-import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducerBufferJoin;
-import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducerForEvery;
 import com.dataArtisans.flinkCascading.exec.operators.JoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.JoinReducer;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
-import org.apache.avro.generic.GenericData;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.operators.MapOperator;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class HashJoinOperator extends Operator {

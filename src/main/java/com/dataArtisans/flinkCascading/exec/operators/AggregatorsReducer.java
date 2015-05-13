@@ -21,7 +21,6 @@ package com.dataArtisans.flinkCascading.exec.operators;
 import cascading.flow.planner.Scope;
 import cascading.operation.Aggregator;
 import cascading.operation.ConcreteCall;
-import cascading.operation.GroupAssertion;
 import cascading.pipe.Every;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
@@ -82,7 +81,7 @@ public class AggregatorsReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tup
 		this.ffps = new FlinkFlowProcess[num];
 		for (int i=0; i<num; i++) {
 
-			this.ffps[i] = new FlinkFlowProcess(this.getRuntimeContext());
+			this.ffps[i] = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 			this.calls[i] = new ConcreteCall(outgoingScopes[i].getArgumentsDeclarator(), outgoingScopes[i].getOperationDeclaredFields());
 
 			Fields argumentsSelector = outgoingScopes[i].getArgumentsSelector();

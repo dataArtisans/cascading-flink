@@ -31,7 +31,6 @@ import com.dataArtisans.flinkCascading.exec.FlinkCoGroupClosure;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
-import org.apache.flink.api.java.functions.FunctionAnnotation;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
@@ -72,7 +71,7 @@ public class CoGroupReducerForEvery extends RichGroupReduceFunction<Tuple3<Tuple
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 
 		/// Duct.initialize
 

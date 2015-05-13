@@ -19,7 +19,6 @@
 package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.flow.planner.Scope;
-import cascading.operation.Aggregator;
 import cascading.operation.ConcreteCall;
 import cascading.operation.GroupAssertion;
 import cascading.pipe.Every;
@@ -27,11 +26,8 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.util.TupleBuilder;
-import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.exec.PassOnCollector;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
-import com.dataArtisans.flinkCascading.exec.TupleBuilderCollector;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.api.java.functions.FunctionAnnotation;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -81,7 +77,7 @@ public class GroupAssertionReducer extends RichGroupReduceFunction<Tuple3<Tuple,
 		this.ffps = new FlinkFlowProcess[num];
 		for (int i=0; i<num; i++) {
 
-			this.ffps[i] = new FlinkFlowProcess(this.getRuntimeContext());
+			this.ffps[i] = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 			this.calls[i] = new ConcreteCall(outgoingScopes[i].getArgumentsDeclarator(), outgoingScopes[i].getOperationDeclaredFields());
 
 			Fields argumentsSelector = outgoingScopes[i].getArgumentsSelector();

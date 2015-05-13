@@ -20,7 +20,6 @@ package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.flow.planner.Scope;
 import cascading.operation.ConcreteCall;
-import cascading.operation.Function;
 import cascading.operation.ValueAssertion;
 import cascading.operation.expression.ExpressionOperation;
 import cascading.pipe.Each;
@@ -28,13 +27,10 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.util.TupleBuilder;
-import com.dataArtisans.flinkCascading.exec.FlinkCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.TupleBuilderBuilder;
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.util.Collector;
 
 /**
  * Mapper that processes a single Cascading Function
@@ -62,7 +58,7 @@ public class EachValueAssertionMapper extends RichMapFunction<Tuple, Tuple> {
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 		this.assertion = each.getValueAssertion();
 
 		call = new ConcreteCall( outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields() );

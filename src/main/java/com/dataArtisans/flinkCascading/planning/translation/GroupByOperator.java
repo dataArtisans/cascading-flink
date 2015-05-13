@@ -121,7 +121,7 @@ public class GroupByOperator extends Operator {
 
 	@Override
 	protected DataSet translateToFlink(ExecutionEnvironment env,
-									   List<DataSet> inputSets, List<Operator> inputOps) {
+										List<DataSet> inputSets, List<Operator> inputOps) {
 
 		// add latest outgoing scope
 		this.outgoingScopes.put(lastAdded, this.getOutgoingScope());
