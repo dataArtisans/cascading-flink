@@ -24,7 +24,6 @@ import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;
 import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
-import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;

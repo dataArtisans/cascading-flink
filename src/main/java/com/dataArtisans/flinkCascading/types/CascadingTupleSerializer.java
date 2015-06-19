@@ -42,6 +42,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 public class CascadingTupleSerializer extends TypeSerializer<Tuple> {
 
@@ -53,7 +54,7 @@ public class CascadingTupleSerializer extends TypeSerializer<Tuple> {
 	private final List<ExecutionConfig.Entry<Class<?>, Class<? extends Serializer<?>>>> registeredTypesWithSerializerClasses;
 	private final List<ExecutionConfig.Entry<Class<?>, Serializer<?>>> defaultSerializers;
 	private final List<ExecutionConfig.Entry<Class<?>, Class<? extends Serializer<?>>>> defaultSerializerClasses;
-	private final List<Class<?>> registeredTypes;
+	private final Set<Class<?>> registeredTypes;
 
 	// ------------------------------------------------------------------------
 	// The fields below are lazily initialized after duplication or deserialization.

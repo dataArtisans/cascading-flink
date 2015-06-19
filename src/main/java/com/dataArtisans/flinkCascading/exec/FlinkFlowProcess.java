@@ -20,6 +20,7 @@ package com.dataArtisans.flinkCascading.exec;
 
 import cascading.CascadingException;
 import cascading.flow.FlowProcess;
+import cascading.flow.FlowSession;
 import cascading.tap.Tap;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
@@ -45,6 +46,11 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	public FlinkFlowProcess() {}
 
 	public FlinkFlowProcess(Configuration conf) {
+		this.conf = conf;
+	}
+
+	public FlinkFlowProcess(FlowSession flowSession, Configuration conf) {
+		super(flowSession);
 		this.conf = conf;
 	}
 
@@ -119,7 +125,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public void increment(Enum e, long l) {
-		throw new UnsupportedOperationException("Enum counters not supported.");
+//		throw new UnsupportedOperationException("Enum counters not supported."); // TODO
 	}
 
 	@Override
@@ -129,6 +135,22 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 		}
 		else {
 			this.runtimeContext.getLongCounter(group+"."+counter).add(l);
+		}
+	}
+
+	@Override
+	public long getCounterValue(Enum anEnum) {
+//		throw new UnsupportedOperationException("Enum counters not supported."); // TODO
+		return -1l;
+	}
+
+	@Override
+	public long getCounterValue(String group, String counter) {
+		if(this.runtimeContext == null) {
+			throw new RuntimeException("RuntimeContext has not been set.");
+		}
+		else {
+			return this.runtimeContext.getLongCounter(group+"."+counter).getLocalValue();
 		}
 	}
 
@@ -160,6 +182,11 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	@Override
 	public TupleEntryCollector openSystemIntermediateForWrite() throws IOException {
 		return null; // Not required for Flink
+	}
+
+	@Override
+	public Configuration getConfig() {
+		return conf;
 	}
 
 	@Override

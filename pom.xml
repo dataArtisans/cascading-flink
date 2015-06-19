@@ -78,39 +78,45 @@ under the License.
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-local</artifactId>
-			<version>3.0.0-wip-65</version>
+			<version>3.0.0</version>
 		</dependency>
 
         <dependency>
             <groupId>cascading</groupId>
             <artifactId>cascading-local</artifactId>
-            <version>3.0.0-wip-65</version>
+            <version>3.0.0</version>
             <type>test-jar</type>
         </dependency>
 
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-hadoop</artifactId>
-			<version>3.0.0-wip-65</version>
+			<version>3.0.0</version>
 		</dependency>
+
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-hadoop2-tez</artifactId>
+            <version>3.0.0</version>
+        </dependency>
 
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-core</artifactId>
-			<version>3.0.0-wip-65</version>
+			<version>3.0.0</version>
 		</dependency>
 
         <dependency>
             <groupId>cascading</groupId>
             <artifactId>cascading-core</artifactId>
-            <version>3.0.0-wip-65</version>
+            <version>3.0.0</version>
             <type>test-jar</type>
         </dependency>
 
         <dependency>
             <groupId>cascading</groupId>
             <artifactId>cascading-platform</artifactId>
-            <version>3.0.0-wip-65</version>
+            <version>3.0.0</version>
             <type>test-jar</type>
         </dependency>
 

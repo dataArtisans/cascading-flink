@@ -37,7 +37,7 @@ import cascading.tap.local.PartitionTap;
 import cascading.tap.partition.Partition;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.planning.FlinkConnector;
+import com.dataArtisans.flinkCascading.FlinkConnector;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.ExecutionEnvironment;
 

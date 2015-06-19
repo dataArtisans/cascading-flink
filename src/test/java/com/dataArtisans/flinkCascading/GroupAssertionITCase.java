@@ -19,9 +19,7 @@
 package com.dataArtisans.flinkCascading;
 
 import cascading.flow.FlowDef;
-import cascading.operation.AssertionLevel;
 import cascading.operation.aggregator.Count;
-import cascading.operation.assertion.AssertGroupSizeMoreThan;
 import cascading.operation.buffer.FirstNBuffer;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;

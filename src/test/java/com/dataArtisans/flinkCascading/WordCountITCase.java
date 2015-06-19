@@ -28,8 +28,6 @@ import cascading.pipe.Pipe;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;
 import com.dataArtisans.flinkCascading.util.TestData;
-import org.junit.Assert;
-import org.junit.Test;
 
 import java.util.Collections;
 import java.util.HashMap;

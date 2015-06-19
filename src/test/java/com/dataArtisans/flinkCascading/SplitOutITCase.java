@@ -18,18 +18,12 @@
 
 package com.dataArtisans.flinkCascading;
 
-import cascading.flow.Flow;
 import cascading.flow.FlowDef;
-import cascading.operation.regex.RegexFilter;
-import cascading.pipe.Each;
 import cascading.pipe.GroupBy;
 import cascading.pipe.Pipe;
-import cascading.tap.SinkMode;
-import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;
 import com.dataArtisans.flinkCascading.util.TestData;
-import data.InputData;
 
 import java.util.HashMap;
 import java.util.HashSet;

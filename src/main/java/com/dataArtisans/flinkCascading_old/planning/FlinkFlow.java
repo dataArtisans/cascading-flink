@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.planning;
+package com.dataArtisans.flinkCascading_old.planning;
 
 import cascading.flow.BaseFlow;
 import cascading.flow.FlowDef;
+import cascading.flow.FlowException;
 import cascading.flow.FlowProcess;
 import cascading.flow.planner.PlatformInfo;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
@@ -84,18 +85,18 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	}
 
-//	@Override
-//	public void complete() {
-//		// TODO: Overrides superclass method and requires some more work
-//		try {
-//
-////			System.out.println(flinkEnv.getExecutionPlan());
-//
-//			flinkEnv.execute();
-//		} catch(Exception e) {
-//			throw new FlowException("FlinkFlow execution failed", e);
-//		}
-//	}
+	@Override
+	public void complete() {
+		// TODO: Overrides superclass method and requires some more work
+		try {
+
+//			System.out.println(flinkEnv.getExecutionPlan());
+
+			flinkEnv.execute();
+		} catch(Exception e) {
+			throw new FlowException("FlinkFlow execution failed", e);
+		}
+	}
 
 	@Override
 	protected void internalShutdown() {

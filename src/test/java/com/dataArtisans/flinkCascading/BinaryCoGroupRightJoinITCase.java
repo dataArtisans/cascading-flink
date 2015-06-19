@@ -23,7 +23,6 @@ import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.CoGroup;
 import cascading.pipe.Each;
 import cascading.pipe.Pipe;
-import cascading.pipe.joiner.LeftJoin;
 import cascading.pipe.joiner.RightJoin;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;

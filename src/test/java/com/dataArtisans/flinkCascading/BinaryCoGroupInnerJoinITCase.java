@@ -19,12 +19,9 @@
 package com.dataArtisans.flinkCascading;
 
 import cascading.flow.FlowDef;
-import cascading.operation.aggregator.Count;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.CoGroup;
 import cascading.pipe.Each;
-import cascading.pipe.Every;
-import cascading.pipe.GroupBy;
 import cascading.pipe.Pipe;
 import cascading.pipe.joiner.InnerJoin;
 import cascading.tuple.Fields;

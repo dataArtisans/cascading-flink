@@ -18,12 +18,13 @@
 
 package com.dataArtisans.flinkCascading.util;
 
+import cascading.flow.Flow;
 import cascading.flow.FlowDef;
 import cascading.flow.local.LocalFlowConnector;
+import cascading.flow.planner.PlannerException;
 import cascading.tap.Tap;
 import cascading.tap.local.FileTap;
-import cascading.tuple.Fields;
-import com.dataArtisans.flinkCascading.planning.FlinkConnector;
+import com.dataArtisans.flinkCascading.FlinkConnector;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.junit.After;
 import org.junit.Before;
@@ -110,6 +111,7 @@ public abstract class FlinkCascadingTestBase {
 			fail(); // test error?
 		} catch(Exception e) {
 			e.printStackTrace();
+			((PlannerException)e).writeDOT("/users/fhueske/fail.dot");
 			fail();
 		}
 	}
@@ -140,7 +142,10 @@ public abstract class FlinkCascadingTestBase {
 		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
 		env.setParallelism(4);
 		FlinkConnector fc = new FlinkConnector(env);
-		fc.connect(flinkFlow).complete();
+		Flow flow = fc.connect(flinkFlow);
+		flow.writeDOT("/users/fhueske/cascading-flow.dot");
+		flow.writeStepsDOT("/users/fhueske/cascading-plan.dot");
+		flow.complete();
 	}
 
 	private void runLocalFlow() {

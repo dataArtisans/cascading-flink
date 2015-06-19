@@ -24,7 +24,6 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.Each;
 import cascading.pipe.Pipe;
 import cascading.pipe.joiner.OuterJoin;
-import cascading.pipe.joiner.RightJoin;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.util.FlinkCascadingTestBase;
 import com.dataArtisans.flinkCascading.util.TestData;
