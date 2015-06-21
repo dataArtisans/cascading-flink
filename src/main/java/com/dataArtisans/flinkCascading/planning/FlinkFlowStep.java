@@ -25,6 +25,7 @@ import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.BaseFlowStep;
 import cascading.flow.planner.FlowStepJob;
 import cascading.flow.planner.PlatformInfo;
+import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.ElementGraph;
 import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.management.state.ClientState;
@@ -43,6 +44,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.configuration.Configuration;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
@@ -61,140 +63,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		this.buildFlinkProgram();
 
-//		JobConf conf = parentConfig == null ? new JobConf() : HadoopUtil.copyJobConf(parentConfig); // TODO
-
-		/*
-		// disable warning
-		conf.setBoolean( "mapred.used.genericoptionsparser", true );
-
-		conf.setJobName( getStepDisplayName( conf.getInt( "cascading.display.id.truncate", Util.ID_LENGTH ) ) );
-
-		conf.setOutputKeyClass( Tuple.class );
-		conf.setOutputValueClass( Tuple.class );
-
-		conf.setMapRunnerClass( FlowMapper.class );
-		conf.setReducerClass( FlowReducer.class );
-
-		// set for use by the shuffling phase
-		TupleSerialization.setSerializations(conf);
-
-		initFromSources( flowProcess, conf );
-
-		initFromSink( flowProcess, conf );
-
-		initFromTraps( flowProcess, conf );
-
-		initFromProcessConfigDef( conf );
-
-		int numSinkParts = getSink().getScheme().getNumSinkParts();
-
-		if( numSinkParts != 0 )
-		{
-			// if no reducer, set num map tasks to control parts
-			if( getGroup() != null )
-				conf.setNumReduceTasks( numSinkParts );
-			else
-				conf.setNumMapTasks( numSinkParts );
-		}
-		else if( getGroup() != null )
-		{
-			int gatherPartitions = conf.getNumReduceTasks();
-
-			if( gatherPartitions == 0 )
-				gatherPartitions = conf.getInt( FlowRuntimeProps.GATHER_PARTITIONS, 0 );
-
-			if( gatherPartitions == 0 )
-				throw new FlowException( getName(), "a default number of gather partitions must be set, see FlowRuntimeProps" );
-
-			conf.setNumReduceTasks( gatherPartitions );
-		}
-
-		conf.setOutputKeyComparatorClass( TupleComparator.class );
-
-		if( getGroup() == null )
-		{
-			conf.setNumReduceTasks( 0 ); // disable reducers
-		}
-		else
-		{
-			// must set map output defaults when performing a reduce
-			conf.setMapOutputKeyClass( Tuple.class );
-			conf.setMapOutputValueClass( Tuple.class );
-			conf.setPartitionerClass( GroupingPartitioner.class );
-
-			// handles the case the groupby sort should be reversed
-			if( getGroup().isSortReversed() )
-				conf.setOutputKeyComparatorClass( ReverseTupleComparator.class );
-
-			addComparators( conf, "cascading.group.comparator", getGroup().getKeySelectors(), this, getGroup() );
-
-			if( getGroup().isGroupBy() )
-				addComparators( conf, "cascading.sort.comparator", getGroup().getSortingSelectors(), this, getGroup() );
-
-			if( !getGroup().isGroupBy() )
-			{
-				conf.setPartitionerClass( CoGroupingPartitioner.class );
-				conf.setMapOutputKeyClass( IndexTuple.class ); // allows groups to be sorted by index
-				conf.setMapOutputValueClass( IndexTuple.class );
-				conf.setOutputKeyComparatorClass( IndexTupleCoGroupingComparator.class ); // sorts by group, then by index
-				conf.setOutputValueGroupingComparator( CoGroupingComparator.class );
-			}
-
-			if( getGroup().isSorted() )
-			{
-				conf.setPartitionerClass( GroupingSortingPartitioner.class );
-				conf.setMapOutputKeyClass( TuplePair.class );
-
-				if( getGroup().isSortReversed() )
-					conf.setOutputKeyComparatorClass( ReverseGroupingSortingComparator.class );
-				else
-					conf.setOutputKeyComparatorClass( GroupingSortingComparator.class );
-
-				// no need to supply a reverse comparator, only equality is checked
-				conf.setOutputValueGroupingComparator( GroupingComparator.class );
-			}
-		}
-
-		// perform last so init above will pass to tasks
-		String versionString = Version.getRelease();
-
-		if( versionString != null )
-			conf.set( "cascading.version", versionString );
-
-		conf.set( CASCADING_FLOW_STEP_ID, getID() );
-		conf.set( "cascading.flow.step.num", Integer.toString( getOrdinal() ) );
-
-		HadoopUtil.setIsInflow( conf );
-
-		Iterator<FlowNode> iterator = getFlowNodeGraph().getTopologicalIterator();
-
-		String mapState = pack( iterator.next(), conf );
-		String reduceState = pack( iterator.hasNext() ? iterator.next() : null, conf );
-
-		// hadoop 20.2 doesn't like dist cache when using local mode
-		int maxSize = Short.MAX_VALUE;
-
-		int length = mapState.length() + reduceState.length();
-
-		if( isHadoopLocalMode( conf ) || length < maxSize ) // seems safe
-		{
-			conf.set( "cascading.flow.step.node.map", mapState );
-
-			if( !Util.isEmpty( reduceState ) )
-				conf.set( "cascading.flow.step.node.reduce", reduceState );
-		}
-		else
-		{
-			conf.set( "cascading.flow.step.node.map.path", HadoopMRUtil.writeStateToDistCache(conf, getID(), "map", mapState) );
-
-			if( !Util.isEmpty( reduceState ) )
-				conf.set( "cascading.flow.step.node.reduce.path", HadoopMRUtil.writeStateToDistCache( conf, getID(), "reduce", reduceState ) );
-		}
-
-		return conf;
-
-		*/
-
+		// TODO
 		return null;
 	}
 
@@ -293,7 +162,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					tap.getScheme().sourceConfInit(null, tap, conf);
 
 					flinkPlan = env
-							.createInput(new FileTapInputFormat(tap, conf), new CascadingTupleTypeInfo())
+							.createInput(new FileTapInputFormat(tap, conf), new CascadingTupleTypeInfo(tap.getSourceFields()))
 							.name(tap.getIdentifier())
 							.setParallelism(1);
 				}
@@ -340,14 +209,22 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 			// REDUCE
 			else if(source instanceof GroupBy) {
-					System.out.println("Compile to Reduce: "+node.getElementGraph().vertexSet());
+
+					throw new RuntimeException("Reduce not yet supported");
 				}
 			// MAP
 			else if(source instanceof Boundary) {
+
+				Collection<Scope> inScopes = (Collection<Scope>) node.getPreviousScopes(sink);
+				if(inScopes.size() != 1) {
+					throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
+				}
+				Scope inScope = inScopes.iterator().next();
+
 				// if none of the above, its a Mapper
 				flinkPlan = flinkPlan
 						.mapPartition(new Mapper(node))
-						.returns(new CascadingTupleTypeInfo());
+						.returns(new CascadingTupleTypeInfo(inScope.getOutValuesFields()));
 			}
 
 		}

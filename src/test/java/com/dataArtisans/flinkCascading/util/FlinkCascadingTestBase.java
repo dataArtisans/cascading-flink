@@ -111,7 +111,6 @@ public abstract class FlinkCascadingTestBase {
 			fail(); // test error?
 		} catch(Exception e) {
 			e.printStackTrace();
-			((PlannerException)e).writeDOT("/users/fhueske/fail.dot");
 			fail();
 		}
 	}

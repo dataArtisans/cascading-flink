@@ -165,7 +165,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	@Override
 	protected Throwable getThrowable() {
-		return new Throwable(); // TODO: return (local?) error
+		return jobException;
 	}
 
 	protected String internalJobId() {

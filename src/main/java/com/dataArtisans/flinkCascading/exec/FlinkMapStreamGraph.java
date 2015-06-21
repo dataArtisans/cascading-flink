@@ -89,12 +89,24 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 
 	@Override
 	protected Gate createCoGroupGate(CoGroup coGroup, IORole ioRole) {
-		throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+		if(ioRole == IORole.sink) {
+			// TODO create map out gate
+			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+		}
+		else {
+			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+		}
 	}
 
 	@Override
 	protected Gate createGroupByGate(GroupBy groupBy, IORole ioRole) {
-		throw new UnsupportedOperationException("Cannot create a GroupBy gate in a MapStreamGraph");
+		if(ioRole == IORole.sink) {
+			// TODO create map out gate
+			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+		}
+		else {
+			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+		}
 	}
 
 }
