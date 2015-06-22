@@ -85,6 +85,8 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 //
 //			flowStep.logInfo( "submitted Flink job: " + this.jobSubmission.getJobID() );
 
+			System.out.println(this.env.getExecutionPlan());
+
 			this.jobResult = this.env.execute();
 
 		}

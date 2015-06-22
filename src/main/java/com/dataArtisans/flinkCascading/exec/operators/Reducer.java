@@ -18,33 +18,25 @@
 
 package com.dataArtisans.flinkCascading.exec.operators;
 
-import cascading.CascadingException;
-import cascading.flow.FlowElement;
-import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
 import cascading.flow.hadoop.FlowMapper;
-import cascading.flow.stream.duct.Duct;
-import cascading.flow.stream.element.ElementDuct;
-import cascading.pipe.Boundary;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.exec.BoundaryInStage;
 import com.dataArtisans.flinkCascading.exec.FlinkMapStreamGraph;
-import org.apache.flink.api.common.functions.RichMapPartitionFunction;
+import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.Set;
+import java.util.Iterator;
 
 /**
  *
- * Corresponds to FlowMapper
+ * Corresponds to FlowReducer
  *
  */
-public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
+public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FlowMapper.class);
 
@@ -54,15 +46,16 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 	private FlinkFlowProcess currentProcess;
 
-	public Mapper() {}
+	public Reducer() {}
 
-	public Mapper(FlowNode flowNode) {
+	public Reducer(FlowNode flowNode) {
 		this.flowNode = flowNode;
 	}
 
 	@Override
 	public void open(Configuration config) {
 
+		/*
 		try {
 
 			currentProcess = new FlinkFlowProcess(config);
@@ -94,15 +87,33 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 			throw new FlowException( "internal error during mapper configuration", throwable );
 		}
 
+	*/
 	}
 
 	@Override
-	public void mapPartition(Iterable<Tuple> input, Collector<Tuple> output) throws Exception {
+	public void reduce(Iterable<Tuple> input, Collector<Tuple> output) throws Exception {
 
+		Iterator<Tuple> it = input.iterator();
 
+		Tuple t = it.next();
+		output.collect(t);
+		int cnt = 1;
+		String s = t.getString(0);
+
+		while(it.hasNext()) {
+			t = it.next();
+			cnt++;
+			s+=" "+t.getString(0);
+		}
+
+		int idx = this.getRuntimeContext().getIndexOfThisSubtask();
+
+		System.out.println(idx+" ---> "+cnt+" "+s);
+
+/*
 //		currentProcess.setReporter( reporter );
 
-		BoundaryInStage sourceStage = this.streamGraph.getSourceStage();
+		FlinkMapInStage sourceStage = this.streamGraph.getSourceStage();
 		this.streamGraph.setTupleCollector(output);
 
 		streamGraph.prepare();
@@ -147,6 +158,7 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 //				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
 			}
 		}
+*/
 
 	}
 

@@ -20,21 +20,26 @@ package com.dataArtisans.flinkCascading.types;
 
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.typeutils.GenericTypeInfo;
-import org.apache.flink.api.java.typeutils.TupleTypeInfoBase;
-import org.apache.flink.api.java.typeutils.runtime.TupleComparator;
 
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-public class CascadingTupleTypeInfo extends TupleTypeInfoBase<Tuple> {
+public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 
 	private final int numFields;
 	private final String[] fieldNames;
+	private final Map<String, Integer> fieldNameIndex;
+	private final TypeInformation[] fieldTypesInfos;
 
 	private TypeComparator<?>[] fieldComparators;
 	private int[] logicalKeyFields;
@@ -53,14 +58,41 @@ public class CascadingTupleTypeInfo extends TupleTypeInfoBase<Tuple> {
 	}
 
 	public CascadingTupleTypeInfo(Fields fields) {
-		super(Tuple.class, computeFieldTypes(fields));
+		super(Tuple.class);
+		this. fieldTypesInfos = computeFieldTypes(fields);
 
 		this.numFields = fields.size();
 		this.fieldNames = new String[numFields];
+		this.fieldNameIndex = new HashMap<String, Integer>(numFields);
 		for(int i=0; i<numFields; i++) {
-			// TODO check if we can get names for fields (field names are Comparables not Strings)
-			this.fieldNames[i] = "f"+i;
+			this.fieldNames[i] = fields.get(i).toString();
+			this.fieldNameIndex.put(this.fieldNames[i], i);
 		}
+	}
+
+	@Override
+	public boolean isBasicType() {
+		return false;
+	}
+
+	@Override
+	public boolean isTupleType() {
+		return false;
+	}
+
+	@Override
+	public int getArity() {
+		return numFields;
+	}
+
+	@Override
+	public int getTotalFields() {
+		return numFields;
+	}
+
+	@Override
+	public Class<Tuple> getTypeClass() {
+		return Tuple.class;
 	}
 
 	@Override
@@ -69,17 +101,43 @@ public class CascadingTupleTypeInfo extends TupleTypeInfoBase<Tuple> {
 	}
 
 	@Override
-	public int getFieldIndex(String s) {
-		if(!s.startsWith("f")) {
-			throw new IllegalArgumentException("Field names start with \"f\"");
+	public int getFieldIndex(String fieldName) {
+		if(!this.fieldNameIndex.containsKey(fieldName)) {
+			throw new InvalidArgumentException("\""+fieldName+"\" not a field of this tuple type");
 		}
-		int fieldIndex = Integer.parseInt(s.substring(1));
-		return fieldIndex;
+		return this.fieldNameIndex.get(fieldName);
+	}
+
+	@Override
+	public <X> TypeInformation<X> getTypeAt(String fieldName) {
+		if(!this.fieldNameIndex.containsKey(fieldName)) {
+			throw new InvalidArgumentException("\""+fieldName+"\" not a field of this tuple type");
+		}
+		int idx = this.fieldNameIndex.get(fieldName);
+		return fieldTypesInfos[idx];
+	}
+
+	@Override
+	public <X> TypeInformation<X> getTypeAt(int fieldIdx) {
+		return fieldTypesInfos[fieldIdx];
+	}
+
+	@Override
+	public void getFlatFields(String expressionKey, int offset, List<FlatFieldDescriptor> list) {
+
+		int fieldIdx = this.getFieldIndex(expressionKey);
+		list.add(new FlatFieldDescriptor(offset+fieldIdx, this.fieldTypesInfos[fieldIdx]));
 	}
 
 	@Override
 	public TypeSerializer<Tuple> createSerializer(ExecutionConfig config) {
-		return new CascadingTupleSerializer(config);
+
+		TypeSerializer<?>[] fieldSerializers = new TypeSerializer[this.numFields];
+		for(int i=0; i<numFields; i++) {
+			fieldSerializers[i] = this.fieldTypesInfos[i].createSerializer(config);
+		}
+
+		return new CascadingTupleSerializer(fieldSerializers);
 	}
 
 	protected void initializeNewComparator(int localKeyCount) {
@@ -91,7 +149,7 @@ public class CascadingTupleTypeInfo extends TupleTypeInfoBase<Tuple> {
 	protected void addCompareField(int fieldId, TypeComparator<?> comparator) {
 		this.fieldComparators[this.comparatorHelperIndex] = comparator;
 		this.logicalKeyFields[this.comparatorHelperIndex] = fieldId;
-		++this.comparatorHelperIndex;
+		this.comparatorHelperIndex++;
 	}
 
 	protected TypeComparator<Tuple> getNewComparator(ExecutionConfig executionConfig) {
@@ -109,17 +167,16 @@ public class CascadingTupleTypeInfo extends TupleTypeInfoBase<Tuple> {
 		TypeSerializer[] serializers = new TypeSerializer[maxKey + 1];
 
 		for(int i = 0; i <= maxKey; ++i) {
-			serializers[i] = this.types[i].createSerializer(executionConfig);
+			serializers[i] = this.fieldTypesInfos[i].createSerializer(executionConfig);
 		}
 
 		if(finalFieldComparators.length != 0 && finalLogicalKeyFields.length != 0 && serializers.length != 0 && finalFieldComparators.length == finalLogicalKeyFields.length) {
-			return new TupleComparator(finalLogicalKeyFields, finalFieldComparators, serializers);
+			return new CascadingTupleComparator(finalLogicalKeyFields, finalFieldComparators, serializers);
+//			throw new UnsupportedOperationException("Not yet supported!"); // TODO
 		} else {
 			throw new IllegalArgumentException("Tuple comparator creation has a bug");
 		}
 	}
-
-
 
 	private static TypeInformation[] computeFieldTypes(Fields fields) {
 
@@ -132,13 +189,12 @@ public class CascadingTupleTypeInfo extends TupleTypeInfoBase<Tuple> {
 			Class fieldClazz = fields.getTypeClass(i);
 			if (fieldClazz == null) {
 				// TODO: check
-				fieldClazz = Object.class;
+				fieldClazz = Comparable.class;
 			}
 			fieldTypes[i] = new GenericTypeInfo(fieldClazz);
 		}
 
 		return fieldTypes;
 	}
-
 
 }

@@ -37,6 +37,7 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
 import org.apache.flink.api.java.DataSet;
@@ -210,8 +211,26 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			// REDUCE
 			else if(source instanceof GroupBy) {
 
-					throw new RuntimeException("Reduce not yet supported");
+				GroupBy groupBy = (GroupBy)source;
+
+				if(groupBy.getKeySelectors().size() != 1) {
+					throw new RuntimeException("Currently only groupby with single input supported");
 				}
+				Fields keyFields = groupBy.getKeySelectors().entrySet().iterator().next().getValue();
+				int numKeys = keyFields.size();
+				String[] keys = new String[numKeys];
+				System.out.println("GroupBy keys");
+				for(int i=0; i<numKeys; i++) {
+					keys[i] = keyFields.get(i).toString();
+					System.out.println(keys[i]);
+				}
+
+				flinkPlan = flinkPlan.groupBy(keys)
+						.reduceGroup(new Reducer(node))
+						.returns(new CascadingTupleTypeInfo(new Fields("token"))); // TODO
+
+//				throw new RuntimeException("Reduce not yet supported");
+			}
 			// MAP
 			else if(source instanceof Boundary) {
 
@@ -220,6 +239,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
 				}
 				Scope inScope = inScopes.iterator().next();
+
+				System.out.println("Map output fields: "+inScope.getOutValuesFields());
 
 				// if none of the above, its a Mapper
 				flinkPlan = flinkPlan

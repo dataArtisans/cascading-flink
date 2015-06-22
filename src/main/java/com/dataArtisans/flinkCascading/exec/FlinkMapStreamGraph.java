@@ -33,8 +33,8 @@ import org.apache.flink.util.Collector;
 
 public class FlinkMapStreamGraph extends NodeStreamGraph {
 
-	private FlinkMapInStage sourceStage;
-	private FlinkMapOutStage sinkStage;
+	private BoundaryInStage sourceStage;
+	private FlinkCollectorOutput sinkStage;
 
 	public FlinkMapStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary boundary) {
 
@@ -53,14 +53,14 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 		this.sinkStage.setTupleCollector(tupleCollector);
 	}
 
-	public FlinkMapInStage getSourceStage() {
+	public BoundaryInStage getSourceStage() {
 		return this.sourceStage;
 	}
 
 
-	private FlinkMapInStage handleHead( Boundary boundary, FlowProcess flowProcess ) {
+	private BoundaryInStage handleHead( Boundary boundary, FlowProcess flowProcess ) {
 
-		FlinkMapInStage sourceStage = (FlinkMapInStage)createBoundaryStage(boundary, IORole.source);
+		BoundaryInStage sourceStage = (BoundaryInStage)createBoundaryStage(boundary, IORole.source);
 
 		addHead( sourceStage );
 
@@ -75,12 +75,12 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 	{
 
 		if(role == IORole.source) {
-			this.sourceStage = new FlinkMapInStage(this.flowProcess, boundary );
+			this.sourceStage = new BoundaryInStage(this.flowProcess, boundary );
 			return this.sourceStage;
 		}
 		else if(role == IORole.sink) {
-			this.sinkStage = new FlinkMapOutStage(this.flowProcess, boundary);
-			return this.sinkStage;
+			this.sinkStage = new BoundaryOutStage(this.flowProcess, boundary);
+			return (BoundaryOutStage)this.sinkStage;
 		}
 
 		throw new InvalidArgumentException("Boundary must be either source or sink!"); // TODO: check
@@ -101,11 +101,11 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 	@Override
 	protected Gate createGroupByGate(GroupBy groupBy, IORole ioRole) {
 		if(ioRole == IORole.sink) {
-			// TODO create map out gate
-			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+			this.sinkStage = new GroupByOutGate(flowProcess, groupBy, ioRole);
+			return (GroupByOutGate)this.sinkStage;
 		}
 		else {
-			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+			throw new UnsupportedOperationException("Cannot create a GroupBy gate in a MapStreamGraph");
 		}
 	}
 

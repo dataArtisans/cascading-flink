@@ -27,14 +27,15 @@ import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import org.apache.flink.util.Collector;
 
-public class FlinkMapOutStage extends ElementStage<TupleEntry, Void> {
+public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements FlinkCollectorOutput{
 
 	private Collector<Tuple> tupleCollector;
 
-	public FlinkMapOutStage(FlowProcess flowProcess, FlowElement flowElement) {
+	public BoundaryOutStage(FlowProcess flowProcess, FlowElement flowElement) {
 		super(flowProcess, flowElement);
 	}
 
+	@Override
 	public void setTupleCollector(Collector<Tuple> tupleCollector) {
 		this.tupleCollector = tupleCollector;
 	}

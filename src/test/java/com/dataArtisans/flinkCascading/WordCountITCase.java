@@ -53,7 +53,7 @@ public class WordCountITCase extends FlinkCascadingTestBase {
 	@Override
 	public FlowDef getFlow() {
 
-		Fields token = new Fields( "token" );
+		Fields token = new Fields( "token", String.class );
 		Fields text = new Fields( "line" );
 
 		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "[ \\[\\]\\(\\),.]" );

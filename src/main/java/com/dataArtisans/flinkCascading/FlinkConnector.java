@@ -133,8 +133,6 @@ public class FlinkConnector extends FlowConnector {
 			addRule( new TapGroupTapStepPartitioner() );
 
 			// PartitionNodes
-//			addRule(new SplitSourceTapsOffPartitioner());
-
 			addRule( new ConsecutiveTapsNodePartitioner() );
 			addRule( new MultiTapGroupNodePartitioner() );
 			addRule( new GroupTapNodePartitioner() );

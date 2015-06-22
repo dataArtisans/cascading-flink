@@ -33,9 +33,9 @@ import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 
 import java.util.Iterator;
 
-public class FlinkMapInStage extends ElementStage<Void, TupleEntry> implements InputSource {
+public class BoundaryInStage extends ElementStage<Void, TupleEntry> implements InputSource {
 
-	public FlinkMapInStage(FlowProcess flowProcess, FlowElement flowElement) {
+	public BoundaryInStage(FlowProcess flowProcess, FlowElement flowElement) {
 		super(flowProcess, flowElement);
 	}
 
