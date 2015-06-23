@@ -35,6 +35,9 @@ import cascading.tap.Tap;
 import static cascading.flow.planner.iso.expression.NotElementExpression.not;
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
+/**
+ * Injects a Boundary before a sink tap in order to split of the sink tap as a separate node.
+ */
 public class SinkTapBoundaryTransformer extends RuleInsertionTransformer
 {
 	public SinkTapBoundaryTransformer() {

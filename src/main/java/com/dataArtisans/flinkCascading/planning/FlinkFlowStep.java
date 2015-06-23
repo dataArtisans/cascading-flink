@@ -179,7 +179,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 				// check that no projection is necessary
 				if(!tapFields.isAll()) {
-					throw new RuntimeException("WOOPS!");
+					throw new UnsupportedOperationException("Sinks with projection not supported yet.");
+
 //						Scope scope = getIncomingScopeFrom(inputOps.get(0));
 //						Fields tailFields = scope.getIncomingTapFields();
 //
@@ -210,6 +211,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 			// REDUCE
 			else if(source instanceof GroupBy) {
+				// compile to Reduce if input is GroupBy
 
 				GroupBy groupBy = (GroupBy)source;
 
@@ -222,17 +224,23 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				System.out.println("GroupBy keys");
 				for(int i=0; i<numKeys; i++) {
 					keys[i] = keyFields.get(i).toString();
-					System.out.println(keys[i]);
 				}
+
+				Collection<Scope> inScopes = (Collection<Scope>) node.getPreviousScopes(sink);
+				if(inScopes.size() != 1) {
+					throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
+				}
+				Scope inScope = inScopes.iterator().next();
 
 				flinkPlan = flinkPlan.groupBy(keys)
 						.reduceGroup(new Reducer(node))
-						.returns(new CascadingTupleTypeInfo(new Fields("token"))); // TODO
+						.withParameters(this.getConfig())
+						.returns(new CascadingTupleTypeInfo(inScope.getOutGroupingFields()));
 
-//				throw new RuntimeException("Reduce not yet supported");
 			}
 			// MAP
 			else if(source instanceof Boundary) {
+				// compile to Map if input is Boundary
 
 				Collection<Scope> inScopes = (Collection<Scope>) node.getPreviousScopes(sink);
 				if(inScopes.size() != 1) {
@@ -242,9 +250,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 				System.out.println("Map output fields: "+inScope.getOutValuesFields());
 
-				// if none of the above, its a Mapper
 				flinkPlan = flinkPlan
 						.mapPartition(new Mapper(node))
+						.withParameters(this.getConfig())
 						.returns(new CascadingTupleTypeInfo(inScope.getOutValuesFields()));
 			}
 

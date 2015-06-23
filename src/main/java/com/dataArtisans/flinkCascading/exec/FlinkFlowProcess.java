@@ -37,7 +37,6 @@ import java.util.Set;
 
 public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
-
 	private transient RuntimeContext runtimeContext;
 	private Configuration conf;
 	private int numTasks = -1;

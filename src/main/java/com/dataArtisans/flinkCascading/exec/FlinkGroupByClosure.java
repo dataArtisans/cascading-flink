@@ -18,45 +18,45 @@
 
 package com.dataArtisans.flinkCascading.exec;
 
-import cascading.flow.FlowElement;
 import cascading.flow.FlowProcess;
-import cascading.flow.stream.duct.Duct;
-import cascading.flow.stream.element.ElementStage;
-import cascading.flow.stream.graph.StreamGraph;
+import cascading.pipe.joiner.JoinerClosure;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
-import org.apache.flink.util.Collector;
 
-public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements FlinkCollectorOutput{
+import java.util.Iterator;
 
-	private Collector<Tuple> tupleCollector;
+public class FlinkGroupByClosure extends JoinerClosure {
 
-	public BoundaryOutStage(FlowProcess flowProcess, FlowElement flowElement) {
-		super(flowProcess, flowElement);
+	protected Iterator values;
+
+	public FlinkGroupByClosure(FlowProcess flowProcess, Fields[] groupingFields, Fields[] valueFields) {
+		super(flowProcess, groupingFields, valueFields);
+	}
+
+	public void reset( Iterator<Tuple> values ) {
+		this.values = values;
 	}
 
 	@Override
-	public void setTupleCollector(Collector<Tuple> tupleCollector) {
-		this.tupleCollector = tupleCollector;
+	public int size() {
+		return 1;
 	}
 
 	@Override
-	public void receive(Duct previous, TupleEntry tupleEntry) {
-		this.tupleCollector.collect(tupleEntry.getTuple());
+	public Iterator<Tuple> getIterator(int pos) {
+		if(pos != 0) {
+			throw new IllegalArgumentException("Invalid grouping position: " + pos);
+		}
+		return this.values;
 	}
 
 	@Override
-	public void bind( StreamGraph streamGraph ) {
-		// don't do anything
+	public boolean isEmpty(int pos) {
+		return values != null;
 	}
 
 	@Override
-	public void start( Duct previous ) {
-		// don't do anything
-	}
-
-	@Override
-	public void complete(Duct previous) {
-		// don't do anything
+	public Tuple getGroupTuple(Tuple keysTuple) {
+		return keysTuple;
 	}
 }

@@ -52,6 +52,8 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 	private FlinkMapStreamGraph streamGraph;
 
+	private BoundaryInStage sourceStage;
+
 	private FlinkFlowProcess currentProcess;
 
 	public Mapper() {}
@@ -79,6 +81,8 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 			streamGraph = new FlinkMapStreamGraph( currentProcess, flowNode, source );
 
+			sourceStage = this.streamGraph.getSourceStage();
+
 			for( Duct head : streamGraph.getHeads() )
 				LOG.info( "sourcing from: " + ( (ElementDuct) head ).getFlowElement() );
 
@@ -99,10 +103,8 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 	@Override
 	public void mapPartition(Iterable<Tuple> input, Collector<Tuple> output) throws Exception {
 
-
 //		currentProcess.setReporter( reporter );
 
-		BoundaryInStage sourceStage = this.streamGraph.getSourceStage();
 		this.streamGraph.setTupleCollector(output);
 
 		streamGraph.prepare();

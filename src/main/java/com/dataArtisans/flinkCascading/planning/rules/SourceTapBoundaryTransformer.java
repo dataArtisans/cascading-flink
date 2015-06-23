@@ -35,6 +35,9 @@ import cascading.tap.Tap;
 import static cascading.flow.planner.iso.expression.NotElementExpression.not;
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
+/**
+ * Injects a Boundary after a source Tap in order to split of the source Tap as a separate node.
+ */
 public class SourceTapBoundaryTransformer extends RuleInsertionTransformer
 {
 	public SourceTapBoundaryTransformer() {

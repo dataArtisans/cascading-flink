@@ -22,6 +22,11 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
+/**
+ * Used for Fields that have custom comparators and hashers
+ *
+ * @param <T>
+ */
 public class CascadingFieldTypeInfo<T> extends TypeInformation<T> {
 
 	@Override

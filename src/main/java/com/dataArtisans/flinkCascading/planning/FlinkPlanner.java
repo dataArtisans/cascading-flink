@@ -63,9 +63,11 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 		super.initialize( flowConnector, properties );
 
-		this.env = ExecutionEnvironment.getExecutionEnvironment(); // TODO: replace by configured ExecutionEnvironment
+		// TODO: replace by configured ExecutionEnvironment
+		this.env = ExecutionEnvironment.getExecutionEnvironment();
 
-		defaultConfig = new Configuration(); // TODO: copy properties
+		// TODO: copy properties
+		defaultConfig = new Configuration();
 
 		// TODO: set JAR file
 //		Class type = AppProps.getApplicationJarClass(properties);

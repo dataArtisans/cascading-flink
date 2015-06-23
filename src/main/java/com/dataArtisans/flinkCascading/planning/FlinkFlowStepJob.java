@@ -33,9 +33,7 @@ import java.io.IOException;
 
 public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 {
-	/** static field to capture errors in hadoop local mode */
-	private static Throwable localError;
-	/** Field currentConf */
+
 	private final Configuration currentConf;
 
 	private JobSubmissionResult jobSubmission;
@@ -76,7 +74,9 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 		try {
 
-//			TODO
+			// TODO: Use proper Flink client to connect to JM and run job async
+			// Good enough for local testing
+
 //			Client client = new Client(new Configuration(), Thread.currentThread().getContextClassLoader());
 //			FlinkPlan fp = client.getOptimizedPlan(env.createProgramPlan(), env.getParallelism());
 //			JobGraph jg = client.getJobGraph(null, fp);
@@ -98,6 +98,9 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	@Override
 	protected void updateNodeStatus( FlowNodeStats flowNodeStats )
 	{
+
+		// TODO
+
 		/*
 		try
 		{
@@ -227,15 +230,4 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 //		}
 	}
 
-	/**
-	 * Internal method to report errors that happen on hadoop local mode. Hadoops local
-	 * JobRunner does not give access to TaskReports, but we want to be able to capture
-	 * the exception and not just print it to stderr. FlowMapper and FlowReducer use this method.
-	 *
-	 * @param throwable the throwable to be reported.
-	 */
-	public static void reportLocalError( Throwable throwable )
-	{
-		localError = throwable;
-	}
 }

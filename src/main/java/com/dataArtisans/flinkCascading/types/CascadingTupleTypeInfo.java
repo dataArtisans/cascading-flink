@@ -22,6 +22,7 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.common.typeutils.TypeComparator;
@@ -46,13 +47,13 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 	private int comparatorHelperIndex;
 
 	public CascadingTupleTypeInfo() {
-		// TODO: REMOVE
+		// TODO: REMOVE (just kept to make the old code compile)
 		super(null);
 		throw new UnsupportedOperationException();
 	}
 
 	public CascadingTupleTypeInfo(Comparator[] x) {
-		// TODO: REMOVE
+		// TODO: REMOVE (just kept to make the old code compile)
 		super(null);
 		throw new UnsupportedOperationException();
 	}
@@ -172,7 +173,6 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 
 		if(finalFieldComparators.length != 0 && finalLogicalKeyFields.length != 0 && serializers.length != 0 && finalFieldComparators.length == finalLogicalKeyFields.length) {
 			return new CascadingTupleComparator(finalLogicalKeyFields, finalFieldComparators, serializers);
-//			throw new UnsupportedOperationException("Not yet supported!"); // TODO
 		} else {
 			throw new IllegalArgumentException("Tuple comparator creation has a bug");
 		}
@@ -185,13 +185,44 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 		int numFields = fields.size();
 		TypeInformation[] fieldTypes = new TypeInformation[numFields];
 		for(int i=0; i<numFields; i++) {
-			// TODO: check for special types
+
 			Class fieldClazz = fields.getTypeClass(i);
+
 			if (fieldClazz == null) {
-				// TODO: check
-				fieldClazz = Comparable.class;
+				// TODO: check if this works also for fields that do not implement comparable!
+				fieldTypes[i] = new GenericTypeInfo(Comparable.class);
 			}
-			fieldTypes[i] = new GenericTypeInfo(fieldClazz);
+			else if (fieldClazz.equals(String.class)) {
+				fieldTypes[i] = BasicTypeInfo.STRING_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Byte.class)) {
+				fieldTypes[i] = BasicTypeInfo.BYTE_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Short.class)) {
+				fieldTypes[i] = BasicTypeInfo.SHORT_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Integer.class)) {
+				fieldTypes[i] = BasicTypeInfo.INT_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Long.class)) {
+				fieldTypes[i] = BasicTypeInfo.LONG_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Float.class)) {
+				fieldTypes[i] = BasicTypeInfo.FLOAT_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Double.class)) {
+				fieldTypes[i] = BasicTypeInfo.DOUBLE_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Boolean.class)) {
+				fieldTypes[i] = BasicTypeInfo.BOOLEAN_TYPE_INFO;
+			}
+			else if (fieldClazz.equals(Character.class)) {
+				fieldTypes[i] = BasicTypeInfo.CHAR_TYPE_INFO;
+			}
+			else {
+				fieldTypes[i] = new GenericTypeInfo(fieldClazz);
+			}
+
 		}
 
 		return fieldTypes;

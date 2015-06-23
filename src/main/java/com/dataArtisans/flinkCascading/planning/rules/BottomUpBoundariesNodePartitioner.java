@@ -41,6 +41,9 @@ import static cascading.flow.planner.iso.expression.NotElementExpression.not;
 import static cascading.flow.planner.iso.expression.OrElementExpression.or;
 import static cascading.flow.planner.rule.PlanPhase.PartitionNodes;
 
+/**
+ * Partition flow steps across Boundaries, GroupBys, CoGroups, Merges
+ */
 public class BottomUpBoundariesNodePartitioner extends ExpressionRulePartitioner
 {
 

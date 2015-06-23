@@ -18,18 +18,29 @@
 
 package com.dataArtisans.flinkCascading.exec.operators;
 
+import cascading.CascadingException;
+import cascading.flow.FlowElement;
+import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
+import cascading.flow.SliceCounters;
 import cascading.flow.hadoop.FlowMapper;
+import cascading.flow.stream.duct.Duct;
+import cascading.flow.stream.element.ElementDuct;
+import cascading.pipe.GroupBy;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.exec.FlinkMapStreamGraph;
+import com.dataArtisans.flinkCascading.exec.FlinkReduceStreamGraph;
+import com.dataArtisans.flinkCascading.exec.GroupByInGate;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
+import java.util.Set;
+
+import static cascading.util.LogUtil.logCounters;
+import static cascading.util.LogUtil.logMemory;
 
 /**
  *
@@ -42,9 +53,13 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
 	private FlowNode flowNode;
 
-	private FlinkMapStreamGraph streamGraph;
+	private FlinkReduceStreamGraph streamGraph;
+
+	private GroupByInGate groupSource;
 
 	private FlinkFlowProcess currentProcess;
+
+	private boolean calledPrepare;
 
 	public Reducer() {}
 
@@ -55,7 +70,8 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 	@Override
 	public void open(Configuration config) {
 
-		/*
+		this.calledPrepare = false;
+
 		try {
 
 			currentProcess = new FlinkFlowProcess(config);
@@ -65,18 +81,22 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 				throw new RuntimeException("FlowNode for Mapper may only have a single source");
 			}
 			FlowElement sourceElement = sources.iterator().next();
-			if(!(sourceElement instanceof Boundary)) {
-				throw new RuntimeException("Source of Mapper must be a Boundary");
+			if(!(sourceElement instanceof GroupBy)) {
+				throw new RuntimeException("Source of Reduce must be a GroupBy");
 			}
-			Boundary source = (Boundary)sourceElement;
+			GroupBy source = (GroupBy)sourceElement;
 
-			streamGraph = new FlinkMapStreamGraph( currentProcess, flowNode, source );
+			streamGraph = new FlinkReduceStreamGraph( currentProcess, flowNode, source );
 
-			for( Duct head : streamGraph.getHeads() )
-				LOG.info( "sourcing from: " + ( (ElementDuct) head ).getFlowElement() );
+			groupSource = this.streamGraph.getGroupSource();
 
-			for( Duct tail : streamGraph.getTails() )
-				LOG.info( "sinking to: " + ( (ElementDuct) tail ).getFlowElement() );
+			for( Duct head : streamGraph.getHeads() ) {
+				LOG.info("sourcing from: " + ((ElementDuct) head).getFlowElement());
+			}
+
+			for( Duct tail : streamGraph.getTails() ) {
+				LOG.info("sinking to: " + ((ElementDuct) tail).getFlowElement());
+			}
 		}
 		catch( Throwable throwable ) {
 
@@ -87,85 +107,69 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 			throw new FlowException( "internal error during mapper configuration", throwable );
 		}
 
-	*/
 	}
 
 	@Override
 	public void reduce(Iterable<Tuple> input, Collector<Tuple> output) throws Exception {
 
-		Iterator<Tuple> it = input.iterator();
-
-		Tuple t = it.next();
-		output.collect(t);
-		int cnt = 1;
-		String s = t.getString(0);
-
-		while(it.hasNext()) {
-			t = it.next();
-			cnt++;
-			s+=" "+t.getString(0);
-		}
-
-		int idx = this.getRuntimeContext().getIndexOfThisSubtask();
-
-		System.out.println(idx+" ---> "+cnt+" "+s);
-
-/*
 //		currentProcess.setReporter( reporter );
 
-		FlinkMapInStage sourceStage = this.streamGraph.getSourceStage();
 		this.streamGraph.setTupleCollector(output);
 
-		streamGraph.prepare();
+		if(! this.calledPrepare) {
+			this.streamGraph.prepare();
+			this.calledPrepare = true;
+
+			this.groupSource.start(this.groupSource);
+		}
 
 		long processBeginTime = System.currentTimeMillis();
 
 //		currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
 
-		try {
-			try {
-
-				sourceStage.run( input.iterator() );
-			}
-			catch( OutOfMemoryError error ) {
-				throw error;
-			}
-			catch( IOException exception ) {
-//				reportIfLocal( exception );
-				throw exception;
-			}
-			catch( Throwable throwable ) {
-//				reportIfLocal( throwable );
-
-				if( throwable instanceof CascadingException ) {
-					throw (CascadingException) throwable;
-				}
-
-				throw new FlowException( "internal error during mapper execution", throwable );
-			}
-		}
-		finally
+		try
 		{
-			try
-			{
-				streamGraph.cleanup();
-			}
-			finally
-			{
-				long processEndTime = System.currentTimeMillis();
-
-//				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
-//				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
-			}
+			this.groupSource.run(input.iterator());
 		}
-*/
+		catch( OutOfMemoryError error )
+		{
+			throw error;
+		}
+		catch( Throwable throwable )
+		{
+//			reportIfLocal( throwable );
 
+			if( throwable instanceof CascadingException )
+				throw (CascadingException) throwable;
+
+			throw new FlowException( "internal error during reducer execution", throwable );
+		}
 	}
 
 
 	@Override
 	public void close() {
 
+		try {
+			if( this.calledPrepare)
+			{
+				this.groupSource.complete(this.groupSource);
+
+				this.streamGraph.cleanup();
+			}
+		}
+		finally {
+			if( currentProcess != null )
+			{
+				long processEndTime = System.currentTimeMillis();
+				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
+//				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
+			}
+
+			String message = "flow node id: " + flowNode.getID();
+			logMemory( LOG, message + ", mem on close" );
+			logCounters( LOG, message + ", counter:", currentProcess );
+		}
 	}
 
 }
