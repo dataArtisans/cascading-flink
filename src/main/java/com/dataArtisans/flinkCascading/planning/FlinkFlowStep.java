@@ -27,10 +27,13 @@ import cascading.flow.planner.FlowStepJob;
 import cascading.flow.planner.PlatformInfo;
 import cascading.flow.planner.Scope;
 import cascading.flow.planner.graph.ElementGraph;
+import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.management.state.ClientState;
 import cascading.pipe.Boundary;
 import cascading.pipe.GroupBy;
+import cascading.pipe.Merge;
+import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
 import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
@@ -40,13 +43,17 @@ import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
+import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -104,7 +111,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	}
 
 	private void printFlowStep() {
-		Iterator<FlowNode> iterator = getFlowNodeGraph().getOrderedTopologicalIterator();
+		Iterator<FlowNode> iterator = getFlowNodeGraph().getTopologicalIterator();
 
 		System.out.println("Step Cnt: "+getFlowNodeGraph().vertexSet().size());
 		System.out.println("Edge Cnt: "+getFlowNodeGraph().edgeSet().size());
@@ -132,132 +139,304 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		printFlowStep();
 
 		FlowNodeGraph flowNodeGraph = getFlowNodeGraph();
-		Iterator<FlowNode> iterator = flowNodeGraph.getOrderedTopologicalIterator();
+		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator(); // TODO: topologicalIterator is non-deterministically broken!!!
 
-		DataSet<Tuple> flinkPlan = null;
+		Map<FlowElement, DataSet<Tuple>> flinkFlows = new HashMap<FlowElement, DataSet<Tuple>>();
 
 		while(iterator.hasNext()) {
 			FlowNode node = iterator.next();
 
-			Set<FlowElement> nodeSources = node.getSourceElements();
-			if(nodeSources.size() != 1) {
-				throw new RuntimeException("Only nodes with one input supported right now"); // TODO
-			}
-			Set<FlowElement> nodeSinks = node.getSinkElements();
-			if(nodeSinks.size() != 1) {
-				throw new RuntimeException("Only nodes with one output supported right now"); // TODO
-			}
+			Set<FlowElement> sources = getSources(node);
 
-			FlowElement source = nodeSources.iterator().next();
-			FlowElement sink = nodeSinks.iterator().next();
+			if(sources.size() == 1) {
 
-			// SOURCE
-			if(source instanceof Tap && sink instanceof Boundary && ((Tap)source).isSource()) {
+				// single input node: Map, Reduce, Source, Sink
 
-				// add data source to Flink program
-				if(source instanceof FileTap) {
+				FlowElement source = getSource(node);
+				FlowElement sink = getSink(node);
 
-					FileTap tap = (FileTap)source;
+				// SOURCE
+				if (source instanceof Tap && sink instanceof Boundary && ((Tap) source).isSource()) {
 
-					Properties conf = new Properties();
-					tap.getScheme().sourceConfInit(null, tap, conf);
-
-					flinkPlan = env
-							.createInput(new FileTapInputFormat(tap, conf), new CascadingTupleTypeInfo(tap.getSourceFields()))
-							.name(tap.getIdentifier())
-							.setParallelism(1);
+					DataSet<Tuple> sourceFlow = translateSource(node, env);
+					flinkFlows.put(sink, sourceFlow);
 				}
-				else {
-					throw new RuntimeException("Only File taps supported right now");
+				// SINK
+				else if (source instanceof Boundary && sink instanceof Tap && ((Tap) sink).isSink()) {
+
+					DataSet<Tuple> input = flinkFlows.get(source);
+					translateSink(input, node);
 				}
-			}
-			// SINK
-			else if(source instanceof Boundary && sink instanceof Tap && ((Tap)sink).isSink()) {
+				// REDUCE
+				else if (source instanceof GroupBy) {
 
-				Tap tap = (Tap)sink;
-				Fields tapFields = tap.getSinkFields();
+					DataSet<Tuple> input = flinkFlows.get(source);
+					DataSet<Tuple> grouped = translateReduce(input, node);
+					flinkFlows.put(sink, grouped);
+				}
+				// MAP
+				else if (source instanceof Boundary) {
 
-				// check that no projection is necessary
-				if(!tapFields.isAll()) {
-					throw new UnsupportedOperationException("Sinks with projection not supported yet.");
-
-//						Scope scope = getIncomingScopeFrom(inputOps.get(0));
-//						Fields tailFields = scope.getIncomingTapFields();
-//
-//						// check if we need to project
-//						if(!tapFields.equalsFields(tailFields)) {
-//							// add projection mapper
-//							tail = tail
-//									.map(new ProjectionMapper(tailFields, tapFields))
-//									.returns(new CascadingTupleTypeInfo())
-//									.name("Tap Projection Mapper");
-//						}
+					DataSet<Tuple> input = flinkFlows.get(source);
+					DataSet<Tuple> mapped = translateMap(input, node);
+					flinkFlows.put(sink, mapped);
 				}
 
-				if(tap instanceof FileTap) {
+			}
+			else {
 
-					FileTap fileTap = (FileTap) tap;
-					Properties props = new Properties();
+				// multi input node: Merge, (CoGroup, Join)
 
-					flinkPlan
-							.output(new FileTapOutputFormat(fileTap, tapFields, props))
-							.setParallelism(1);
+				boolean allSourcesBoundaries = true;
+				for(FlowElement source : sources) {
+					if(!(source instanceof Boundary)) {
+						allSourcesBoundaries = false;
+						break;
+					}
+				}
+
+				FlowElement sink = getSink(node);
+				// MERGE
+				if(allSourcesBoundaries &&
+						// only sources + sink + one more node (Merge) + head + tail
+						node.getElementGraph().vertexSet().size() == sources.size() + 4) {
+
+					DataSet<Tuple> unioned = translateMerge(flinkFlows, node);
+					flinkFlows.put(sink, unioned);
 
 				}
 				else {
-					throw new RuntimeException("Only FileTaps supported right now."); // TODO
+					throw new UnsupportedOperationException("No multi-input nodes other than Merge supported right now.");
 				}
 
-			}
-			// REDUCE
-			else if(source instanceof GroupBy) {
-				// compile to Reduce if input is GroupBy
 
-				GroupBy groupBy = (GroupBy)source;
-
-				if(groupBy.getKeySelectors().size() != 1) {
-					throw new RuntimeException("Currently only groupby with single input supported");
-				}
-				Fields keyFields = groupBy.getKeySelectors().entrySet().iterator().next().getValue();
-				int numKeys = keyFields.size();
-				String[] keys = new String[numKeys];
-				System.out.println("GroupBy keys");
-				for(int i=0; i<numKeys; i++) {
-					keys[i] = keyFields.get(i).toString();
-				}
-
-				Collection<Scope> inScopes = (Collection<Scope>) node.getPreviousScopes(sink);
-				if(inScopes.size() != 1) {
-					throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
-				}
-				Scope inScope = inScopes.iterator().next();
-
-				flinkPlan = flinkPlan.groupBy(keys)
-						.reduceGroup(new Reducer(node))
-						.withParameters(this.getConfig())
-						.returns(new CascadingTupleTypeInfo(inScope.getOutGroupingFields()));
-
-			}
-			// MAP
-			else if(source instanceof Boundary) {
-				// compile to Map if input is Boundary
-
-				Collection<Scope> inScopes = (Collection<Scope>) node.getPreviousScopes(sink);
-				if(inScopes.size() != 1) {
-					throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
-				}
-				Scope inScope = inScopes.iterator().next();
-
-				System.out.println("Map output fields: "+inScope.getOutValuesFields());
-
-				flinkPlan = flinkPlan
-						.mapPartition(new Mapper(node))
-						.withParameters(this.getConfig())
-						.returns(new CascadingTupleTypeInfo(inScope.getOutValuesFields()));
 			}
 
 		}
 
 	}
+
+	private DataSet<Tuple> translateSource(FlowNode node, ExecutionEnvironment env) {
+
+		FlowElement source = getSource(node);
+
+		// add data source to Flink program
+		if(source instanceof FileTap) {
+			return this.translateFileTapSource((FileTap)source, env);
+		}
+		else if(source instanceof MultiSourceTap) {
+			return this.translateMultiSourceTap((MultiSourceTap)source, env);
+		}
+		else {
+			throw new RuntimeException("Unsupported tap type encountered"); // TODO
+		}
+
+	}
+
+	private DataSet translateFileTapSource(FileTap tap, ExecutionEnvironment env) {
+
+		Properties conf = new Properties();
+		tap.getScheme().sourceConfInit(null, tap, conf);
+
+		DataSet<Tuple> src = env
+				.createInput(new FileTapInputFormat(tap, conf), new CascadingTupleTypeInfo(tap.getSourceFields()))
+				.name(tap.getIdentifier())
+				.setParallelism(1);
+
+		return src;
+	}
+
+	private DataSet translateMultiSourceTap(MultiSourceTap tap, ExecutionEnvironment env) {
+
+		Iterator<Tap> childTaps = ((MultiSourceTap)tap).getChildTaps();
+
+		DataSet cur = null;
+		while(childTaps.hasNext()) {
+			Tap childTap = childTaps.next();
+			DataSet source;
+
+			if(childTap instanceof FileTap) {
+				source = translateFileTapSource((FileTap)childTap, env);
+			}
+			else {
+				throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
+			}
+
+			if(cur == null) {
+				cur = source;
+			}
+			else {
+				cur = cur.union(source);
+			}
+		}
+
+		return cur;
+	}
+
+	private void translateSink(DataSet<Tuple> input, FlowNode node) {
+
+		FlowElement sink = getSink(node);
+
+		if(!(sink instanceof Tap)) {
+			throw new IllegalArgumentException("FlowNode is not a sink");
+		}
+
+		Tap sinkTap = (Tap)sink;
+
+		Fields tapFields = sinkTap.getSinkFields();
+		// check that no projection is necessary
+		if(!tapFields.isAll()) {
+
+			Scope inScope = getInScope(node);
+			Fields tailFields = inScope.getIncomingTapFields();
+
+			// check if we need to project
+			if(!tapFields.equalsFields(tailFields)) {
+				// add projection mapper
+				input = input
+						.map(new ProjectionMapper(tailFields, tapFields))
+						.returns(new CascadingTupleTypeInfo(tapFields));
+			}
+		}
+
+		if(sinkTap instanceof FileTap) {
+			translateFileSinkTap(input, (FileTap) sinkTap);
+		}
+		else {
+			throw new UnsupportedOperationException("Only file taps as sinks suppported right now.");
+		}
+
+	}
+
+	private void translateFileSinkTap(DataSet<Tuple> input, FileTap fileSink) {
+
+		Properties props = new Properties();
+		input
+				.output(new FileTapOutputFormat(fileSink, fileSink.getSinkFields(), props))
+				.setParallelism(1);
+	}
+
+	private DataSet translateMap(DataSet<Tuple> input, FlowNode node) {
+
+		Scope outScope = getOutScope(node);
+
+		return input
+				.mapPartition(new Mapper(node))
+				.withParameters(this.getConfig())
+				.returns(new CascadingTupleTypeInfo(outScope.getOutValuesFields()));
+
+	}
+
+	private DataSet translateReduce(DataSet<Tuple> input, FlowNode node) {
+
+		GroupBy groupBy = (GroupBy)getSource(node);
+
+		Scope inScope = getInScope(node);
+		Scope outScope = getOutScope(node);
+
+		if(groupBy.getKeySelectors().size() != 1) {
+			throw new RuntimeException("Currently only groupby with single input supported");
+		}
+		Fields keyFields = groupBy.getKeySelectors().entrySet().iterator().next().getValue();
+
+		int numKeys = keyFields.size();
+		String[] keys = new String[numKeys];
+		for(int i=0; i<numKeys; i++) {
+
+			Comparable keyField = keyFields.get(i);
+			if(keyField instanceof Integer) {
+				keyField = inScope.getOutValuesFields().get((Integer) keyField);
+			}
+			keys[i] = keyField.toString();
+		}
+
+		Fields outFields;
+		if(outScope.isEvery()) {
+			outFields = outScope.getOutGroupingFields();
+		}
+		else {
+			outFields = outScope.getOutValuesFields();
+		}
+
+		return input
+				.groupBy(keys)
+				.reduceGroup(new Reducer(node))
+				.withParameters(this.getConfig())
+				.returns(new CascadingTupleTypeInfo(outFields));
+
+	}
+
+	private DataSet<Tuple> translateMerge(Map<FlowElement, DataSet<Tuple>> flinkFlows, FlowNode node) {
+
+		// check if remaining node is a Merge
+		Set<FlowElement> elements = new HashSet(node.getElementGraph().vertexSet());
+		elements.removeAll(getSources(node));
+		elements.remove(getSink(node));
+
+		for(FlowElement v : elements) {
+			if(!(v instanceof Merge || v instanceof Extent)) {
+				throw new RuntimeException("Unexpected non-merge element found.");
+			}
+		}
+
+		// this node is just a merge wrapped in boundaries.
+		// translate it to a Flink union
+
+		Set<FlowElement> sources = getSources(node);
+
+		DataSet<Tuple> unioned = null;
+		for(FlowElement source : sources) {
+			if(unioned == null) {
+				unioned = flinkFlows.get(source);
+			}
+			else {
+				unioned = unioned.union(flinkFlows.get(source));
+			}
+		}
+		return unioned;
+	}
+
+	private Set<FlowElement> getSources(FlowNode node) {
+		return node.getSourceElements();
+	}
+
+	private FlowElement getSource(FlowNode node) {
+		Set<FlowElement> nodeSources = node.getSourceElements();
+		if(nodeSources.size() != 1) {
+			throw new RuntimeException("Only nodes with one input supported right now"); // TODO
+		}
+		return nodeSources.iterator().next();
+	}
+
+	private FlowElement getSink(FlowNode node) {
+		Set<FlowElement> nodeSinks = node.getSinkElements();
+		if(nodeSinks.size() != 1) {
+			throw new RuntimeException("Only nodes with one output supported right now"); // TODO
+		}
+		return nodeSinks.iterator().next();
+	}
+
+	private Scope getInScope(FlowNode node) {
+
+		FlowElement source = getSource(node);
+
+		Collection<Scope> inScopes = (Collection<Scope>) node.getPreviousScopes(source);
+		if(inScopes.size() != 1) {
+			throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
+		}
+		return inScopes.iterator().next();
+	}
+
+	private Scope getOutScope(FlowNode node) {
+
+		FlowElement sink = getSink(node);
+
+		Collection<Scope> outScopes = (Collection<Scope>) node.getPreviousScopes(sink);
+		if(outScopes.size() != 1) {
+			throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
+		}
+		return outScopes.iterator().next();
+	}
+
 
 }

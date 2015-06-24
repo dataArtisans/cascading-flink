@@ -57,6 +57,11 @@ public class GroupByOutGate extends GroupingSpliceGate implements FlinkCollector
 	}
 
 	@Override
+	public void complete( Duct previous ) {
+		// don't do anything
+	}
+
+	@Override
 	public Duct getNext() {
 		return null;
 	}

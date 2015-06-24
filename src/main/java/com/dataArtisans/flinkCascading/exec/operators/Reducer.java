@@ -139,8 +139,9 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 		{
 //			reportIfLocal( throwable );
 
-			if( throwable instanceof CascadingException )
+			if( throwable instanceof CascadingException ) {
 				throw (CascadingException) throwable;
+			}
 
 			throw new FlowException( "internal error during reducer execution", throwable );
 		}

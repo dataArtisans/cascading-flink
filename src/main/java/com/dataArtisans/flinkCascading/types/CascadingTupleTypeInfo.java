@@ -20,7 +20,6 @@ package com.dataArtisans.flinkCascading.types;
 
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -36,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
+
+	private final Fields fields;
 
 	private final int numFields;
 	private final String[] fieldNames;
@@ -60,6 +61,7 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 
 	public CascadingTupleTypeInfo(Fields fields) {
 		super(Tuple.class);
+		this.fields = fields;
 		this. fieldTypesInfos = computeFieldTypes(fields);
 
 		this.numFields = fields.size();
@@ -104,7 +106,7 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 	@Override
 	public int getFieldIndex(String fieldName) {
 		if(!this.fieldNameIndex.containsKey(fieldName)) {
-			throw new InvalidArgumentException("\""+fieldName+"\" not a field of this tuple type");
+			throw new IllegalArgumentException("\""+fieldName+"\" not a field of this tuple type");
 		}
 		return this.fieldNameIndex.get(fieldName);
 	}
@@ -112,7 +114,7 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 	@Override
 	public <X> TypeInformation<X> getTypeAt(String fieldName) {
 		if(!this.fieldNameIndex.containsKey(fieldName)) {
-			throw new InvalidArgumentException("\""+fieldName+"\" not a field of this tuple type");
+			throw new IllegalArgumentException("\""+fieldName+"\" not a field of this tuple type");
 		}
 		int idx = this.fieldNameIndex.get(fieldName);
 		return fieldTypesInfos[idx];
@@ -226,6 +228,17 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 		}
 
 		return fieldTypes;
+	}
+
+	@Override
+	public boolean equals(Object o) {
+
+		if(!(o instanceof CascadingTupleTypeInfo)) {
+			return false;
+		}
+		else {
+			return this.fields.equals(((CascadingTupleTypeInfo) o).fields);
+		}
 	}
 
 }

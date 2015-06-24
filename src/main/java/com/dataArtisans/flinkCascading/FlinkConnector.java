@@ -60,8 +60,12 @@ import cascading.pipe.Boundary;
 import cascading.scheme.Scheme;
 import com.dataArtisans.flinkCascading.planning.FlinkPlanner;
 import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePartitioner;
-import com.dataArtisans.flinkCascading.planning.rules.SinkTapBoundaryTransformer;
-import com.dataArtisans.flinkCascading.planning.rules.SourceTapBoundaryTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeGroupByRemovalTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTransformer;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.HashMap;
@@ -93,6 +97,87 @@ public class FlinkConnector extends FlowConnector {
 
 		return new RuleRegistrySet(new FlinkDagRuleRegistry());
 	}
+
+	public static class FlinkDagRuleRegistry extends RuleRegistry {
+
+		public FlinkDagRuleRegistry() {
+
+			enableDebugLogging();
+
+			// PreBalance
+			addRule( new LoneGroupAssert() );
+			addRule( new MissingGroupAssert() );
+			addRule( new BufferAfterEveryAssert() );
+			addRule( new EveryAfterBufferAssert() );
+			addRule( new SplitBeforeEveryAssert() );
+
+//			addRule( new BoundaryBalanceGroupSplitSpliceTransformer() ); // prevents AssemblyHelpersPlatformTest#testSameSourceMerge deadlock
+//			addRule( new BoundaryBalanceCheckpointTransformer() );
+
+			// Balance
+			// inject boundaries after source taps and before sink taps
+			addRule( new BoundaryAfterSourceTapTransformer() );
+			addRule( new BoundaryBeforeMergeTransformer() );
+			addRule( new BoundaryAfterMergeTransformer() );
+			addRule( new BoundaryBeforeSinkTapTransformer() );
+
+			// remove duplicate boundaries
+			addRule( new DoubleBoundaryRemovalTransformer() );
+			// remove boundaries in front of GroupBys
+			addRule( new BoundaryBeforeGroupByRemovalTransformer() );
+
+			// hash join
+//			addRule( new BoundaryBalanceHashJoinSameSourceTransformer() );
+//			addRule( new BoundaryBalanceHashJoinToHashJoinTransformer() ); // force HJ into unique nodes
+//			addRule( new BoundaryBalanceGroupBlockingHashJoinTransformer() ); // joinAfterEvery
+
+//			addRule( new BoundaryBalanceGroupSplitHashJoinTransformer() ); // groupBySplitJoins
+
+			// PreResolve
+			addRule( new RemoveNoOpPipeTransformer() );
+			addRule( new ApplyAssertionLevelTransformer() );
+			addRule( new ApplyDebugLevelTransformer() );
+
+			// PostResolve
+
+			// PartitionSteps
+			addRule( new WholeGraphStepPartitioner() );
+
+			// PostSteps
+
+			// PartitionNodes
+
+			// no match with HashJoin inclusion
+//			addRule( new TopDownSplitBoundariesNodePartitioner() ); // split from source to multiple sinks
+//			addRule( new ConsecutiveGroupOrMergesNodePartitioner() );
+			addRule( new BottomUpBoundariesNodePartitioner() ); // streamed paths re-partitioned w/ StreamedOnly
+//			addRule( new SplitJoinBoundariesNodeRePartitioner() ); // testCoGroupSelf - compensates for tez-1190
+
+			// hash join inclusion
+//			addRule( new BottomUpJoinedBoundariesNodePartitioner() ); // will capture multiple inputs into sink for use with HashJoins
+//			addRule( new StreamedAccumulatedBoundariesNodeRePartitioner() ); // joinsIntoCoGroupLhs & groupBySplitJoins
+//			addRule( new StreamedOnlySourcesNodeRePartitioner() );
+
+			// PostNodes
+//			addRule( new RemoveMalformedHashJoinNodeTransformer() ); // joinsIntoCoGroupLhs
+//			addRule( new AccumulatedPostNodeAnnotator() ); // allows accumulated boundaries to be identified
+
+//			addRule( new DualStreamedAccumulatedMergeNodeAssert() );
+
+			this.addElementFactory(BoundaryElementFactory.BOUNDARY_PIPE, new IntermediateBoundaryElementFactory());
+		}
+
+		public static class IntermediateBoundaryElementFactory extends BoundaryElementFactory {
+
+			@Override
+			public FlowElement create( ElementGraph graph, FlowElement flowElement )
+			{
+				return new Boundary();
+			}
+		}
+
+	}
+
 
 	public static class FlinkMRRuleRegistry extends RuleRegistry {
 
@@ -151,79 +236,6 @@ public class FlinkConnector extends FlowConnector {
 			// enable when GraphFinder supports captured edges
 			// addRule( new RemoveStreamedBranchTransformer() );
 		}
-	}
-
-	public static class FlinkDagRuleRegistry extends RuleRegistry {
-
-		public FlinkDagRuleRegistry() {
-
-			enableDebugLogging();
-
-			// PreBalance
-			addRule( new LoneGroupAssert() );
-			addRule( new MissingGroupAssert() );
-			addRule( new BufferAfterEveryAssert() );
-			addRule( new EveryAfterBufferAssert() );
-			addRule( new SplitBeforeEveryAssert() );
-
-//			addRule( new BoundaryBalanceGroupSplitSpliceTransformer() ); // prevents AssemblyHelpersPlatformTest#testSameSourceMerge deadlock
-//			addRule( new BoundaryBalanceCheckpointTransformer() );
-
-			// Balance
-			// inject boundaries after source taps and before sink taps
-			addRule( new SourceTapBoundaryTransformer() );
-			addRule( new SinkTapBoundaryTransformer() );
-
-			// hash join
-//			addRule( new BoundaryBalanceHashJoinSameSourceTransformer() );
-//			addRule( new BoundaryBalanceHashJoinToHashJoinTransformer() ); // force HJ into unique nodes
-//			addRule( new BoundaryBalanceGroupBlockingHashJoinTransformer() ); // joinAfterEvery
-
-//			addRule( new BoundaryBalanceGroupSplitHashJoinTransformer() ); // groupBySplitJoins
-
-			// PreResolve
-			addRule( new RemoveNoOpPipeTransformer() );
-			addRule( new ApplyAssertionLevelTransformer() );
-			addRule( new ApplyDebugLevelTransformer() );
-
-			// PostResolve
-
-			// PartitionSteps
-			addRule( new WholeGraphStepPartitioner() );
-
-			// PostSteps
-
-			// PartitionNodes
-
-			// no match with HashJoin inclusion
-//			addRule( new TopDownSplitBoundariesNodePartitioner() ); // split from source to multiple sinks
-//			addRule( new ConsecutiveGroupOrMergesNodePartitioner() );
-			addRule( new BottomUpBoundariesNodePartitioner() ); // streamed paths re-partitioned w/ StreamedOnly
-//			addRule( new SplitJoinBoundariesNodeRePartitioner() ); // testCoGroupSelf - compensates for tez-1190
-
-			// hash join inclusion
-//			addRule( new BottomUpJoinedBoundariesNodePartitioner() ); // will capture multiple inputs into sink for use with HashJoins
-//			addRule( new StreamedAccumulatedBoundariesNodeRePartitioner() ); // joinsIntoCoGroupLhs & groupBySplitJoins
-//			addRule( new StreamedOnlySourcesNodeRePartitioner() );
-
-			// PostNodes
-//			addRule( new RemoveMalformedHashJoinNodeTransformer() ); // joinsIntoCoGroupLhs
-//			addRule( new AccumulatedPostNodeAnnotator() ); // allows accumulated boundaries to be identified
-
-//			addRule( new DualStreamedAccumulatedMergeNodeAssert() );
-
-			this.addElementFactory(BoundaryElementFactory.BOUNDARY_PIPE, new IntermediateBoundaryElementFactory());
-		}
-
-		public static class IntermediateBoundaryElementFactory extends BoundaryElementFactory {
-
-			@Override
-			public FlowElement create( ElementGraph graph, FlowElement flowElement )
-			{
-				return new Boundary();
-			}
-		}
-
 	}
 
 }

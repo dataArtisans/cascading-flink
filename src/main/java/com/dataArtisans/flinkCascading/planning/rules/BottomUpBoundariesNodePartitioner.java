@@ -34,7 +34,6 @@ import cascading.flow.stream.graph.IORole;
 import cascading.pipe.Boundary;
 import cascading.pipe.Group;
 import cascading.pipe.HashJoin;
-import cascading.pipe.Merge;
 import cascading.tap.Tap;
 
 import static cascading.flow.planner.iso.expression.NotElementExpression.not;
@@ -69,7 +68,7 @@ public class BottomUpBoundariesNodePartitioner extends ExpressionRulePartitioner
 									new FlowElementExpression(Extent.class),
 									new FlowElementExpression(Group.class),
 									new FlowElementExpression(HashJoin.class),
-									new FlowElementExpression(Merge.class),
+//									new FlowElementExpression(Merge.class),
 									new FlowElementExpression(Boundary.class),
 									new FlowElementExpression(Tap.class)
 							)
@@ -88,8 +87,8 @@ public class BottomUpBoundariesNodePartitioner extends ExpressionRulePartitioner
 					or(
 							new FlowElementExpression( Boundary.class, TypeExpression.Topo.LinearOut ),
 							new FlowElementExpression( Tap.class, TypeExpression.Topo.LinearOut ),
-							new FlowElementExpression( Group.class, TypeExpression.Topo.LinearOut ),
-							new FlowElementExpression( Merge.class, TypeExpression.Topo.LinearOut )
+//							new FlowElementExpression( Merge.class, TypeExpression.Topo.LinearOut ),
+							new FlowElementExpression( Group.class, TypeExpression.Topo.LinearOut )
 					),
 
 					PathScopeExpression.ANY,

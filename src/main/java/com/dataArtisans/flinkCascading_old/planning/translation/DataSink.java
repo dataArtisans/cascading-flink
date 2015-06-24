@@ -26,7 +26,7 @@ import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
-import com.dataArtisans.flinkCascading_old.exec.operators.ProjectionMapper;
+import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;

@@ -47,11 +47,13 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 	@Override
 	public void bind( StreamGraph streamGraph )
 	{
-		if( role != IORole.sink )
-			next = getNextFor( streamGraph );
+		if( role != IORole.sink ) {
+			next = getNextFor(streamGraph);
+		}
 
-		if( role == IORole.sink )
-			setOrdinalMap( streamGraph );
+		if( role == IORole.sink ) {
+			setOrdinalMap(streamGraph);
+		}
 	}
 
 
@@ -75,8 +77,9 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 	@Override
 	public void start( Duct previous )
 	{
-		if( next != null )
-			super.start( previous );
+		if( next != null ) {
+			super.start(previous);
+		}
 	}
 
 	public void receive( Duct previous, TupleEntry incomingEntry ) {

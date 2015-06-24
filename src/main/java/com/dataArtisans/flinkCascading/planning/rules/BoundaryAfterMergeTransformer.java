@@ -18,63 +18,47 @@
 
 package com.dataArtisans.flinkCascading.planning.rules;
 
-import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.iso.expression.ElementCapture;
 import cascading.flow.planner.iso.expression.ExpressionGraph;
 import cascading.flow.planner.iso.expression.FlowElementExpression;
-import cascading.flow.planner.iso.expression.OrElementExpression;
-import cascading.flow.planner.iso.expression.ScopeExpression;
 import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
 import cascading.flow.planner.rule.transformer.BoundaryElementFactory;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
-import cascading.pipe.Boundary;
-import cascading.tap.Tap;
+import cascading.pipe.Merge;
 
-import static cascading.flow.planner.iso.expression.NotElementExpression.not;
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
 /**
- * Injects a Boundary after a source Tap in order to split of the source Tap as a separate node.
+ * Injects a Boundary after a Merge in order to split of the Merge as a separate node.
  */
-public class SourceTapBoundaryTransformer extends RuleInsertionTransformer
+public class BoundaryAfterMergeTransformer extends RuleInsertionTransformer
 {
-	public SourceTapBoundaryTransformer() {
+	public BoundaryAfterMergeTransformer() {
 		super(
 				BalanceAssembly,
-				new SourceTapMatcher(),
+				new MergeMatcher(),
 				BoundaryElementFactory.BOUNDARY_PIPE,
 				InsertionGraphTransformer.Insertion.After
 		);
 	}
 
-	public static class SourceTapMatcher extends RuleExpression
+	public static class MergeMatcher extends RuleExpression
 	{
-		public SourceTapMatcher()
+		public MergeMatcher()
 		{
-			super( new SourceTapGraph() );
+			super( new MergeGraph() );
 		}
 	}
 
-	public static class SourceTapGraph extends ExpressionGraph {
+	public static class MergeGraph extends ExpressionGraph {
 
-		public SourceTapGraph() {
+		public MergeGraph() {
 
-			super(SearchOrder.ReverseTopological);
+			super(SearchOrder.ReverseTopological, new FlowElementExpression(ElementCapture.Primary, Merge.class));
 
-			arc(
-					new FlowElementExpression(ElementCapture.Primary, Tap.class),
-					ScopeExpression.ANY,
-					not(
-							OrElementExpression.or(
-									new FlowElementExpression(Extent.class),
-									new FlowElementExpression(Boundary.class)
-							)
-						)
-			);
 		}
 	}
-
 
 }

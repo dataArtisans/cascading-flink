@@ -18,64 +18,47 @@
 
 package com.dataArtisans.flinkCascading.planning.rules;
 
-import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.iso.expression.ElementCapture;
 import cascading.flow.planner.iso.expression.ExpressionGraph;
 import cascading.flow.planner.iso.expression.FlowElementExpression;
-import cascading.flow.planner.iso.expression.OrElementExpression;
-import cascading.flow.planner.iso.expression.ScopeExpression;
 import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
 import cascading.flow.planner.rule.transformer.BoundaryElementFactory;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
-import cascading.pipe.Boundary;
-import cascading.tap.Tap;
+import cascading.pipe.Merge;
 
-import static cascading.flow.planner.iso.expression.NotElementExpression.not;
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
 /**
- * Injects a Boundary before a sink tap in order to split of the sink tap as a separate node.
+ * Injects a Boundary before a Merge in order to split of the Merge as a separate node.
  */
-public class SinkTapBoundaryTransformer extends RuleInsertionTransformer
+public class BoundaryBeforeMergeTransformer extends RuleInsertionTransformer
 {
-	public SinkTapBoundaryTransformer() {
+	public BoundaryBeforeMergeTransformer() {
 		super(
 				BalanceAssembly,
-				new SinkTapMatcher(),
+				new MergeMatcher(),
 				BoundaryElementFactory.BOUNDARY_PIPE,
-				InsertionGraphTransformer.Insertion.Before
+				InsertionGraphTransformer.Insertion.BeforeEachEdge
 		);
 	}
 
-	public static class SinkTapMatcher extends RuleExpression
+	public static class MergeMatcher extends RuleExpression
 	{
-		public SinkTapMatcher()
+		public MergeMatcher()
 		{
-			super( new SinkTapGraph() );
+			super( new MergeGraph() );
 		}
 	}
 
-	public static class SinkTapGraph extends ExpressionGraph {
+	public static class MergeGraph extends ExpressionGraph {
 
-		public SinkTapGraph() {
+		public MergeGraph() {
 
-			super(SearchOrder.ReverseTopological);
+			super(SearchOrder.ReverseTopological, new FlowElementExpression(ElementCapture.Primary, Merge.class));
 
-			arc(
-					not(
-							OrElementExpression.or(
-									new FlowElementExpression(Extent.class),
-									new FlowElementExpression(Boundary.class)
-							)
-						),
-					ScopeExpression.ANY,
-					new FlowElementExpression(ElementCapture.Primary, Tap.class)
-
-				);
 		}
 	}
-
 
 }
