@@ -44,6 +44,7 @@ import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
 import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
@@ -153,33 +154,53 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				// single input node: Map, Reduce, Source, Sink
 
 				FlowElement source = getSource(node);
-				FlowElement sink = getSink(node);
+				Set<FlowElement> sinks = getSinks(node);
 
 				// SOURCE
-				if (source instanceof Tap && sink instanceof Boundary && ((Tap) source).isSource()) {
+				if (source instanceof Tap
+						&& ((Tap) source).isSource()) {
 
 					DataSet<Tuple> sourceFlow = translateSource(node, env);
-					flinkFlows.put(sink, sourceFlow);
+					for(FlowElement sink : sinks) {
+						flinkFlows.put(sink, sourceFlow);
+					}
 				}
 				// SINK
-				else if (source instanceof Boundary && sink instanceof Tap && ((Tap) sink).isSink()) {
+				else if (source instanceof Boundary
+						&& sinks.size() == 1
+						&& sinks.iterator().next() instanceof Tap) {
 
 					DataSet<Tuple> input = flinkFlows.get(source);
 					translateSink(input, node);
+				}
+				else if (source instanceof Boundary
+						&& sinks.size() > 1
+						// only sinks + source + head + tail
+						&& node.getElementGraph().vertexSet().size() == sinks.size() + 1 + 2 ) {
+
+					// just forward
+					for(FlowElement sink : sinks) {
+						flinkFlows.put(sink, flinkFlows.get(source));
+					}
+
 				}
 				// REDUCE
 				else if (source instanceof GroupBy) {
 
 					DataSet<Tuple> input = flinkFlows.get(source);
 					DataSet<Tuple> grouped = translateReduce(input, node);
-					flinkFlows.put(sink, grouped);
+					for(FlowElement sink : sinks) {
+						flinkFlows.put(sink, grouped);
+					}
 				}
 				// MAP
 				else if (source instanceof Boundary) {
 
 					DataSet<Tuple> input = flinkFlows.get(source);
 					DataSet<Tuple> mapped = translateMap(input, node);
-					flinkFlows.put(sink, mapped);
+					for(FlowElement sink : sinks) {
+						flinkFlows.put(sink, mapped);
+					}
 				}
 
 			}
@@ -195,14 +216,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					}
 				}
 
-				FlowElement sink = getSink(node);
+				Set<FlowElement> sinks = getSinks(node);
 				// MERGE
 				if(allSourcesBoundaries &&
 						// only sources + sink + one more node (Merge) + head + tail
 						node.getElementGraph().vertexSet().size() == sources.size() + 4) {
 
 					DataSet<Tuple> unioned = translateMerge(flinkFlows, node);
-					flinkFlows.put(sink, unioned);
+					for(FlowElement sink : sinks) {
+						flinkFlows.put(sink, unioned);
+					}
 
 				}
 				else {
@@ -318,7 +341,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private DataSet translateMap(DataSet<Tuple> input, FlowNode node) {
 
-		Scope outScope = getOutScope(node);
+		Scope outScope = getFirstOutScope(node);
 
 		return input
 				.mapPartition(new Mapper(node))
@@ -357,6 +380,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		else {
 			outFields = outScope.getOutValuesFields();
 		}
+
+		// TODO: check if custom comparator is set in key fields and update TypeInformation if necessary
+		TypeInformation ti = input.getType();
 
 		return input
 				.groupBy(keys)
@@ -400,10 +426,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return node.getSourceElements();
 	}
 
+	private Set<FlowElement> getSinks(FlowNode node) {
+		return node.getSinkElements();
+	}
+
 	private FlowElement getSource(FlowNode node) {
 		Set<FlowElement> nodeSources = node.getSourceElements();
 		if(nodeSources.size() != 1) {
-			throw new RuntimeException("Only nodes with one input supported right now"); // TODO
+			throw new RuntimeException("Only nodes with one input supported right now");
 		}
 		return nodeSources.iterator().next();
 	}
@@ -411,7 +441,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	private FlowElement getSink(FlowNode node) {
 		Set<FlowElement> nodeSinks = node.getSinkElements();
 		if(nodeSinks.size() != 1) {
-			throw new RuntimeException("Only nodes with one output supported right now"); // TODO
+			throw new RuntimeException("Only nodes with one output supported right now");
 		}
 		return nodeSinks.iterator().next();
 	}
@@ -438,5 +468,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return outScopes.iterator().next();
 	}
 
+	private Scope getFirstOutScope(FlowNode node) {
+
+		FlowElement firstSink = getSinks(node).iterator().next();
+
+		Collection<Scope> outScopes = (Collection<Scope>) node.getPreviousScopes(firstSink);
+		if(outScopes.size() != 1) {
+			throw new RuntimeException("Only one incoming scope for last node of mapper allowed");
+		}
+		return outScopes.iterator().next();
+
+	}
 
 }

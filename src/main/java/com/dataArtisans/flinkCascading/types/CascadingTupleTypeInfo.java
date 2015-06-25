@@ -183,6 +183,7 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 	private static TypeInformation[] computeFieldTypes(Fields fields) {
 
 		// TODO: check for special comparators in fields and use them if present
+		Comparator[] comparators = fields.getComparators();
 
 		int numFields = fields.size();
 		TypeInformation[] fieldTypes = new TypeInformation[numFields];

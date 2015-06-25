@@ -27,7 +27,6 @@ import cascading.flow.planner.iso.expression.ScopeExpression;
 import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
-import cascading.flow.planner.rule.transformer.BoundaryElementFactory;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
 import cascading.pipe.Boundary;
 import cascading.tap.Tap;
@@ -44,7 +43,7 @@ public class BoundaryAfterSourceTapTransformer extends RuleInsertionTransformer
 		super(
 				BalanceAssembly,
 				new SourceTapMatcher(),
-				BoundaryElementFactory.BOUNDARY_PIPE,
+				BoundaryElementFactory.BOUNDARY_FACTORY,
 				InsertionGraphTransformer.Insertion.After
 		);
 	}

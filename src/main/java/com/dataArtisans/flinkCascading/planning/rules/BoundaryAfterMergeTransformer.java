@@ -24,7 +24,6 @@ import cascading.flow.planner.iso.expression.FlowElementExpression;
 import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
-import cascading.flow.planner.rule.transformer.BoundaryElementFactory;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
 import cascading.pipe.Merge;
 
@@ -39,7 +38,7 @@ public class BoundaryAfterMergeTransformer extends RuleInsertionTransformer
 		super(
 				BalanceAssembly,
 				new MergeMatcher(),
-				BoundaryElementFactory.BOUNDARY_PIPE,
+				BoundaryElementFactory.BOUNDARY_FACTORY,
 				InsertionGraphTransformer.Insertion.After
 		);
 	}

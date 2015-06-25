@@ -19,7 +19,6 @@
 package com.dataArtisans.flinkCascading;
 
 import cascading.flow.FlowConnector;
-import cascading.flow.FlowElement;
 import cascading.flow.hadoop.planner.rule.assertion.DualStreamedAccumulatedMergePipelineAssert;
 import cascading.flow.hadoop.planner.rule.partitioner.ConsecutiveTapsNodePartitioner;
 import cascading.flow.hadoop.planner.rule.partitioner.ConsecutiveTapsStepPartitioner;
@@ -43,7 +42,6 @@ import cascading.flow.hadoop.planner.rule.transformer.TapBalanceNonSafePipeSplit
 import cascading.flow.hadoop.planner.rule.transformer.TapBalanceNonSafeSplitTransformer;
 import cascading.flow.hadoop.planner.rule.transformer.TapBalanceSameSourceStreamedAccumulatedTransformer;
 import cascading.flow.planner.FlowPlanner;
-import cascading.flow.planner.graph.ElementGraph;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.flow.planner.rule.RuleRegistrySet;
 import cascading.flow.planner.rule.assertion.BufferAfterEveryAssert;
@@ -54,18 +52,21 @@ import cascading.flow.planner.rule.assertion.SplitBeforeEveryAssert;
 import cascading.flow.planner.rule.partitioner.WholeGraphStepPartitioner;
 import cascading.flow.planner.rule.transformer.ApplyAssertionLevelTransformer;
 import cascading.flow.planner.rule.transformer.ApplyDebugLevelTransformer;
-import cascading.flow.planner.rule.transformer.BoundaryElementFactory;
 import cascading.flow.planner.rule.transformer.RemoveNoOpPipeTransformer;
-import cascading.pipe.Boundary;
+import cascading.flow.tez.planner.rule.partitioner.TopDownSplitBoundariesNodePartitioner;
 import cascading.scheme.Scheme;
 import com.dataArtisans.flinkCascading.planning.FlinkPlanner;
 import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePartitioner;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeGroupByRemovalTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
-import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryElementFactory;
+import com.dataArtisans.flinkCascading.planning.rules.MergeBeforeMergingGroupByTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.MergeElementFactory;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.HashMap;
@@ -115,14 +116,22 @@ public class FlinkConnector extends FlowConnector {
 //			addRule( new BoundaryBalanceCheckpointTransformer() );
 
 			// Balance
+
+			// inject merge in front of merging group bys
+			addRule( new MergeBeforeMergingGroupByTransformer() );
+
 			// inject boundaries after source taps and before sink taps
 			addRule( new BoundaryAfterSourceTapTransformer() );
 			addRule( new BoundaryBeforeMergeTransformer() );
+			// inject boundaries before and after merges
 			addRule( new BoundaryAfterMergeTransformer() );
 			addRule( new BoundaryBeforeSinkTapTransformer() );
+			// inject boundaries after each split node
+			addRule( new BoundaryAfterSplitNodeTransformer() );
+			addRule( new BoundaryAfterSplitEdgeTransformer() );
 
 			// remove duplicate boundaries
-			addRule( new DoubleBoundaryRemovalTransformer() );
+//			addRule( new DoubleBoundaryRemovalTransformer() ); // TODO: add again (for linear Boundary(out=1)-Boundary(in=1) connections)
 			// remove boundaries in front of GroupBys
 			addRule( new BoundaryBeforeGroupByRemovalTransformer() );
 
@@ -148,7 +157,7 @@ public class FlinkConnector extends FlowConnector {
 			// PartitionNodes
 
 			// no match with HashJoin inclusion
-//			addRule( new TopDownSplitBoundariesNodePartitioner() ); // split from source to multiple sinks
+			addRule( new TopDownSplitBoundariesNodePartitioner() ); // split from source to multiple sinks
 //			addRule( new ConsecutiveGroupOrMergesNodePartitioner() );
 			addRule( new BottomUpBoundariesNodePartitioner() ); // streamed paths re-partitioned w/ StreamedOnly
 //			addRule( new SplitJoinBoundariesNodeRePartitioner() ); // testCoGroupSelf - compensates for tez-1190
@@ -164,16 +173,8 @@ public class FlinkConnector extends FlowConnector {
 
 //			addRule( new DualStreamedAccumulatedMergeNodeAssert() );
 
-			this.addElementFactory(BoundaryElementFactory.BOUNDARY_PIPE, new IntermediateBoundaryElementFactory());
-		}
-
-		public static class IntermediateBoundaryElementFactory extends BoundaryElementFactory {
-
-			@Override
-			public FlowElement create( ElementGraph graph, FlowElement flowElement )
-			{
-				return new Boundary();
-			}
+			this.addElementFactory(BoundaryElementFactory.BOUNDARY_FACTORY, new BoundaryElementFactory());
+			this.addElementFactory(MergeElementFactory.MERGE_FACTORY, new MergeElementFactory());
 		}
 
 	}

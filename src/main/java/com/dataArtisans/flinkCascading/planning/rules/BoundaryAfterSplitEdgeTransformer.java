@@ -18,63 +18,47 @@
 
 package com.dataArtisans.flinkCascading.planning.rules;
 
-import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.iso.expression.ElementCapture;
 import cascading.flow.planner.iso.expression.ExpressionGraph;
-import cascading.flow.planner.iso.expression.FlowElementExpression;
-import cascading.flow.planner.iso.expression.OrElementExpression;
-import cascading.flow.planner.iso.expression.ScopeExpression;
+import cascading.flow.planner.iso.expression.TypeExpression;
 import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
 import cascading.pipe.Boundary;
-import cascading.tap.Tap;
 
-import static cascading.flow.planner.iso.expression.NotElementExpression.not;
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
 /**
- * Injects a Boundary before a sink tap in order to split of the sink tap as a separate node.
+ * Injects a Boundary after each outgoing edge of a splitting boundary.
  */
-public class BoundaryBeforeSinkTapTransformer extends RuleInsertionTransformer
+public class BoundaryAfterSplitEdgeTransformer extends RuleInsertionTransformer
 {
-	public BoundaryBeforeSinkTapTransformer() {
+	public BoundaryAfterSplitEdgeTransformer() {
 		super(
 				BalanceAssembly,
-				new SinkTapMatcher(),
+				new SplitElementMatcher(),
 				BoundaryElementFactory.BOUNDARY_FACTORY,
-				InsertionGraphTransformer.Insertion.Before
+				InsertionGraphTransformer.Insertion.AfterEachEdge
 		);
 	}
 
-	public static class SinkTapMatcher extends RuleExpression
+	public static class SplitElementMatcher extends RuleExpression
 	{
-		public SinkTapMatcher()
+		public SplitElementMatcher()
 		{
-			super( new SinkTapGraph() );
+			super( new SplitElementGraph() );
 		}
 	}
 
-	public static class SinkTapGraph extends ExpressionGraph {
+	public static class SplitElementGraph extends ExpressionGraph {
 
-		public SinkTapGraph() {
+		public SplitElementGraph() {
 
-			super(SearchOrder.ReverseTopological);
+			super(SearchOrder.ReverseTopological,
+					new TypeExpression(ElementCapture.Primary, true, Boundary.class, TypeExpression.Topo.Split));
 
-			arc(
-					not(
-							OrElementExpression.or(
-									new FlowElementExpression(Extent.class),
-									new FlowElementExpression(Boundary.class)
-							)
-						),
-					ScopeExpression.ANY,
-					new FlowElementExpression(ElementCapture.Primary, Tap.class)
-
-				);
 		}
 	}
-
 
 }
