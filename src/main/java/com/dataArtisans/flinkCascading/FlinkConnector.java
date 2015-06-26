@@ -60,7 +60,7 @@ import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePart
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
-import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeGroupByRemovalTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeCoGroupTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
@@ -130,6 +130,8 @@ public class FlinkConnector extends FlowConnector {
 			// inject boundaries after each split node
 			addRule( new BoundaryAfterSplitNodeTransformer() );
 			addRule( new BoundaryAfterSplitEdgeTransformer() );
+			// inject boundaries before co groups
+			addRule( new BoundaryBeforeCoGroupTransformer() );
 
 			// remove duplicate boundaries
 			addRule( new DoubleBoundaryRemovalTransformer() );

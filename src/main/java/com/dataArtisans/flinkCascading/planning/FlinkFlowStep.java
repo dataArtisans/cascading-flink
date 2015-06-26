@@ -31,6 +31,7 @@ import cascading.flow.planner.graph.Extent;
 import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.management.state.ClientState;
 import cascading.pipe.Boundary;
+import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
 import cascading.pipe.Merge;
 import cascading.tap.MultiSourceTap;
@@ -51,11 +52,13 @@ import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.configuration.Configuration;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -145,6 +148,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator(); // TODO: topologicalIterator is non-deterministically broken!!!
 
 		Map<FlowElement, DataSet<Tuple>> flinkFlows = new HashMap<FlowElement, DataSet<Tuple>>();
+		Map<FlowElement, List<DataSet<Tuple>>> binaryFlinkFlows = new HashMap<FlowElement, List<DataSet<Tuple>>>();
 
 		while(iterator.hasNext()) {
 			FlowNode node = iterator.next();
@@ -205,6 +209,18 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						flinkFlows.put(sink, mapped);
 					}
 				}
+				else if (source instanceof CoGroup) {
+
+					List<DataSet<Tuple>> inputs = binaryFlinkFlows.get(source);
+					DataSet<Tuple> coGrouped = translateBinaryCoGroup(inputs, node);
+					for(FlowElement sink : sinks) {
+						flinkFlows.put(sink, coGrouped);
+					}
+
+				}
+				else {
+					throw new RuntimeException("Could not translate this node: "+node.getElementGraph().vertexSet());
+				}
 
 			}
 			else {
@@ -218,10 +234,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						break;
 					}
 				}
+				Set<FlowElement> nodeElements = node.getElementGraph().vertexSet();
+				Set<FlowElement> innerElements = new HashSet<FlowElement>(nodeElements);
+				innerElements.remove(sources);
+				innerElements.remove(sinks);
 
 				Set<FlowElement> sinks = getSinks(node);
 				// MERGE
 				if(allSourcesBoundaries &&
+						sinks.size() == 1 &&
+						sinks.iterator().next() instanceof Boundary &&
 						// only sources + sink + one more node (Merge) + head + tail
 						node.getElementGraph().vertexSet().size() == sources.size() + 4) {
 
@@ -229,6 +251,22 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					for(FlowElement sink : sinks) {
 						flinkFlows.put(sink, unioned);
 					}
+				}
+				// Input of binary CoGroup
+				else if(allSourcesBoundaries &&
+						sources.size() == 2 &&
+						sinks.size() == 1 &&
+						sinks.iterator().next() instanceof CoGroup) {
+
+					CoGroup coGroup = (CoGroup)sinks.iterator().next();
+
+					// TODO: get the order of inputs right!!!
+					// just register inputs of binary CoGroup
+					List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(2);
+					for(FlowElement source : sources) {
+						coGroupInputs.add(flinkFlows.get(source));
+					}
+					binaryFlinkFlows.put(coGroup, coGroupInputs);
 
 				}
 				else {
@@ -491,6 +529,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 		}
 		return unioned;
+	}
+
+	private DataSet translateBinaryCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
+
+		throw new UnsupportedOperationException("CoGroup not supported yet");
+
 	}
 
 	private Set<FlowElement> getSources(FlowNode node) {
