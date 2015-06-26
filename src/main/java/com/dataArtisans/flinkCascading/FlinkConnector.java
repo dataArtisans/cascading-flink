@@ -60,7 +60,6 @@ import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePart
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
-import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeGroupByRemovalTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
@@ -122,10 +121,10 @@ public class FlinkConnector extends FlowConnector {
 
 			// inject boundaries after source taps and before sink taps
 			addRule( new BoundaryAfterSourceTapTransformer() );
-			addRule( new BoundaryBeforeMergeTransformer() );
-			// inject boundaries before and after merges
-			addRule( new BoundaryAfterMergeTransformer() );
 			addRule( new BoundaryBeforeSinkTapTransformer() );
+			// inject boundaries before and after merges
+			addRule( new BoundaryBeforeMergeTransformer() );
+			addRule( new BoundaryAfterMergeTransformer() );
 			// inject boundaries after each split node
 			addRule( new BoundaryAfterSplitNodeTransformer() );
 			addRule( new BoundaryAfterSplitEdgeTransformer() );
@@ -133,7 +132,7 @@ public class FlinkConnector extends FlowConnector {
 			// remove duplicate boundaries
 //			addRule( new DoubleBoundaryRemovalTransformer() ); // TODO: add again (for linear Boundary(out=1)-Boundary(in=1) connections)
 			// remove boundaries in front of GroupBys
-			addRule( new BoundaryBeforeGroupByRemovalTransformer() );
+//			addRule( new BoundaryBeforeGroupByRemovalTransformer() ); // TODO: add again (check with FieldedPipesPlatformTest.testSplitOut!) probably check for linear connection
 
 			// hash join
 //			addRule( new BoundaryBalanceHashJoinSameSourceTransformer() );

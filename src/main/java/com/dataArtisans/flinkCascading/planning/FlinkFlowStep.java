@@ -44,13 +44,15 @@ import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
 import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -358,21 +360,64 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Scope outScope = getOutScope(node);
 
 		if(groupBy.getKeySelectors().size() != 1) {
-			throw new RuntimeException("Currently only groupby with single input supported");
+			throw new RuntimeException("Currently only groupBy with single input supported");
 		}
-		Fields keyFields = groupBy.getKeySelectors().entrySet().iterator().next().getValue();
 
+		// get grouping keys
+		Fields keyFields = groupBy.getKeySelectors().entrySet().iterator().next().getValue();
 		int numKeys = keyFields.size();
-		String[] keys = new String[numKeys];
+		String[] groupKeys = new String[numKeys];
 		for(int i=0; i<numKeys; i++) {
 
 			Comparable keyField = keyFields.get(i);
 			if(keyField instanceof Integer) {
 				keyField = inScope.getOutValuesFields().get((Integer) keyField);
 			}
-			keys[i] = keyField.toString();
+			groupKeys[i] = keyField.toString();
+		}
+		Comparator[] groupComps = keyFields.getComparators();
+
+		// get group sorting keys
+		Map<String, Fields> sortingSelectors = groupBy.getSortingSelectors();
+		String[] sortKeys = null;
+		Comparator[] sortComps = null;
+		if(sortingSelectors.size() > 0) {
+			Fields sortFields = groupBy.getSortingSelectors().entrySet().iterator().next().getValue();
+			int numSortKeys = sortFields.size();
+			sortKeys = new String[numSortKeys];
+			for (int i = 0; i < numSortKeys; i++) {
+
+				Comparable sortKeyField = sortFields.get(i);
+				if (sortKeyField instanceof Integer) {
+					sortKeyField = inScope.getOutValuesFields().get((Integer) sortKeyField);
+				}
+				sortKeys[i] = sortKeyField.toString();
+			}
+			sortComps = sortFields.getComparators();
 		}
 
+		// set custom comparators for grouping keys
+		if(groupComps != null && groupComps.length > 0) {
+			CascadingTupleTypeInfo tupleType = (CascadingTupleTypeInfo)input.getType();
+
+			for(int i=0; i<groupKeys.length; i++) {
+				if(groupComps[i] != null) {
+					tupleType.setFieldComparator(groupKeys[i], groupComps[i]);
+				}
+			}
+		}
+		// set custom comparators for sort keys
+		if(sortComps != null && sortComps.length > 0) {
+			CascadingTupleTypeInfo tupleType = (CascadingTupleTypeInfo)input.getType();
+
+			for(int i=0; i<sortKeys.length; i++) {
+				if(sortComps[i] != null) {
+					tupleType.setFieldComparator(sortKeys[i], groupComps[i]);
+				}
+			}
+		}
+
+		// get output fields for type info
 		Fields outFields;
 		if(outScope.isEvery()) {
 			outFields = outScope.getOutGroupingFields();
@@ -381,14 +426,31 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			outFields = outScope.getOutValuesFields();
 		}
 
-		// TODO: check if custom comparator is set in key fields and update TypeInformation if necessary
-		TypeInformation ti = input.getType();
+		// Reduce without group sorting
+		if(sortKeys == null) {
 
-		return input
-				.groupBy(keys)
-				.reduceGroup(new Reducer(node))
-				.withParameters(this.getConfig())
-				.returns(new CascadingTupleTypeInfo(outFields));
+			return input
+					.groupBy(groupKeys)
+					.reduceGroup(new Reducer(node))
+					.withParameters(this.getConfig())
+					.returns(new CascadingTupleTypeInfo(outFields));
+		}
+		// Reduce with group sorting
+		else {
+
+			SortedGrouping<Tuple> grouping = input
+					.groupBy(groupKeys)
+					.sortGroup(sortKeys[0], Order.ASCENDING);
+
+			for(int i=1; i<sortKeys.length; i++) {
+				grouping = grouping.sortGroup(sortKeys[i], Order.ASCENDING);
+			}
+
+			return grouping
+					.reduceGroup(new Reducer(node))
+					.withParameters(this.getConfig())
+					.returns(new CascadingTupleTypeInfo(outFields));
+		}
 
 	}
 

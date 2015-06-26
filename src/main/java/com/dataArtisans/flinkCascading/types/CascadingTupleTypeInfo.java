@@ -41,7 +41,7 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 	private final int numFields;
 	private final String[] fieldNames;
 	private final Map<String, Integer> fieldNameIndex;
-	private final TypeInformation[] fieldTypesInfos;
+	private final CascadingFieldTypeInfo[] fieldTypesInfos;
 
 	private TypeComparator<?>[] fieldComparators;
 	private int[] logicalKeyFields;
@@ -62,7 +62,7 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 	public CascadingTupleTypeInfo(Fields fields) {
 		super(Tuple.class);
 		this.fields = fields;
-		this. fieldTypesInfos = computeFieldTypes(fields);
+		this.fieldTypesInfos = computeFieldTypes(fields);
 
 		this.numFields = fields.size();
 		this.fieldNames = new String[numFields];
@@ -71,6 +71,11 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 			this.fieldNames[i] = fields.get(i).toString();
 			this.fieldNameIndex.put(this.fieldNames[i], i);
 		}
+	}
+
+	public void setFieldComparator(String field, Comparator comp) {
+		int fieldIdx = this.getFieldIndex(field);
+		this.fieldTypesInfos[fieldIdx].setCustomComparator(comp);
 	}
 
 	@Override
@@ -180,51 +185,58 @@ public class CascadingTupleTypeInfo extends CompositeType<Tuple> {
 		}
 	}
 
-	private static TypeInformation[] computeFieldTypes(Fields fields) {
+	private static CascadingFieldTypeInfo[] computeFieldTypes(Fields fields) {
 
-		// TODO: check for special comparators in fields and use them if present
 		Comparator[] comparators = fields.getComparators();
 
 		int numFields = fields.size();
-		TypeInformation[] fieldTypes = new TypeInformation[numFields];
+		CascadingFieldTypeInfo[] fieldTypes = new CascadingFieldTypeInfo[numFields];
 		for(int i=0; i<numFields; i++) {
 
 			Class fieldClazz = fields.getTypeClass(i);
+			TypeInformation fieldTInfo;
 
 			if (fieldClazz == null) {
 				// TODO: check if this works also for fields that do not implement comparable!
-				fieldTypes[i] = new GenericTypeInfo(Comparable.class);
+				fieldTInfo = new GenericTypeInfo(Comparable.class);
 			}
 			else if (fieldClazz.equals(String.class)) {
-				fieldTypes[i] = BasicTypeInfo.STRING_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.STRING_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Byte.class)) {
-				fieldTypes[i] = BasicTypeInfo.BYTE_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.BYTE_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Short.class)) {
-				fieldTypes[i] = BasicTypeInfo.SHORT_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.SHORT_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Integer.class)) {
-				fieldTypes[i] = BasicTypeInfo.INT_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.INT_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Long.class)) {
-				fieldTypes[i] = BasicTypeInfo.LONG_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.LONG_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Float.class)) {
-				fieldTypes[i] = BasicTypeInfo.FLOAT_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.FLOAT_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Double.class)) {
-				fieldTypes[i] = BasicTypeInfo.DOUBLE_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.DOUBLE_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Boolean.class)) {
-				fieldTypes[i] = BasicTypeInfo.BOOLEAN_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.BOOLEAN_TYPE_INFO;
 			}
 			else if (fieldClazz.equals(Character.class)) {
-				fieldTypes[i] = BasicTypeInfo.CHAR_TYPE_INFO;
+				fieldTInfo = BasicTypeInfo.CHAR_TYPE_INFO;
 			}
 			else {
-				fieldTypes[i] = new GenericTypeInfo(fieldClazz);
+				fieldTInfo = new GenericTypeInfo(fieldClazz);
 			}
+
+			CascadingFieldTypeInfo cFieldInfoT = new CascadingFieldTypeInfo(fieldTInfo);
+			if(comparators[i] != null) {
+				cFieldInfoT.setCustomComparator(comparators[i]);
+			}
+
+			fieldTypes[i] = cFieldInfoT;
 
 		}
 
