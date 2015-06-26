@@ -175,6 +175,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					DataSet<Tuple> input = flinkFlows.get(source);
 					translateSink(input, node);
 				}
+				// SPLIT
 				else if (source instanceof Boundary
 						&& sinks.size() > 1
 						// only sinks + source + head + tail
@@ -438,12 +439,20 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		// Reduce with group sorting
 		else {
 
+			Order sortOrder;
+			if(groupBy.isSortReversed()) {
+				sortOrder = Order.DESCENDING;
+			}
+			else {
+				sortOrder = Order.ASCENDING;
+			}
+
 			SortedGrouping<Tuple> grouping = input
 					.groupBy(groupKeys)
-					.sortGroup(sortKeys[0], Order.ASCENDING);
+					.sortGroup(sortKeys[0], sortOrder);
 
 			for(int i=1; i<sortKeys.length; i++) {
-				grouping = grouping.sortGroup(sortKeys[i], Order.ASCENDING);
+				grouping = grouping.sortGroup(sortKeys[i], sortOrder);
 			}
 
 			return grouping

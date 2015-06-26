@@ -60,10 +60,12 @@ import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePart
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeGroupByRemovalTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryElementFactory;
+import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.MergeBeforeMergingGroupByTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.MergeElementFactory;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -130,7 +132,7 @@ public class FlinkConnector extends FlowConnector {
 			addRule( new BoundaryAfterSplitEdgeTransformer() );
 
 			// remove duplicate boundaries
-//			addRule( new DoubleBoundaryRemovalTransformer() ); // TODO: add again (for linear Boundary(out=1)-Boundary(in=1) connections)
+			addRule( new DoubleBoundaryRemovalTransformer() );
 			// remove boundaries in front of GroupBys
 //			addRule( new BoundaryBeforeGroupByRemovalTransformer() ); // TODO: add again (check with FieldedPipesPlatformTest.testSplitOut!) probably check for linear connection
 

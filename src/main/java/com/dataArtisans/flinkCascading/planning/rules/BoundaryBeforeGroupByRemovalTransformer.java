@@ -22,6 +22,7 @@ import cascading.flow.planner.iso.expression.ElementCapture;
 import cascading.flow.planner.iso.expression.ExpressionGraph;
 import cascading.flow.planner.iso.expression.FlowElementExpression;
 import cascading.flow.planner.iso.expression.ScopeExpression;
+import cascading.flow.planner.iso.expression.TypeExpression;
 import cascading.flow.planner.rule.PlanPhase;
 import cascading.flow.planner.rule.RuleExpression;
 import cascading.flow.planner.rule.transformer.RuleReplaceTransformer;
@@ -43,9 +44,11 @@ public class BoundaryBeforeGroupByRemovalTransformer extends RuleReplaceTransfor
 			super(
 					(new ExpressionGraph()).
 							arc(
-									new FlowElementExpression(ElementCapture.Primary, Boundary.class),
+									new TypeExpression(ElementCapture.Primary, Boundary.class, TypeExpression.Topo.LinearOut),
 									ScopeExpression.ALL,
-									new FlowElementExpression(ElementCapture.Secondary, GroupBy.class)));
+									new TypeExpression(ElementCapture.Secondary, GroupBy.class, TypeExpression.Topo.LinearIn)
+					)
+			);
 		}
 	}
 

@@ -91,7 +91,7 @@ public class CascadingFieldTypeInfo<T> extends TypeInformation<T> implements Ato
 			}
 		}
 		else {
-			return new CustomCascadingFieldComparator<T>(true, this.fieldComparator, this.createSerializer(config));
+			return new CustomCascadingFieldComparator<T>(sortOrderAscending, this.fieldComparator, this.createSerializer(config));
 		}
 
 	}
