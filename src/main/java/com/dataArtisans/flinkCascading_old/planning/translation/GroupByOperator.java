@@ -25,19 +25,18 @@ import cascading.pipe.Every;
 import cascading.pipe.GroupBy;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading_old.exec.operators.AggregatorsReducer;
 import com.dataArtisans.flinkCascading_old.exec.operators.BufferReducer;
 import com.dataArtisans.flinkCascading_old.exec.operators.GroupAssertionReducer;
 import com.dataArtisans.flinkCascading_old.exec.operators.GroupByKeyExtractor;
 import com.dataArtisans.flinkCascading_old.exec.operators.IdentityReducer;
-import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.ArrayList;
@@ -53,7 +52,7 @@ public class GroupByOperator extends Operator {
 		BUFFER
 	}
 
-	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
+	TupleTypeInfo tupleType = new TupleTypeInfo(Fields.ALL);
 
 	private GroupBy groupBy;
 	private List<Every> functions;
@@ -133,7 +132,7 @@ public class GroupByOperator extends Operator {
 
 		DataSet<Tuple3<Tuple, Tuple, Tuple>> mergedSets = null;
 		Fields groupByFields = null;
-		TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType = null;
+		org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Tuple, Tuple>> groupingSortingType = null;
 
 		// get unioned input for group-by
 		for(int i=0; i<inputOps.size(); i++) {
@@ -150,15 +149,16 @@ public class GroupByOperator extends Operator {
 				secondarySort = true;
 			}
 
-			CascadingTupleTypeInfo keyTupleInfo;
+			TupleTypeInfo keyTupleInfo;
 			if(groupByFields.hasComparators()) {
-				keyTupleInfo = new CascadingTupleTypeInfo(groupByFields.getComparators());
+				keyTupleInfo = new TupleTypeInfo(Fields.ALL);
 			}
 			else {
 				keyTupleInfo = tupleType;
 			}
 
-			groupingSortingType = new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
+			groupingSortingType =
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Tuple, Tuple>>(
 							keyTupleInfo, tupleType, tupleType
 					);
 

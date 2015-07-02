@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading_old.exec;
+package com.dataArtisans.flinkCascading.exec;
 
 import cascading.flow.FlowProcess;
 import cascading.flow.hadoop.util.FalseCollection;
@@ -29,6 +29,8 @@ import cascading.tuple.collect.Spillable;
 import cascading.tuple.collect.SpillableTupleList;
 import cascading.tuple.collect.TupleCollectionFactory;
 import cascading.tuple.util.TupleViews;
+import com.dataArtisans.flinkCascading_old.exec.FlinkTupleCollectionFactory;
+import com.dataArtisans.flinkCascading_old.exec.FlinkUnwrappingIterator;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.hadoop.conf.Configuration;
 
@@ -226,13 +228,7 @@ public class FlinkCoGroupClosure extends JoinerClosure {
 
 			Tuple3<Tuple, Integer, Tuple> v = values[0].next();
 
-			if(!joinFields[0].isNone()) {
-				this.grouping = v.f0;
-			}
-			else {
-				// key was default key for none-join
-				this.grouping = new Tuple();
-			}
+			this.grouping = v.f0;
 			Tuple current = v.f2;
 			int pos = v.f1;
 
@@ -300,7 +296,7 @@ public class FlinkCoGroupClosure extends JoinerClosure {
 	}
 
 	static interface TupleBuilder {
-		Tuple makeResult( Tuple[] tuples );
+		Tuple makeResult(Tuple[] tuples);
 	}
 
 	private class SpillListener implements Spillable.SpillListener {

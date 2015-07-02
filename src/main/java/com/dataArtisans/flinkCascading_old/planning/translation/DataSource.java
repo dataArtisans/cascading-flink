@@ -23,10 +23,11 @@ import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tap.local.FileTap;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsInputFormat;
-import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
+import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.configuration.Configuration;
@@ -72,7 +73,7 @@ public class DataSource extends Operator {
 		conf.set("mapreduce.input.fileinputformat.inputdir", tap.getPath().toString());
 
 		DataSet<Tuple> src = env
-				.createInput(new HfsInputFormat(tap, conf), new CascadingTupleTypeInfo())
+				.createInput(new HfsInputFormat(tap, conf), new TupleTypeInfo(Fields.ALL))
 				.name(tap.getIdentifier());
 
 		return src;
@@ -84,7 +85,7 @@ public class DataSource extends Operator {
 		tap.getScheme().sourceConfInit(null, tap, conf);
 
 		DataSet<Tuple> src = env
-				.createInput(new FileTapInputFormat(tap, conf), new CascadingTupleTypeInfo())
+				.createInput(new FileTapInputFormat(tap, conf), new TupleTypeInfo(Fields.ALL))
 				.name(tap.getIdentifier())
 				.setParallelism(1);
 

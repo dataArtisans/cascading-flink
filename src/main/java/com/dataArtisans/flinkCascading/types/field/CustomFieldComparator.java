@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.types;
+package com.dataArtisans.flinkCascading.types.field;
 
 import cascading.tuple.Hasher;
 import org.apache.flink.api.common.typeutils.TypeComparator;
@@ -26,35 +26,36 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.MemorySegment;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Comparator;
 
-public class CustomCascadingFieldComparator<T> extends TypeComparator<T> {
+public class CustomFieldComparator extends TypeComparator<Comparable> {
 
 	private static final long serialVersionUID = 1L;
 
 	private final boolean ascending;
 
-	private final Comparator<T> comparator;
+	private final Comparator<Comparable> comparator;
 
 	private final Hasher hasher;
 
-	private TypeSerializer<T> serializer;
+	private TypeSerializer<Comparable> serializer;
 
-	private transient T reference;
+	private transient Comparable ref;
 
-	private transient T tmpReference;
+	private transient Comparable tmpRef;
 
 	@SuppressWarnings("rawtypes")
 	private final TypeComparator[] cArray = new TypeComparator[] {this};
 
-	public CustomCascadingFieldComparator(boolean ascending, Comparator<T> comparator, TypeSerializer<T> serializer) {
+	public CustomFieldComparator(boolean ascending, Comparator<Comparable> comparator, TypeSerializer<Comparable> serializer) {
 		this.ascending = ascending;
 		this.comparator = comparator;
 		this.hasher = initializeHasher(comparator);
 		this.serializer = serializer;
 	}
 
-	private CustomCascadingFieldComparator(CustomCascadingFieldComparator<T> toClone) {
+	private CustomFieldComparator(CustomFieldComparator toClone) {
 		this.ascending = toClone.ascending;
 		this.comparator = toClone.comparator;
 		this.hasher = toClone.hasher;
@@ -67,55 +68,58 @@ public class CustomCascadingFieldComparator<T> extends TypeComparator<T> {
 			return (Hasher)comparator;
 		}
 		else {
-			return new Hasher() {
-
-				@Override
-				public int hashCode(Object value) {
-					return value.hashCode();
-				}
-			};
+			return new DefaultHasher();
 		}
 	}
 
-	public int hash(T record) {
+	public int hash(Comparable record) {
 		return this.hasher.hashCode(record);
 	}
 
-	public void setReference(T toCompare) {
-		this.reference = this.serializer.copy(toCompare);
+	public void setReference(Comparable toCompare) {
+		if(toCompare == null) {
+			this.ref = null;
+		}
+		else {
+			this.ref = this.serializer.copy(toCompare);
+		}
 	}
 
-	public boolean equalToReference(T candidate) {
-		return this.comparator.compare(candidate, this.reference) == 0;
+	public boolean equalToReference(Comparable candidate) {
+		return this.comparator.compare(candidate, this.ref) == 0;
 	}
 
-	public int compareToReference(TypeComparator<T> referencedComparator) {
-		T otherRef = (T)((CustomCascadingFieldComparator)referencedComparator).reference;
-		int cmp = this.comparator.compare(otherRef, this.reference);
+	public int compareToReference(TypeComparator<Comparable> referencedComparator) {
+		Comparable otherRef = ((CustomFieldComparator)referencedComparator).ref;
+
+		int cmp = this.comparator.compare(otherRef, this.ref);
 		return this.ascending?cmp:-cmp;
 	}
 
-	public int compare(T first, T second) {
-		return this.comparator.compare(first, second);
+	public int compare(Comparable first, Comparable second) {
+		int cmp;
+
+		cmp = this.comparator.compare(first, second);
+		return this.ascending?cmp:-cmp;
 	}
 
 	public int compareSerialized(DataInputView firstSource, DataInputView secondSource) throws IOException {
-		if(this.reference == null) {
-			this.reference = this.serializer.createInstance();
+		if(this.ref == null) {
+			this.ref = this.serializer.createInstance();
 		}
 
-		if(this.tmpReference == null) {
-			this.tmpReference = this.serializer.createInstance();
+		if(this.tmpRef == null) {
+			this.tmpRef = this.serializer.createInstance();
 		}
 
-		this.reference = this.serializer.deserialize(this.reference, firstSource);
-		this.tmpReference = this.serializer.deserialize(this.tmpReference, secondSource);
-		int cmp = this.comparator.compare(this.reference, this.tmpReference);
+		this.ref = this.serializer.deserialize(this.ref, firstSource);
+		this.tmpRef = this.serializer.deserialize(this.tmpRef, secondSource);
+		int cmp = this.comparator.compare(this.ref, this.tmpRef);
 		return this.ascending?cmp:-cmp;
 	}
 
-	public TypeComparator<T> duplicate() {
-		return new CustomCascadingFieldComparator<T>(this);
+	public TypeComparator<Comparable> duplicate() {
+		return new CustomFieldComparator(this);
 	}
 
 	public int extractKeys(Object record, Object[] target, int index) {
@@ -138,10 +142,10 @@ public class CustomCascadingFieldComparator<T> extends TypeComparator<T> {
 	}
 
 	public boolean isNormalizedKeyPrefixOnly(int keyBytes) {
-		return keyBytes < this.getNormalizeKeyLen();
+		throw new UnsupportedOperationException("Normalized keys not supported.");
 	}
 
-	public void putNormalizedKey(T record, MemorySegment target, int offset, int numBytes) {
+	public void putNormalizedKey(Comparable record, MemorySegment target, int offset, int numBytes) {
 		throw new UnsupportedOperationException("Normalized keys not supported.");
 	}
 
@@ -153,13 +157,25 @@ public class CustomCascadingFieldComparator<T> extends TypeComparator<T> {
 		return false;
 	}
 
-	public void writeWithKeyNormalization(T record, DataOutputView target) throws IOException {
+	public void writeWithKeyNormalization(Comparable record, DataOutputView target) throws IOException {
 		throw new UnsupportedOperationException("Normalized keys not supported.");
 	}
 
-	public T readWithKeyDenormalization(T reuse, DataInputView source) throws IOException {
+	public Comparable readWithKeyDenormalization(Comparable reuse, DataInputView source) throws IOException {
 		throw new UnsupportedOperationException("Normalized keys not supported.");
 	}
 
+	private static class DefaultHasher implements Hasher, Serializable {
+
+		@Override
+		public int hashCode(Object value) {
+			if(value == null) {
+				return 1;
+			}
+			else {
+				return value.hashCode();
+			}
+		}
+	}
 
 }

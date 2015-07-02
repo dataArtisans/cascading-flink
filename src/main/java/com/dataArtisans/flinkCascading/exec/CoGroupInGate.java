@@ -24,21 +24,23 @@ import cascading.flow.stream.element.GroupingSpliceGate;
 import cascading.flow.stream.element.InputSource;
 import cascading.flow.stream.graph.IORole;
 import cascading.flow.stream.graph.StreamGraph;
-import cascading.pipe.GroupBy;
+import cascading.pipe.CoGroup;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
+import com.dataArtisans.flinkCascading_old.exec.FlinkCoGroupClosure;
+import org.apache.flink.api.java.tuple.Tuple3;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-public class GroupByInGate extends GroupingSpliceGate implements InputSource {
+public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 
-	private FlinkGroupByClosure closure;
+	private FlinkCoGroupClosure closure;
 
 	private final boolean isBufferJoin;
 
-	public GroupByInGate(FlowProcess flowProcess, GroupBy splice, IORole ioRole) {
+	public CoGroupInGate(FlowProcess flowProcess, CoGroup splice, IORole ioRole) {
 		super(flowProcess, splice, ioRole);
 
 		this.isBufferJoin = splice.getJoiner() instanceof BufferJoin;
@@ -66,7 +68,7 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 		}
 
 		if( role != IORole.sink ) {
-			closure = new FlinkGroupByClosure(flowProcess, keyFields, valuesFields); // TODO what to do for CoGroupGates
+			closure = new FlinkCoGroupClosure(flowProcess, this.getSplice().getNumSelfJoins(), keyFields, valuesFields); // TODO what to do for CoGroupGates
 		}
 
 		if( grouping != null && splice.getJoinDeclaredFields() != null && splice.getJoinDeclaredFields().isNone() ) {
@@ -83,31 +85,28 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 	}
 
 	public void receive( Duct previous, TupleEntry incomingEntry ) {
-		// receive not implemented for source groupBy
-		throw new UnsupportedOperationException("Receive not implemented for GroupByInGate.");
+		// receive not implemented for source coGroup
+		throw new UnsupportedOperationException("Receive not implemented for CoGroupInGate.");
 	}
 
 	@Override
 	public void run(Object input) {
 
 		if(!(input instanceof Iterator)) {
-			throw new InvalidArgumentException("GroupByInGate requires Iterator<Tuple>");
+			throw new IllegalArgumentException("CoGroupInGate requires Iterator<Tuple>");
 		}
 
-		KeyPeekingIterator keyPeekingIt = new KeyPeekingIterator((Iterator)input, keyBuilder[0]);
+		KeyPeekingIterator iterator = new KeyPeekingIterator((Iterator)input);
+		Tuple key = iterator.peekNextKey();
 
-		closure.reset(keyPeekingIt);
+		closure.reset(iterator);
 
 		// Buffer is using JoinerClosure directly
 		if( !isBufferJoin ) {
 			tupleEntryIterator.reset(splice.getJoiner().getIterator(closure));
 		}
-		else {
-			tupleEntryIterator.reset(keyPeekingIt);
-		}
 
-		Tuple groupTuple = keyPeekingIt.peekNextKey();
-		keyEntry.setTuple( groupTuple );
+		keyEntry.setTuple( this.closure.getGroupTuple(key) );
 
 		next.receive( this, grouping );
 
@@ -118,6 +117,50 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 	{
 		if( next != null ) {
 			super.complete(previous);
+		}
+	}
+
+	private static class KeyPeekingIterator implements Iterator<Tuple3<Tuple, Integer, Tuple>> {
+
+		private final Iterator<Tuple3<Tuple, Integer, Tuple>> values;
+
+		private Tuple3<Tuple, Integer, Tuple> peekedValue;
+		private Tuple peekedKey;
+
+		public KeyPeekingIterator(Iterator<Tuple3<Tuple, Integer, Tuple>> values) {
+			this.values = values;
+		}
+
+		public Tuple peekNextKey() {
+			if(peekedValue == null && values.hasNext()) {
+				peekedValue = values.next();
+				peekedKey = peekedValue.f0;
+			}
+			if(peekedKey != null) {
+				return peekedKey;
+			}
+			else {
+				throw new NoSuchElementException();
+			}
+		}
+
+		@Override
+		public boolean hasNext() {
+			return peekedValue != null || values.hasNext();
+		}
+
+		@Override
+		public Tuple3<Tuple, Integer, Tuple> next() {
+
+			if(peekedValue != null) {
+				Tuple3<Tuple, Integer, Tuple> v = peekedValue;
+				peekedValue = null;
+				peekedKey = null;
+				return v;
+			}
+			else {
+				return values.next();
+			}
 		}
 	}
 

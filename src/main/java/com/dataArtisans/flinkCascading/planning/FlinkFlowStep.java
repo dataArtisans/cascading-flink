@@ -33,28 +33,41 @@ import cascading.management.state.ClientState;
 import cascading.pipe.Boundary;
 import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
+import cascading.pipe.HashJoin;
 import cascading.pipe.Merge;
+import cascading.pipe.Pipe;
+import cascading.pipe.Splice;
+import cascading.pipe.joiner.InnerJoin;
+import cascading.pipe.joiner.Joiner;
 import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
 import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
+import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
 import com.dataArtisans.flinkCascading.exec.operators.Reducer;
-import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
 import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
+import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import org.apache.flink.api.common.operators.Order;
+import org.apache.flink.api.common.operators.base.JoinOperatorBase;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -142,18 +155,21 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	public void buildFlinkProgram() {
 
+		env.setParallelism(1); // TODO: set for tests that count groups
+
 		printFlowStep();
 
 		FlowNodeGraph flowNodeGraph = getFlowNodeGraph();
 		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator(); // TODO: topologicalIterator is non-deterministically broken!!!
 
-		Map<FlowElement, DataSet<Tuple>> flinkFlows = new HashMap<FlowElement, DataSet<Tuple>>();
-		Map<FlowElement, List<DataSet<Tuple>>> binaryFlinkFlows = new HashMap<FlowElement, List<DataSet<Tuple>>>();
+//		Map<FlowElement, DataSet<Tuple>> flinkFlows = new HashMap<FlowElement, DataSet<Tuple>>();
+		Map<FlowElement, List<DataSet<Tuple>>> flinkMemo = new HashMap<FlowElement, List<DataSet<Tuple>>>();
 
 		while(iterator.hasNext()) {
 			FlowNode node = iterator.next();
 
 			Set<FlowElement> sources = getSources(node);
+			int numNodes = node.getElementGraph().vertexSet().size() - 2; // don't count head & tail
 
 			if(sources.size() == 1) {
 
@@ -168,7 +184,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 					DataSet<Tuple> sourceFlow = translateSource(node, env);
 					for(FlowElement sink : sinks) {
-						flinkFlows.put(sink, sourceFlow);
+						flinkMemo.put(sink, Collections.singletonList(sourceFlow));
 					}
 				}
 				// SINK
@@ -176,45 +192,54 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						&& sinks.size() == 1
 						&& sinks.iterator().next() instanceof Tap) {
 
-					DataSet<Tuple> input = flinkFlows.get(source);
+					DataSet<Tuple> input = flinkMemo.get(source).get(0);
 					translateSink(input, node);
 				}
-				// SPLIT
+				// SPLIT (Single boundary source, multiple sinks & no intermediate nodes)
 				else if (source instanceof Boundary
 						&& sinks.size() > 1
-						// only sinks + source + head + tail
-						&& node.getElementGraph().vertexSet().size() == sinks.size() + 1 + 2 ) {
+						// only sinks + source
+						&& numNodes == sinks.size() + 1 ) {
 
 					// just forward
 					for(FlowElement sink : sinks) {
-						flinkFlows.put(sink, flinkFlows.get(source));
+						flinkMemo.put(sink, flinkMemo.get(source));
 					}
 
 				}
-				// REDUCE
+				// EMPTY NODE (Single boundary source, single sink & no intermediate nodes)
+				else if (source instanceof Boundary &&
+						sinks.size() == 1 &&
+						numNodes == 2) {
+					for(FlowElement sink : sinks) {
+						flinkMemo.put(sink, flinkMemo.get(source));
+					}
+				}
+				// REDUCE (Single groupBy source)
 				else if (source instanceof GroupBy) {
 
-					DataSet<Tuple> input = flinkFlows.get(source);
+					DataSet<Tuple> input = flinkMemo.get(source).get(0);
 					DataSet<Tuple> grouped = translateReduce(input, node);
 					for(FlowElement sink : sinks) {
-						flinkFlows.put(sink, grouped);
+						flinkMemo.put(sink, Collections.singletonList(grouped));
 					}
 				}
-				// MAP
+				// MAP (Single boundary source)
 				else if (source instanceof Boundary) {
 
-					DataSet<Tuple> input = flinkFlows.get(source);
+					DataSet<Tuple> input = flinkMemo.get(source).get(0);
 					DataSet<Tuple> mapped = translateMap(input, node);
 					for(FlowElement sink : sinks) {
-						flinkFlows.put(sink, mapped);
+						flinkMemo.put(sink, Collections.singletonList(mapped));
 					}
 				}
+				// CoGroup (Single CoGroup source)
 				else if (source instanceof CoGroup) {
 
-					List<DataSet<Tuple>> inputs = binaryFlinkFlows.get(source);
-					DataSet<Tuple> coGrouped = translateBinaryCoGroup(inputs, node);
+					List<DataSet<Tuple>> inputs = flinkMemo.get(source);
+					DataSet<Tuple> coGrouped = translateCoGroup(inputs, node);
 					for(FlowElement sink : sinks) {
-						flinkFlows.put(sink, coGrouped);
+						flinkMemo.put(sink, Collections.singletonList(coGrouped));
 					}
 
 				}
@@ -247,26 +272,42 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						// only sources + sink + one more node (Merge) + head + tail
 						node.getElementGraph().vertexSet().size() == sources.size() + 4) {
 
-					DataSet<Tuple> unioned = translateMerge(flinkFlows, node);
+					DataSet<Tuple> unioned = translateMerge(flinkMemo, node);
 					for(FlowElement sink : sinks) {
-						flinkFlows.put(sink, unioned);
+						flinkMemo.put(sink, Collections.singletonList(unioned));
 					}
 				}
-				// Input of binary CoGroup
+				// Input of CoGroup or HashJoin
 				else if(allSourcesBoundaries &&
-						sources.size() == 2 &&
 						sinks.size() == 1 &&
-						sinks.iterator().next() instanceof CoGroup) {
+						// check that only sources + sink + head + tail are in this node
+						node.getElementGraph().vertexSet().size() == sources.size() + 1 + 2 &&
+						(
+								sinks.iterator().next() instanceof CoGroup ||
+								sinks.iterator().next() instanceof HashJoin
+						)) {
 
-					CoGroup coGroup = (CoGroup)sinks.iterator().next();
+					Splice splice = (Splice)sinks.iterator().next();
 
-					// TODO: get the order of inputs right!!!
-					// just register inputs of binary CoGroup
-					List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(2);
-					for(FlowElement source : sources) {
-						coGroupInputs.add(flinkFlows.get(source));
+					// register input of CoGroup or HashJoin
+					List<DataSet<Tuple>> flinkSpliceInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+					ElementGraph eg= node.getElementGraph();
+					for(Pipe spliceInput : splice.getPrevious()) {
+
+						String inputName = spliceInput.getName();
+						boolean found = false;
+						for(FlowElement nodeSource : sources) {
+							if(eg.getEdge(nodeSource, splice).getName().equals(inputName)) {
+								flinkSpliceInputs.add(flinkMemo.get(nodeSource).get(0));
+								found = true;
+								break;
+							}
+						}
+						if(!found) {
+							throw new RuntimeException("CoGroup input was not found");
+						}
 					}
-					binaryFlinkFlows.put(coGroup, coGroupInputs);
+					flinkMemo.put(splice, flinkSpliceInputs);
 
 				}
 				else {
@@ -297,20 +338,20 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	private DataSet translateFileTapSource(FileTap tap, ExecutionEnvironment env) {
+	private DataSet<Tuple> translateFileTapSource(FileTap tap, ExecutionEnvironment env) {
 
 		Properties conf = new Properties();
 		tap.getScheme().sourceConfInit(null, tap, conf);
 
 		DataSet<Tuple> src = env
-				.createInput(new FileTapInputFormat(tap, conf), new CascadingTupleTypeInfo(tap.getSourceFields()))
+				.createInput(new FileTapInputFormat(tap, conf), new TupleTypeInfo(tap.getSourceFields()))
 				.name(tap.getIdentifier())
 				.setParallelism(1);
 
 		return src;
 	}
 
-	private DataSet translateMultiSourceTap(MultiSourceTap tap, ExecutionEnvironment env) {
+	private DataSet<Tuple> translateMultiSourceTap(MultiSourceTap tap, ExecutionEnvironment env) {
 
 		Iterator<Tap> childTaps = ((MultiSourceTap)tap).getChildTaps();
 
@@ -359,7 +400,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				// add projection mapper
 				input = input
 						.map(new ProjectionMapper(tailFields, tapFields))
-						.returns(new CascadingTupleTypeInfo(tapFields));
+						.returns(new TupleTypeInfo(tapFields));
 			}
 		}
 
@@ -380,18 +421,18 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.setParallelism(1);
 	}
 
-	private DataSet translateMap(DataSet<Tuple> input, FlowNode node) {
+	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node) {
 
 		Scope outScope = getFirstOutScope(node);
 
 		return input
 				.mapPartition(new Mapper(node))
 				.withParameters(this.getConfig())
-				.returns(new CascadingTupleTypeInfo(outScope.getOutValuesFields()));
+				.returns(new TupleTypeInfo(outScope.getOutValuesFields()));
 
 	}
 
-	private DataSet translateReduce(DataSet<Tuple> input, FlowNode node) {
+	private DataSet<Tuple> translateReduce(DataSet<Tuple> input, FlowNode node) {
 
 		GroupBy groupBy = (GroupBy)getSource(node);
 
@@ -403,57 +444,17 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 
 		// get grouping keys
-		Fields keyFields = groupBy.getKeySelectors().entrySet().iterator().next().getValue();
-		int numKeys = keyFields.size();
-		String[] groupKeys = new String[numKeys];
-		for(int i=0; i<numKeys; i++) {
-
-			Comparable keyField = keyFields.get(i);
-			if(keyField instanceof Integer) {
-				keyField = inScope.getOutValuesFields().get((Integer) keyField);
-			}
-			groupKeys[i] = keyField.toString();
+		Fields keyFields = groupBy.getKeySelectors().get(inScope.getName());
+		if(keyFields == null) {
+			throw new RuntimeException("No valid key fields found for GroupBy");
 		}
-		Comparator[] groupComps = keyFields.getComparators();
+		String[] groupKeys = registerKeyFields(input, keyFields);
 
 		// get group sorting keys
-		Map<String, Fields> sortingSelectors = groupBy.getSortingSelectors();
+		Fields sortKeyFields = groupBy.getSortingSelectors().get(inScope.getName());
 		String[] sortKeys = null;
-		Comparator[] sortComps = null;
-		if(sortingSelectors.size() > 0) {
-			Fields sortFields = groupBy.getSortingSelectors().entrySet().iterator().next().getValue();
-			int numSortKeys = sortFields.size();
-			sortKeys = new String[numSortKeys];
-			for (int i = 0; i < numSortKeys; i++) {
-
-				Comparable sortKeyField = sortFields.get(i);
-				if (sortKeyField instanceof Integer) {
-					sortKeyField = inScope.getOutValuesFields().get((Integer) sortKeyField);
-				}
-				sortKeys[i] = sortKeyField.toString();
-			}
-			sortComps = sortFields.getComparators();
-		}
-
-		// set custom comparators for grouping keys
-		if(groupComps != null && groupComps.length > 0) {
-			CascadingTupleTypeInfo tupleType = (CascadingTupleTypeInfo)input.getType();
-
-			for(int i=0; i<groupKeys.length; i++) {
-				if(groupComps[i] != null) {
-					tupleType.setFieldComparator(groupKeys[i], groupComps[i]);
-				}
-			}
-		}
-		// set custom comparators for sort keys
-		if(sortComps != null && sortComps.length > 0) {
-			CascadingTupleTypeInfo tupleType = (CascadingTupleTypeInfo)input.getType();
-
-			for(int i=0; i<sortKeys.length; i++) {
-				if(sortComps[i] != null) {
-					tupleType.setFieldComparator(sortKeys[i], groupComps[i]);
-				}
-			}
+		if(sortKeyFields != null) {
+			sortKeys = registerKeyFields(input, sortKeyFields);
 		}
 
 		// get output fields for type info
@@ -466,13 +467,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 
 		// Reduce without group sorting
+
 		if(sortKeys == null) {
 
 			return input
 					.groupBy(groupKeys)
 					.reduceGroup(new Reducer(node))
 					.withParameters(this.getConfig())
-					.returns(new CascadingTupleTypeInfo(outFields));
+					.returns(new TupleTypeInfo(outFields));
 		}
 		// Reduce with group sorting
 		else {
@@ -496,12 +498,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			return grouping
 					.reduceGroup(new Reducer(node))
 					.withParameters(this.getConfig())
-					.returns(new CascadingTupleTypeInfo(outFields));
+					.returns(new TupleTypeInfo(outFields));
 		}
 
 	}
 
-	private DataSet<Tuple> translateMerge(Map<FlowElement, DataSet<Tuple>> flinkFlows, FlowNode node) {
+	private DataSet<Tuple> translateMerge(Map<FlowElement, List<DataSet<Tuple>>> flinkFlows, FlowNode node) {
 
 		// check if remaining node is a Merge
 		Set<FlowElement> elements = new HashSet(node.getElementGraph().vertexSet());
@@ -522,20 +524,267 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		DataSet<Tuple> unioned = null;
 		for(FlowElement source : sources) {
 			if(unioned == null) {
-				unioned = flinkFlows.get(source);
+				unioned = flinkFlows.get(source).get(0);
 			}
 			else {
-				unioned = unioned.union(flinkFlows.get(source));
+				unioned = unioned.union(flinkFlows.get(source).get(0));
 			}
 		}
 		return unioned;
 	}
 
-	private DataSet translateBinaryCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translateCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
 
-		throw new UnsupportedOperationException("CoGroup not supported yet");
+		CoGroup coGroup = (CoGroup)node.getSourceElements().iterator().next();
+
+		return translateGroupByCoGroup(inputs, node);
+		/*
+
+		Joiner joiner = coGroup.getJoiner();
+		if(joiner instanceof InnerJoin) {
+			// handle inner join
+			return this.translateInnerCoGroup(inputs, node);
+		}
+		else if(joiner instanceof LeftJoin) {
+			// TODO handle left outer join
+			throw new UnsupportedOperationException("Left outer join not supported yet");
+		}
+		else if(joiner instanceof RightJoin) {
+			// TODO handle right outer join
+			throw new UnsupportedOperationException("Right outer join not supported yet");
+		}
+		else if(joiner instanceof OuterJoin) {
+			// TODO handle full outer join
+			throw new UnsupportedOperationException("Full outer join not supported yet");
+		}
+		else if(joiner instanceof MixedJoin) {
+			// TODO handle mixed join
+			throw new UnsupportedOperationException("Mixed join not supported yet");
+		}
+		else if(joiner instanceof BufferJoin) {
+			// TODO hanlde buffer join
+			// translate to GroupBy
+			throw new UnsupportedOperationException("Buffer join not supported yet");
+		}
+		else {
+			// TODO handle user-defined join
+			throw new UnsupportedOperationException("User-defined join not supported yet");
+		}
+		*/
+	}
+
+	private DataSet<Tuple> translateGroupByCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
+
+		CoGroup coGroup = (CoGroup) node.getSourceElements().iterator().next();
+
+		// prepare inputs: (extract keys and assign input id)
+		DataSet<Tuple3<Tuple, Integer, Tuple>> groupByInput = null;
+
+		Scope outScope = getOutScope(node);
+		List<Scope> inScopes = getInputScopes(node, coGroup);
+		TypeInformation<Tuple3<Tuple, Integer, Tuple>> keyedType = null;
+
+		Fields outFields;
+		if(outScope.isEvery()) {
+			outFields = outScope.getOutGroupingFields();
+		}
+		else {
+			outFields = outScope.getOutValuesFields();
+		}
+
+		for(int i=0; i<inputs.size(); i++) {
+
+			// get Flink DataSet
+			DataSet<Tuple> input = inputs.get(i);
+			// get input scope
+			Scope inputScope = inScopes.get(i);
+
+			// get keys
+			Fields inputFields = ((TupleTypeInfo)input.getType()).getFields();
+			Fields joinKeyFields = coGroup.getKeySelectors().get(inputScope.getName());
+			int[] keyPos = inputFields.getPos(joinKeyFields);
+
+			if(joinKeyFields.isNone()) {
+				// set default key
+				joinKeyFields = new Fields("defaultKey");
+			}
+
+			if(keyedType == null) {
+				keyedType = new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Integer, Tuple>>(
+						new TupleTypeInfo(joinKeyFields),
+						BasicTypeInfo.INT_TYPE_INFO,
+						new TupleTypeInfo(inputFields)
+				);
+			}
+
+			// add mapper
+			DataSet<Tuple3<Tuple, Integer, Tuple>> keyedInput = input
+					.map(new ReducerJoinKeyExtractor(i, keyPos))
+					.returns(keyedType);
+
+			// add to groupByInput
+			if(groupByInput == null) {
+				groupByInput = keyedInput;
+			}
+			else {
+				groupByInput = groupByInput
+						.union(keyedInput);
+			}
+		}
+
+		return groupByInput
+				.groupBy("f0.*")
+				.sortGroup(1, Order.DESCENDING)
+				.reduceGroup(new CoGroupReducer(node))
+				.withParameters(getConfig())
+				.returns(new TupleTypeInfo(outFields));
+
+		// group by input on join key, secondary sort on input id
 
 	}
+
+
+	private DataSet<Tuple> translateInnerCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
+
+		CoGroup coGroup = (CoGroup) node.getSourceElements().iterator().next();
+		Joiner joiner = coGroup.getJoiner();
+		if (!(joiner instanceof InnerJoin)) {
+			throw new IllegalArgumentException("CoGroup must have InnerJoiner");
+		}
+		if (coGroup.isSelfJoin()) {
+			throw new UnsupportedOperationException("Self-join not supported yet");
+		}
+		if (inputs.size() > 2) {
+			throw new UnsupportedOperationException("Only binary CoGroups supported yet");
+		}
+
+		DataSet<Tuple> joined = null;
+		Fields resultFields = new Fields();
+		String[] firstInputJoinKeys = null;
+
+		// get result fields for each input
+		List<Scope> inScopes = getInputScopes(node, coGroup);
+		List<Fields> resultFieldsByInput = getResultFieldsByInput(coGroup, inScopes);
+
+		// for each input
+		for (int i = 0; i < inputs.size(); i++) {
+
+			// get Flink DataSet
+			DataSet<Tuple> input = inputs.get(i);
+			// get input scope
+			Scope inputScope = inScopes.get(i);
+
+			// get join keys
+			Fields joinKeyFields = coGroup.getKeySelectors().get(inputScope.getName());
+			String[] joinKeys = registerKeyFields(input, joinKeyFields);
+
+			resultFields = resultFields.append(resultFieldsByInput.get(i));
+
+			// first input
+			if (joined == null) {
+
+				joined = input;
+				firstInputJoinKeys = joinKeys;
+
+			// other inputs
+			} else {
+
+				joined = joined.join(input, JoinOperatorBase.JoinHint.REPARTITION_SORT_MERGE)
+						.where(firstInputJoinKeys).equalTo(joinKeys)
+						.with(new InnerJoiner())
+						.returns(new TupleTypeInfo(resultFields))
+//						.withForwardedFieldsFirst(leftJoinKeys) // TODO
+//						.withForwardedFieldsSecond(joinKeys) // TODO
+						.withParameters(this.getConfig());
+
+				// TODO: update firstInputJoinKeys, update leftJoinKeys
+
+			}
+		}
+		return joined;
+
+	}
+
+	private List<Scope> getInputScopes(FlowNode node, Splice splice) {
+
+		Pipe[] inputs = splice.getPrevious();
+		List<Scope> inScopes = new ArrayList<Scope>(inputs.length);
+		for(Pipe input : inputs) {
+			boolean found = false;
+			for (Scope inScope : node.getPreviousScopes(splice)) {
+				if(inScope.getName().equals(input.getName())) {
+					inScopes.add(inScope);
+					found = true;
+					break;
+				}
+			}
+			if(!found) {
+				throw new RuntimeException("Input scope was not found");
+			}
+		}
+
+		return inScopes;
+	}
+
+	private List<Fields> getResultFieldsByInput(Splice splice, List<Scope> inScopes) {
+
+		List<Fields> resultFieldsByInput = new ArrayList<Fields>();
+
+		if(splice.getJoinDeclaredFields() == null) {
+			for(int i=0; i<inScopes.size(); i++) {
+				Fields resultFields = inScopes.get(i).getOutValuesFields();
+
+				resultFieldsByInput.add(resultFields);
+			}
+		}
+		else {
+			int cnt = 0;
+			Fields declaredFields = splice.getJoinDeclaredFields();
+			for(int i=0; i<inScopes.size(); i++) {
+				Fields inputFields = inScopes.get(i).getOutValuesFields();
+
+				Fields resultFields = new Fields();
+
+				for(int j=0; j<inputFields.size(); j++) {
+					Comparable name = declaredFields.get(cnt++);
+					Type type = inputFields.getType(j);
+
+					if(type != null) {
+						resultFields = resultFields.append(new Fields(name, type));
+					}
+					else {
+						resultFields = resultFields.append(new Fields(name));
+					}
+				}
+
+				resultFieldsByInput.add(resultFields);
+			}
+		}
+
+		return resultFieldsByInput;
+	}
+
+//	private void setCustomComparators(Fields keys, DataSet<Tuple> input) {
+//
+//		if(fields == null) {
+//			throw new IllegalArgumentException("Fields may not be null");
+//		}
+//		else if(comparators == null) {
+//			throw new IllegalArgumentException("Comparators may not be null");
+//		}
+//		else if(fields.length != comparators.length) {
+//			throw new IllegalArgumentException("Fields and Comparators must have same length");
+//		}
+//
+//		// get type info of input
+//		CascadingTupleTypeInfo tupleType = (CascadingTupleTypeInfo)input.getType();
+//
+//		for(int i=0; i<comparators.length; i++) {
+//			if(comparators[i] != null) {
+//				tupleType.setFieldComparator(fields[i], comparators[i]);
+//			}
+//		}
+//	}
 
 	private Set<FlowElement> getSources(FlowNode node) {
 		return node.getSourceElements();
@@ -593,6 +842,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		return outScopes.iterator().next();
 
+	}
+
+	private String[] registerKeyFields(DataSet<Tuple> input, Fields keyFields) {
+		return ((TupleTypeInfo)input.getType()).registerKeyFields(keyFields);
 	}
 
 }

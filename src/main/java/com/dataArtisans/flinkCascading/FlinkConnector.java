@@ -66,6 +66,7 @@ import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTrans
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryElementFactory;
 import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.GroupByAfterCoGroupElementFactory;
 import com.dataArtisans.flinkCascading.planning.rules.MergeBeforeMergingGroupByTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.MergeElementFactory;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -118,6 +119,7 @@ public class FlinkConnector extends FlowConnector {
 
 			// Balance
 
+//			addRule( new GroupByAfterCoGroupTransformer() ); // activate for native co-group support
 			// inject merge in front of merging group bys
 			addRule( new MergeBeforeMergingGroupByTransformer() );
 
@@ -178,6 +180,7 @@ public class FlinkConnector extends FlowConnector {
 
 			this.addElementFactory(BoundaryElementFactory.BOUNDARY_FACTORY, new BoundaryElementFactory());
 			this.addElementFactory(MergeElementFactory.MERGE_FACTORY, new MergeElementFactory());
+			this.addElementFactory(GroupByAfterCoGroupElementFactory.GROUPBY_FACTORY, new GroupByAfterCoGroupElementFactory());
 		}
 
 	}

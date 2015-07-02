@@ -20,10 +20,11 @@ package com.dataArtisans.flinkCascading_old.planning.translation;
 
 import cascading.flow.planner.graph.FlowElementGraph;
 import cascading.pipe.Each;
+import cascading.tuple.Fields;
+import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading_old.exec.operators.EachFilter;
 import com.dataArtisans.flinkCascading_old.exec.operators.EachFunctionMapper;
 import com.dataArtisans.flinkCascading_old.exec.operators.EachValueAssertionMapper;
-import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.configuration.Configuration;
@@ -59,21 +60,21 @@ public class EachOperator extends Operator {
 			return inputSet
 					.flatMap(new EachFunctionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
 					.withParameters(config)
-					.returns(new CascadingTupleTypeInfo())
+					.returns(new TupleTypeInfo(Fields.ALL))
 					.name(each.getName());
 		}
 		else if (this.each.isFilter()) {
 			return inputSet
 					.filter(new EachFilter(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
 					.withParameters(config)
-					.returns(new CascadingTupleTypeInfo())
+					.returns(new TupleTypeInfo(Fields.ALL))
 					.name(each.getName());
 		}
 		else if (this.each.isValueAssertion()) {
 			return inputSet
 					.map(new EachValueAssertionMapper(each, getIncomingScopeFrom(inputOp), getOutgoingScope()))
 					.withParameters(config)
-					.returns(new CascadingTupleTypeInfo())
+					.returns(new TupleTypeInfo(Fields.ALL))
 					.name(each.getName());
 		}
 		else {

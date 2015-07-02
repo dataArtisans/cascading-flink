@@ -27,7 +27,7 @@ import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
-import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
+import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.configuration.Configuration;
@@ -68,7 +68,7 @@ public class DataSink extends Operator {
 				// add projection mapper
 				tail = tail
 						.map(new ProjectionMapper(tailFields, tapFields))
-						.returns(new CascadingTupleTypeInfo())
+						.returns(new TupleTypeInfo(Fields.ALL))
 						.name("Tap Projection Mapper");
 			}
 		}

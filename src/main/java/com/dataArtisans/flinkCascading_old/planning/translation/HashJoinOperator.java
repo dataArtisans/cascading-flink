@@ -24,9 +24,9 @@ import cascading.pipe.HashJoin;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading_old.exec.operators.JoinKeyExtractor;
 import com.dataArtisans.flinkCascading_old.exec.operators.JoinReducer;
-import com.dataArtisans.flinkCascading.types.CascadingTupleTypeInfo;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -34,17 +34,17 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.List;
 
 public class HashJoinOperator extends Operator {
 
-	CascadingTupleTypeInfo tupleType = new CascadingTupleTypeInfo();
 
-	TypeInformation<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>> groupingAggregationType =
-			new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, Integer, CascadingTupleTypeInfo>>(
+	TupleTypeInfo tupleType = new TupleTypeInfo(Fields.ALL);
+
+	TypeInformation<Tuple3<Tuple, Integer, Tuple>> groupingAggregationType =
+			new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Integer, Tuple>>(
 					tupleType, tupleType, tupleType
 			);
 
@@ -82,16 +82,16 @@ public class HashJoinOperator extends Operator {
 					groupByFields,
 					i);
 
-			CascadingTupleTypeInfo keyTupleInfo;
+			TupleTypeInfo keyTupleInfo;
 			if(groupByFields.hasComparators()) {
-				keyTupleInfo = new CascadingTupleTypeInfo(groupByFields.getComparators());
+				keyTupleInfo = new TupleTypeInfo(Fields.ALL);
 			}
 			else {
 				keyTupleInfo = tupleType;
 			}
 
-			TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>> groupingSortingType =
-					new TupleTypeInfo<Tuple3<CascadingTupleTypeInfo, CascadingTupleTypeInfo, CascadingTupleTypeInfo>>(
+			TypeInformation<Tuple3<Tuple, Integer, Tuple>> groupingSortingType =
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Integer, Tuple>>(
 							keyTupleInfo, BasicTypeInfo.INT_TYPE_INFO, tupleType
 					);
 
@@ -131,6 +131,5 @@ public class HashJoinOperator extends Operator {
 		}
 
 	}
-
 
 }

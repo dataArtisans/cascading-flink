@@ -16,83 +16,79 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.types;
+package com.dataArtisans.flinkCascading.types.field;
 
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.AtomicType;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
 
 import java.util.Comparator;
 
 /**
- * Wraps a TypeInformation and can inject a custom field comparator
+ * Cascading field type info. Uses a generic (Kryo) serializer.
  *
- * @param <T>
  */
-public class CascadingFieldTypeInfo<T> extends TypeInformation<T> implements AtomicType<T> {
+public class FieldTypeInfo extends TypeInformation<Comparable> implements AtomicType {
 
-	private TypeInformation wrappedTypeInfo;
-	private Comparator<T> fieldComparator = null;
+	private Comparator<Comparable> fieldComparator = null;
 
-	public CascadingFieldTypeInfo(TypeInformation<T> wrappedTypeInfo) {
-		this.wrappedTypeInfo = wrappedTypeInfo;
-	}
-
-	public void setCustomComparator(Comparator<T> comparator) {
+	public void setCustomComparator(Comparator<Comparable> comparator) {
 		this.fieldComparator = comparator;
 	}
 
 	@Override
 	public boolean isBasicType() {
-		return this.wrappedTypeInfo.isBasicType();
+		return false;
 	}
 
 	@Override
 	public boolean isTupleType() {
-		return this.wrappedTypeInfo.isTupleType();
+		return false;
 	}
 
 	@Override
 	public int getArity() {
-		return this.wrappedTypeInfo.getArity();
+		return 1;
 	}
 
 	@Override
 	public int getTotalFields() {
-		return this.wrappedTypeInfo.getTotalFields();
+		return 1;
 	}
 
 	@Override
-	public Class<T> getTypeClass() {
-		return this.wrappedTypeInfo.getTypeClass();
+	public Class getTypeClass() {
+		return Comparable.class;
 	}
 
 	@Override
 	public boolean isKeyType() {
-		return this.wrappedTypeInfo.isKeyType();
+		return true;
 	}
 
 	@Override
-	public TypeSerializer<T> createSerializer(ExecutionConfig config) {
-		return this.wrappedTypeInfo.createSerializer(config);
+	public TypeSerializer<Comparable> createSerializer(ExecutionConfig config) {
+		return new KryoSerializer(Comparable.class, config);
 	}
 
 	@Override
-	public TypeComparator<T> createComparator(boolean sortOrderAscending, ExecutionConfig config) {
+	public TypeComparator<Comparable> createComparator(boolean sortOrderAscending, ExecutionConfig config) {
+
+		TypeSerializer<Comparable> serializer = this.createSerializer(config);
 
 		if(this.fieldComparator == null) {
-			if(this.wrappedTypeInfo instanceof AtomicType) {
-				return ((AtomicType) this.wrappedTypeInfo).createComparator(sortOrderAscending, config);
-			}
-			else {
-				throw new RuntimeException("Unable to create comparator for non-atomic wrapped type");
-			}
+			return new FieldComparator(sortOrderAscending, serializer, Comparable.class);
 		}
 		else {
-			return new CustomCascadingFieldComparator<T>(sortOrderAscending, this.fieldComparator, this.createSerializer(config));
+			return new CustomFieldComparator(sortOrderAscending, this.fieldComparator, this.createSerializer(config));
 		}
+	}
 
+	@Override
+	public boolean equals(Object o) {
+		return  (o instanceof FieldTypeInfo);
 	}
 }
