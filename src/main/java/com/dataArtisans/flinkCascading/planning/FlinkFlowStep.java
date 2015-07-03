@@ -466,8 +466,33 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			outFields = outScope.getOutValuesFields();
 		}
 
-		// Reduce without group sorting
+		Order sortOrder;
+		if(groupBy.isSortReversed()) {
+			sortOrder = Order.DESCENDING;
 
+			// prepartition and sort input
+			// required because Cascading allows to specifiy the order of grouping keys
+
+			DataSet<Tuple> partitioned = input
+					.partitionByHash(groupKeys);
+
+			DataSet<Tuple> sorted = partitioned;
+			for(int i=0; i<groupKeys.length; i++) {
+				sorted = sorted.sortPartition(groupKeys[i], sortOrder);
+			}
+			if(sortKeys != null) {
+				for(int i=0; i<sortKeys.length; i++) {
+					sorted = sorted.sortPartition(sortKeys[i], sortOrder);
+				}
+			}
+
+			input = sorted;
+		}
+		else {
+			sortOrder = Order.ASCENDING;
+		}
+
+		// Reduce without group sorting
 		if(sortKeys == null) {
 
 			return input
@@ -478,14 +503,6 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		// Reduce with group sorting
 		else {
-
-			Order sortOrder;
-			if(groupBy.isSortReversed()) {
-				sortOrder = Order.DESCENDING;
-			}
-			else {
-				sortOrder = Order.ASCENDING;
-			}
 
 			SortedGrouping<Tuple> grouping = input
 					.groupBy(groupKeys)

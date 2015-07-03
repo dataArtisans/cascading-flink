@@ -40,6 +40,7 @@ import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.FlinkConnector;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.configuration.Configuration;
 
 import java.io.File;
 import java.io.IOException;
@@ -95,7 +96,7 @@ public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
 	public FlowProcess getFlowProcess() {
-		return new FlinkFlowProcess();
+		return new FlinkFlowProcess(new Configuration());
 	}
 
 	@Override
