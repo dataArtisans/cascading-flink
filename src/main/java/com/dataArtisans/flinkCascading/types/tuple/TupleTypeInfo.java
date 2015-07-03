@@ -106,9 +106,19 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	public String[] registerKeyFields(Fields keyFields) {
 
-		String[] serdePos = new String[keyFields.size()];
+		int[] keyPos;
+		if(keyFields.isAll()) {
+			keyPos = new int[this.fields.size()];
+			for(int i=0; i<keyPos.length; i++) {
+				keyPos[i] = i;
+			}
+		}
+		else {
+			keyPos = this.fields.getPos(keyFields);
+		}
 
-		int[] keyPos = this.fields.getPos(keyFields);
+		String[] serdePos = new String[keyPos.length];
+
 		Comparator[] comps = keyFields.getComparators();
 
 		for(int j=0; j<keyPos.length; j++) {
@@ -119,7 +129,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			serdePos[j] = Integer.toString(keyPos[j]);
 
 			// set custom comparator (if any)
-			if(comps[j] != null) {
+			if(comps != null && comps.length > j && comps[j] != null) {
 				// set custom comparator
 				this.fieldTypes[keyPos[j]].setCustomComparator(comps[j]);
 			}
