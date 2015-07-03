@@ -25,7 +25,7 @@ import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
-import cascading.pipe.CoGroup;
+import cascading.pipe.HashJoin;
 
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
@@ -33,30 +33,30 @@ import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
  * Injects a Boundary before a CoGroup in order to split of the CoGroup as a separate node
  * and have all predecessors in individual pipes.
  */
-public class BoundaryBeforeCoGroupTransformer extends RuleInsertionTransformer
+public class BoundaryAfterHashJoinTransformer extends RuleInsertionTransformer
 {
-	public BoundaryBeforeCoGroupTransformer() {
+	public BoundaryAfterHashJoinTransformer() {
 		super(
 				BalanceAssembly,
-				new CoGroupMatcher(),
+				new HashJoinMatcher(),
 				BoundaryElementFactory.BOUNDARY_FACTORY,
-				InsertionGraphTransformer.Insertion.BeforeEachEdge
+				InsertionGraphTransformer.Insertion.After
 		);
 	}
 
-	public static class CoGroupMatcher extends RuleExpression
+	public static class HashJoinMatcher extends RuleExpression
 	{
-		public CoGroupMatcher()
+		public HashJoinMatcher()
 		{
-			super( new CoGroupGraph() );
+			super( new HashJoinGraph() );
 		}
 	}
 
-	public static class CoGroupGraph extends ExpressionGraph {
+	public static class HashJoinGraph extends ExpressionGraph {
 
-		public CoGroupGraph() {
+		public HashJoinGraph() {
 
-			super(SearchOrder.ReverseTopological, new FlowElementExpression(ElementCapture.Primary, CoGroup.class));
+			super(SearchOrder.ReverseTopological, new FlowElementExpression(ElementCapture.Primary, HashJoin.class));
 
 		}
 	}

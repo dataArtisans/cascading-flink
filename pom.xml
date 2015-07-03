@@ -197,7 +197,7 @@ under the License.
 			<scope>test</scope>
 		</dependency>
 
-	</dependencies>
+    </dependencies>
 
 	<reporting>
 		<plugins>

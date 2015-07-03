@@ -57,10 +57,12 @@ import cascading.flow.tez.planner.rule.partitioner.TopDownSplitBoundariesNodePar
 import cascading.scheme.Scheme;
 import com.dataArtisans.flinkCascading.planning.FlinkPlanner;
 import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePartitioner;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterHashJoinTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeCoGroupTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeHashJoinTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
@@ -114,9 +116,6 @@ public class FlinkConnector extends FlowConnector {
 			addRule( new EveryAfterBufferAssert() );
 			addRule( new SplitBeforeEveryAssert() );
 
-//			addRule( new BoundaryBalanceGroupSplitSpliceTransformer() ); // prevents AssemblyHelpersPlatformTest#testSameSourceMerge deadlock
-//			addRule( new BoundaryBalanceCheckpointTransformer() );
-
 			// Balance
 
 //			addRule( new GroupByAfterCoGroupTransformer() ); // activate for native co-group support
@@ -134,18 +133,13 @@ public class FlinkConnector extends FlowConnector {
 			addRule( new BoundaryAfterSplitEdgeTransformer() );
 			// inject boundaries before co groups
 			addRule( new BoundaryBeforeCoGroupTransformer() );
+			addRule( new BoundaryBeforeHashJoinTransformer() );
+			addRule( new BoundaryAfterHashJoinTransformer() );
 
 			// remove duplicate boundaries
 			addRule( new DoubleBoundaryRemovalTransformer() );
 			// remove boundaries in front of GroupBys
 //			addRule( new BoundaryBeforeGroupByRemovalTransformer() ); // TODO: add again (check with FieldedPipesPlatformTest.testSplitOut!) probably check for linear connection
-
-			// hash join
-//			addRule( new BoundaryBalanceHashJoinSameSourceTransformer() );
-//			addRule( new BoundaryBalanceHashJoinToHashJoinTransformer() ); // force HJ into unique nodes
-//			addRule( new BoundaryBalanceGroupBlockingHashJoinTransformer() ); // joinAfterEvery
-
-//			addRule( new BoundaryBalanceGroupSplitHashJoinTransformer() ); // groupBySplitJoins
 
 			// PreResolve
 			addRule( new RemoveNoOpPipeTransformer() );
@@ -163,21 +157,9 @@ public class FlinkConnector extends FlowConnector {
 
 			// no match with HashJoin inclusion
 			addRule( new TopDownSplitBoundariesNodePartitioner() ); // split from source to multiple sinks
-//			addRule( new ConsecutiveGroupOrMergesNodePartitioner() );
 			addRule( new BottomUpBoundariesNodePartitioner() ); // streamed paths re-partitioned w/ StreamedOnly
-//			addRule( new SplitJoinBoundariesNodeRePartitioner() ); // testCoGroupSelf - compensates for tez-1190
 
-			// hash join inclusion
-//			addRule( new BottomUpJoinedBoundariesNodePartitioner() ); // will capture multiple inputs into sink for use with HashJoins
-//			addRule( new StreamedAccumulatedBoundariesNodeRePartitioner() ); // joinsIntoCoGroupLhs & groupBySplitJoins
-//			addRule( new StreamedOnlySourcesNodeRePartitioner() );
-
-			// PostNodes
-//			addRule( new RemoveMalformedHashJoinNodeTransformer() ); // joinsIntoCoGroupLhs
-//			addRule( new AccumulatedPostNodeAnnotator() ); // allows accumulated boundaries to be identified
-
-//			addRule( new DualStreamedAccumulatedMergeNodeAssert() );
-
+			// Element Factories
 			this.addElementFactory(BoundaryElementFactory.BOUNDARY_FACTORY, new BoundaryElementFactory());
 			this.addElementFactory(MergeElementFactory.MERGE_FACTORY, new MergeElementFactory());
 			this.addElementFactory(GroupByAfterCoGroupElementFactory.GROUPBY_FACTORY, new GroupByAfterCoGroupElementFactory());

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec;
+package com.dataArtisans.flinkCascading.exec.ducts;
 
 import cascading.flow.FlowProcess;
 import cascading.flow.stream.duct.Duct;

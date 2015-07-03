@@ -30,7 +30,7 @@ import cascading.pipe.GroupBy;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.FlinkReduceStreamGraph;
-import com.dataArtisans.flinkCascading.exec.GroupByInGate;
+import com.dataArtisans.flinkCascading.exec.ducts.GroupByInGate;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;

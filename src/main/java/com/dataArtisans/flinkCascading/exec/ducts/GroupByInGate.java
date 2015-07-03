@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec;
+package com.dataArtisans.flinkCascading.exec.ducts;
 
 import cascading.flow.FlowProcess;
 import cascading.flow.stream.duct.Duct;
@@ -29,6 +29,8 @@ import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
+import com.dataArtisans.flinkCascading.exec.FlinkGroupByClosure;
+import com.dataArtisans.flinkCascading.exec.KeyPeekingIterator;
 
 import java.util.Iterator;
 

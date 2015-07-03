@@ -28,7 +28,7 @@ import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.CoGroup;
 import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.CoGroupInGate;
+import com.dataArtisans.flinkCascading.exec.ducts.CoGroupInGate;
 import com.dataArtisans.flinkCascading.exec.FlinkCoGroupReduceStreamGraph;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;

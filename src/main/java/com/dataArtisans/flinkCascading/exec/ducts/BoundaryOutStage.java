@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec;
+package com.dataArtisans.flinkCascading.exec.ducts;
 
 import cascading.flow.FlowElement;
 import cascading.flow.FlowProcess;
@@ -25,9 +25,10 @@ import cascading.flow.stream.element.ElementStage;
 import cascading.flow.stream.graph.StreamGraph;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
+import com.dataArtisans.flinkCascading.exec.FlinkCollectorOutput;
 import org.apache.flink.util.Collector;
 
-public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements FlinkCollectorOutput{
+public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements FlinkCollectorOutput {
 
 	private Collector<Tuple> tupleCollector;
 

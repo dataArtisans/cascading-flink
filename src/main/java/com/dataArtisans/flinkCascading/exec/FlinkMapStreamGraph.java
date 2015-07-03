@@ -27,8 +27,12 @@ import cascading.flow.stream.graph.NodeStreamGraph;
 import cascading.pipe.Boundary;
 import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
+import cascading.pipe.HashJoin;
 import cascading.tuple.Tuple;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
+import com.dataArtisans.flinkCascading.exec.ducts.BoundaryInStage;
+import com.dataArtisans.flinkCascading.exec.ducts.BoundaryOutStage;
+import com.dataArtisans.flinkCascading.exec.ducts.GroupByOutGate;
 import org.apache.flink.util.Collector;
 
 public class FlinkMapStreamGraph extends NodeStreamGraph {
@@ -36,11 +40,11 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 	private BoundaryInStage sourceStage;
 	private FlinkCollectorOutput sinkStage;
 
-	public FlinkMapStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary boundary) {
+	public FlinkMapStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary source) {
 
 		super(flowProcess, node);
 
-		sourceStage = handleHead(boundary, flowProcess);
+		sourceStage = handleHead(source, flowProcess);
 
 		setTraps();
 		setScopes();
@@ -107,6 +111,11 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 		else {
 			throw new UnsupportedOperationException("Cannot create a GroupBy gate in a MapStreamGraph");
 		}
+	}
+
+	protected Gate createHashJoinGate( HashJoin join ) {
+
+		throw new UnsupportedOperationException("HashJoin not supported at this place.");
 	}
 
 }

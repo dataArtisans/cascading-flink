@@ -47,6 +47,7 @@ import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
 import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
 import com.dataArtisans.flinkCascading.exec.operators.Reducer;
@@ -59,6 +60,7 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.operators.MapPartitionOperator;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -168,15 +170,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		while(iterator.hasNext()) {
 			FlowNode node = iterator.next();
 
+			Set<FlowElement> all = node.getElementGraph().vertexSet();
 			Set<FlowElement> sources = getSources(node);
-			int numNodes = node.getElementGraph().vertexSet().size() - 2; // don't count head & tail
+			Set<FlowElement> sinks = getSinks(node);
+			Set<FlowElement> inner = getInnerElements(node);
 
 			if(sources.size() == 1) {
 
 				// single input node: Map, Reduce, Source, Sink
 
 				FlowElement source = getSource(node);
-				Set<FlowElement> sinks = getSinks(node);
 
 				// SOURCE
 				if (source instanceof Tap
@@ -199,7 +202,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				else if (source instanceof Boundary
 						&& sinks.size() > 1
 						// only sinks + source
-						&& numNodes == sinks.size() + 1 ) {
+						&& inner.size() == 0 ) {
 
 					// just forward
 					for(FlowElement sink : sinks) {
@@ -210,9 +213,22 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				// EMPTY NODE (Single boundary source, single sink & no intermediate nodes)
 				else if (source instanceof Boundary &&
 						sinks.size() == 1 &&
-						numNodes == 2) {
+						inner.size() == 0) {
 					for(FlowElement sink : sinks) {
 						flinkMemo.put(sink, flinkMemo.get(source));
+					}
+				}
+				// Single-input HASHJOIN (Single boundary source, single boundary sink, single inner HashJoin
+				else if (source instanceof Boundary &&
+						sinks.size() == 1 &&
+						sinks.iterator().next() instanceof Boundary &&
+						inner.size() == 1 &&
+						inner.iterator().next() instanceof HashJoin) {
+
+					List<DataSet<Tuple>> joinInputs = flinkMemo.get(source);
+					DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
+					for(FlowElement sink : sinks) {
+						flinkMemo.put(sink, Collections.singletonList(joined));
 					}
 				}
 				// REDUCE (Single groupBy source)
@@ -224,6 +240,15 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						flinkMemo.put(sink, Collections.singletonList(grouped));
 					}
 				}
+				// COGROUP (Single CoGroup source)
+				else if (source instanceof CoGroup) {
+
+					List<DataSet<Tuple>> inputs = flinkMemo.get(source);
+					DataSet<Tuple> coGrouped = translateCoGroup(inputs, node);
+					for(FlowElement sink : sinks) {
+						flinkMemo.put(sink, Collections.singletonList(coGrouped));
+					}
+				}
 				// MAP (Single boundary source)
 				else if (source instanceof Boundary) {
 
@@ -233,16 +258,6 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						flinkMemo.put(sink, Collections.singletonList(mapped));
 					}
 				}
-				// CoGroup (Single CoGroup source)
-				else if (source instanceof CoGroup) {
-
-					List<DataSet<Tuple>> inputs = flinkMemo.get(source);
-					DataSet<Tuple> coGrouped = translateCoGroup(inputs, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(coGrouped));
-					}
-
-				}
 				else {
 					throw new RuntimeException("Could not translate this node: "+node.getElementGraph().vertexSet());
 				}
@@ -250,8 +265,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 			else {
 
-				// multi input node: Merge, (CoGroup, Join)
-
+				// multi input node: Merge, CoGroup, Join
 				boolean allSourcesBoundaries = true;
 				for(FlowElement source : sources) {
 					if(!(source instanceof Boundary)) {
@@ -259,55 +273,55 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						break;
 					}
 				}
-				Set<FlowElement> nodeElements = node.getElementGraph().vertexSet();
-				Set<FlowElement> innerElements = new HashSet<FlowElement>(nodeElements);
-				innerElements.remove(sources);
-				innerElements.remove(sinks);
-
-				Set<FlowElement> sinks = getSinks(node);
 				// MERGE
 				if(allSourcesBoundaries &&
 						sinks.size() == 1 &&
 						sinks.iterator().next() instanceof Boundary &&
-						// only sources + sink + one more node (Merge) + head + tail
-						node.getElementGraph().vertexSet().size() == sources.size() + 4) {
+						inner.size() == 1 &&
+						inner.iterator().next() instanceof Merge) {
 
 					DataSet<Tuple> unioned = translateMerge(flinkMemo, node);
 					for(FlowElement sink : sinks) {
 						flinkMemo.put(sink, Collections.singletonList(unioned));
 					}
 				}
-				// Input of CoGroup or HashJoin
+				// Multi-Input HashJoin
 				else if(allSourcesBoundaries &&
 						sinks.size() == 1 &&
-						// check that only sources + sink + head + tail are in this node
-						node.getElementGraph().vertexSet().size() == sources.size() + 1 + 2 &&
-						(
-								sinks.iterator().next() instanceof CoGroup ||
-								sinks.iterator().next() instanceof HashJoin
-						)) {
+						sinks.iterator().next() instanceof Boundary &&
+						inner.size() == 1 &&
+						inner.iterator().next() instanceof HashJoin
+						) {
 
-					Splice splice = (Splice)sinks.iterator().next();
+					HashJoin join = (HashJoin)inner.iterator().next();
 
-					// register input of CoGroup or HashJoin
-					List<DataSet<Tuple>> flinkSpliceInputs = new ArrayList<DataSet<Tuple>>(sources.size());
-					ElementGraph eg= node.getElementGraph();
-					for(Pipe spliceInput : splice.getPrevious()) {
-
-						String inputName = spliceInput.getName();
-						boolean found = false;
-						for(FlowElement nodeSource : sources) {
-							if(eg.getEdge(nodeSource, splice).getName().equals(inputName)) {
-								flinkSpliceInputs.add(flinkMemo.get(nodeSource).get(0));
-								found = true;
-								break;
-							}
-						}
-						if(!found) {
-							throw new RuntimeException("CoGroup input was not found");
-						}
+					List<DataSet<Tuple>> joinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+					for(FlowElement e : getNodeInputsInOrder(node, join)) {
+						joinInputs.add(flinkMemo.get(e).get(0));
 					}
-					flinkMemo.put(splice, flinkSpliceInputs);
+
+					DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
+					for(FlowElement sink : sinks) {
+						flinkMemo.put(sink, Collections.singletonList(joined));
+					}
+
+				}
+				// Input of CoGroup
+				else if(allSourcesBoundaries &&
+						sinks.size() == 1 &&
+						inner.size() == 0 &&
+						sinks.iterator().next() instanceof CoGroup
+						) {
+
+					CoGroup coGroup = (CoGroup)sinks.iterator().next();
+
+					// register input of CoGroup
+					List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+					for(FlowElement e : getNodeInputsInOrder(node, coGroup)) {
+						coGroupInputs.add(flinkMemo.get(e).get(0));
+					}
+
+					flinkMemo.put(coGroup, coGroupInputs);
 
 				}
 				else {
@@ -554,7 +568,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		CoGroup coGroup = (CoGroup)node.getSourceElements().iterator().next();
 
-		return translateGroupByCoGroup(inputs, node);
+		return translateCoGroupAsReduce(inputs, node);
 		/*
 
 		Joiner joiner = coGroup.getJoiner();
@@ -590,7 +604,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		*/
 	}
 
-	private DataSet<Tuple> translateGroupByCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translateCoGroupAsReduce(List<DataSet<Tuple>> inputs, FlowNode node) {
 
 		CoGroup coGroup = (CoGroup) node.getSourceElements().iterator().next();
 
@@ -656,10 +670,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.withParameters(getConfig())
 				.returns(new TupleTypeInfo(outFields));
 
-		// group by input on join key, secondary sort on input id
-
 	}
-
 
 	private DataSet<Tuple> translateInnerCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
 
@@ -718,6 +729,50 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			}
 		}
+		return joined;
+
+	}
+
+	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node) {
+
+		// TODO: add proper HashJoin implementation!
+		return translatHashJoinAsMap(inputs, node);
+
+	}
+
+	private DataSet<Tuple> translatHashJoinAsMap(List<DataSet<Tuple>> inputs, FlowNode node) {
+
+		Set<FlowElement> innerElements = getInnerElements(node);
+		if(innerElements.size() != 1 && !(innerElements.iterator().next() instanceof HashJoin)) {
+			throw new RuntimeException("Only one inner element allowed which must be a HashJoin.");
+		}
+
+		HashJoin hashJoin = (HashJoin)innerElements.iterator().next();
+		FlowElement[] nodeInputs = getNodeInputsInOrder(node, hashJoin);
+
+		String[] inputIds = new String[nodeInputs.length];
+		for(int i=0; i<nodeInputs.length; i++) {
+			inputIds[i] = ((Pipe)nodeInputs[i]).getName();
+		}
+
+		Scope outScope = getOutScope(node);
+
+		Fields outFields;
+		if(outScope.isEvery()) {
+			outFields = outScope.getOutGroupingFields();
+		}
+		else {
+			outFields = outScope.getOutValuesFields();
+		}
+
+		MapPartitionOperator<Tuple, Tuple> joined = inputs.get(0)
+				.mapPartition(new HashJoinMapper(node, inputIds))
+				.withParameters(this.getConfig());
+		for(int i=1; i<inputs.size(); i++) {
+			joined.withBroadcastSet(inputs.get(i), inputIds[i]);
+		}
+		joined.returns(new TupleTypeInfo(outFields));
+
 		return joined;
 
 	}
@@ -781,27 +836,20 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return resultFieldsByInput;
 	}
 
-//	private void setCustomComparators(Fields keys, DataSet<Tuple> input) {
-//
-//		if(fields == null) {
-//			throw new IllegalArgumentException("Fields may not be null");
-//		}
-//		else if(comparators == null) {
-//			throw new IllegalArgumentException("Comparators may not be null");
-//		}
-//		else if(fields.length != comparators.length) {
-//			throw new IllegalArgumentException("Fields and Comparators must have same length");
-//		}
-//
-//		// get type info of input
-//		CascadingTupleTypeInfo tupleType = (CascadingTupleTypeInfo)input.getType();
-//
-//		for(int i=0; i<comparators.length; i++) {
-//			if(comparators[i] != null) {
-//				tupleType.setFieldComparator(fields[i], comparators[i]);
-//			}
-//		}
-//	}
+	private FlowElement[] getNodeInputsInOrder(FlowNode node, Splice splice) {
+
+		Map<String, Integer> posMap = splice.getPipePos();
+		FlowElement[] spliceInputs = new FlowElement[posMap.size()];
+		ElementGraph eg = node.getElementGraph();
+
+		for(FlowElement nodeSource : getSources(node)) {
+			int idx = posMap.get(eg.getEdge(nodeSource, splice).getName());
+			spliceInputs[idx] = nodeSource;
+		}
+
+		return spliceInputs;
+	}
+
 
 	private Set<FlowElement> getSources(FlowNode node) {
 		return node.getSourceElements();
@@ -809,6 +857,20 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private Set<FlowElement> getSinks(FlowNode node) {
 		return node.getSinkElements();
+	}
+
+	private Set<FlowElement> getInnerElements(FlowNode node) {
+		Set<FlowElement> inner = new HashSet(node.getElementGraph().vertexSet());
+		inner.removeAll(getSources(node));
+		inner.removeAll(getSinks(node));
+		Set<FlowElement> toRemove = new HashSet<FlowElement>();
+		for(FlowElement e : inner) {
+			if(e instanceof Extent) {
+				toRemove.add(e);
+			}
+		}
+		inner.removeAll(toRemove);
+		return inner;
 	}
 
 	private FlowElement getSource(FlowNode node) {

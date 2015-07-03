@@ -35,7 +35,6 @@ public class MergeElementFactory implements ElementFactory {
 	public FlowElement create(ElementGraph graph, FlowElement flowElement) {
 
 		GroupBy groupBy = (GroupBy)flowElement;
-		Merge merge = new Merge(groupBy.getName(), groupBy.getPrevious());
 
 		Map<String, Fields> keyMap = groupBy.getKeySelectors();
 		// check that key fields are identical for all inputs
@@ -72,6 +71,7 @@ public class MergeElementFactory implements ElementFactory {
 			sortKeyMap.put(groupBy.getName(), sortFields);
 		}
 
+		Merge merge = new Merge(groupBy.getName(), groupBy.getPrevious());
 		return merge;
 	}
 }

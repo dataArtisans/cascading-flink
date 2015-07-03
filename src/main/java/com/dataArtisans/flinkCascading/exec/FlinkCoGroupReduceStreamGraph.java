@@ -29,6 +29,9 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
 import cascading.tuple.Tuple;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
+import com.dataArtisans.flinkCascading.exec.ducts.BoundaryOutStage;
+import com.dataArtisans.flinkCascading.exec.ducts.CoGroupInGate;
+import com.dataArtisans.flinkCascading.exec.ducts.GroupByOutGate;
 import org.apache.flink.util.Collector;
 
 public class FlinkCoGroupReduceStreamGraph extends NodeStreamGraph {
