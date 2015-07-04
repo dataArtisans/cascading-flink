@@ -175,164 +175,142 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			Set<FlowElement> sinks = getSinks(node);
 			Set<FlowElement> inner = getInnerElements(node);
 
-			if(sources.size() == 1) {
+			// SOURCE
+			if (sources.size() == 1 &&
+					allOfType(sources, Tap.class) &&
+					sinks.size() == 1 &&
+					allOfType(sinks, Boundary.class)) {
 
-				// single input node: Map, Reduce, Source, Sink
-
-				FlowElement source = getSource(node);
-
-				// SOURCE
-				if (source instanceof Tap
-						&& ((Tap) source).isSource()) {
-
-					DataSet<Tuple> sourceFlow = translateSource(node, env);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(sourceFlow));
-					}
+				DataSet<Tuple> sourceFlow = translateSource(node, env);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(sourceFlow));
 				}
-				// SINK
-				else if (source instanceof Boundary
-						&& sinks.size() == 1
-						&& sinks.iterator().next() instanceof Tap) {
+			}
+			// SINK
+			else if (sources.size() == 1 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() == 1 &&
+					allOfType(sinks, Tap.class)) {
 
-					DataSet<Tuple> input = flinkMemo.get(source).get(0);
-					translateSink(input, node);
-				}
-				// SPLIT (Single boundary source, multiple sinks & no intermediate nodes)
-				else if (source instanceof Boundary
-						&& sinks.size() > 1
-						// only sinks + source
-						&& inner.size() == 0 ) {
+				DataSet<Tuple> input = flinkMemo.get(getSingle(sources)).get(0);
+				translateSink(input, node);
+			}
+			// SPLIT or EMPTY NODE (Single boundary source, one or more boundary sinks & no intermediate nodes)
+			else if (sources.size() == 1 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() >= 1 &&
+					allOfType(sinks, Boundary.class) &&
+					inner.size() == 0 ) {
 
-					// just forward
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, flinkMemo.get(source));
-					}
-
-				}
-				// EMPTY NODE (Single boundary source, single sink & no intermediate nodes)
-				else if (source instanceof Boundary &&
-						sinks.size() == 1 &&
-						inner.size() == 0) {
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, flinkMemo.get(source));
-					}
-				}
-				// Single-input HASHJOIN (Single boundary source, single boundary sink, single inner HashJoin
-				else if (source instanceof Boundary &&
-						sinks.size() == 1 &&
-						sinks.iterator().next() instanceof Boundary &&
-						inner.size() == 1 &&
-						inner.iterator().next() instanceof HashJoin) {
-
-					List<DataSet<Tuple>> joinInputs = flinkMemo.get(source);
-					DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(joined));
-					}
-				}
-				// REDUCE (Single groupBy source)
-				else if (source instanceof GroupBy) {
-
-					DataSet<Tuple> input = flinkMemo.get(source).get(0);
-					DataSet<Tuple> grouped = translateReduce(input, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(grouped));
-					}
-				}
-				// COGROUP (Single CoGroup source)
-				else if (source instanceof CoGroup) {
-
-					List<DataSet<Tuple>> inputs = flinkMemo.get(source);
-					DataSet<Tuple> coGrouped = translateCoGroup(inputs, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(coGrouped));
-					}
-				}
-				// MAP (Single boundary source)
-				else if (source instanceof Boundary) {
-
-					DataSet<Tuple> input = flinkMemo.get(source).get(0);
-					DataSet<Tuple> mapped = translateMap(input, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(mapped));
-					}
-				}
-				else {
-					throw new RuntimeException("Could not translate this node: "+node.getElementGraph().vertexSet());
+				// just forward
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, flinkMemo.get(getSingle(sources)));
 				}
 
+			}
+			// HASHJOIN (One or more boundary source, single boundary sink, single hashjoin inner)
+			else if(sources.size() > 0 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() == 1 &&
+					sinks.iterator().next() instanceof Boundary &&
+					inner.size() == 1 &&
+					inner.iterator().next() instanceof HashJoin
+					) {
+
+				HashJoin join = (HashJoin)inner.iterator().next();
+
+				List<DataSet<Tuple>> joinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				for(FlowElement e : getNodeInputsInOrder(node, join)) {
+					joinInputs.add(flinkMemo.get(e).get(0));
+				}
+
+				DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(joined));
+				}
+
+			}
+			// INPUT OF GROUPBY (one or more boundary sources, single groupBy sink, no inner)
+			else if(sources.size() > 0 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() == 1 &&
+					allOfType(sinks, GroupBy.class) &&
+					inner.size() == 0) {
+
+				GroupBy groupBy = (GroupBy)sinks.iterator().next();
+
+				// register input of groupBy
+				List<DataSet<Tuple>> groupByInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				for(FlowElement e : sources) {
+					groupByInputs.add(flinkMemo.get(e).get(0));
+				}
+
+				flinkMemo.put(groupBy, groupByInputs);
+			}
+			// GROUPBY (Single groupBy source)
+			else if (sources.size() == 1 &&
+					allOfType(sources, GroupBy.class)) {
+
+				List<DataSet<Tuple>> inputs = flinkMemo.get(getSingle(sources));
+				DataSet<Tuple> grouped = translateReduce(inputs, node);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(grouped));
+				}
+			}
+			// INPUT OF COGROUP (one or more boundary sources, single coGroup sink, no inner)
+			else if(sources.size() > 0 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() == 1 &&
+					allOfType(sinks, CoGroup.class) &&
+					inner.size() == 0) {
+
+				CoGroup coGroup = (CoGroup)sinks.iterator().next();
+
+				// register input of CoGroup
+				List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				for(FlowElement e : getNodeInputsInOrder(node, coGroup)) {
+					coGroupInputs.add(flinkMemo.get(e).get(0));
+				}
+
+				flinkMemo.put(coGroup, coGroupInputs);
+			}
+			// COGROUP (Single CoGroup source)
+			else if (sources.size() == 1 &&
+					allOfType(sources, CoGroup.class)) {
+
+				List<DataSet<Tuple>> inputs = flinkMemo.get(getSingle(sources));
+				DataSet<Tuple> coGrouped = translateCoGroup(inputs, node);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(coGrouped));
+				}
+			}
+			// MERGE (multiple boundary sources, single boundary sink, single merge inner)
+			else if (sources.size() > 1 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() == 1 &&
+					allOfType(sinks, Boundary.class) &&
+					inner.size() == 1 &&
+					allOfType(inner, Merge.class)) {
+
+				DataSet<Tuple> unioned = translateMerge(flinkMemo, node);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(unioned));
+				}
+			}
+			// MAP (Single boundary source AND nothing else matches)
+			else if (sources.size() == 1 &&
+					allOfType(sources, Boundary.class)) {
+
+				DataSet<Tuple> input = flinkMemo.get(getSingle(sources)).get(0);
+				DataSet<Tuple> mapped = translateMap(input, node);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(mapped));
+				}
 			}
 			else {
-
-				// multi input node: Merge, CoGroup, Join
-				boolean allSourcesBoundaries = true;
-				for(FlowElement source : sources) {
-					if(!(source instanceof Boundary)) {
-						allSourcesBoundaries = false;
-						break;
-					}
-				}
-				// MERGE
-				if(allSourcesBoundaries &&
-						sinks.size() == 1 &&
-						sinks.iterator().next() instanceof Boundary &&
-						inner.size() == 1 &&
-						inner.iterator().next() instanceof Merge) {
-
-					DataSet<Tuple> unioned = translateMerge(flinkMemo, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(unioned));
-					}
-				}
-				// Multi-Input HashJoin
-				else if(allSourcesBoundaries &&
-						sinks.size() == 1 &&
-						sinks.iterator().next() instanceof Boundary &&
-						inner.size() == 1 &&
-						inner.iterator().next() instanceof HashJoin
-						) {
-
-					HashJoin join = (HashJoin)inner.iterator().next();
-
-					List<DataSet<Tuple>> joinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
-					for(FlowElement e : getNodeInputsInOrder(node, join)) {
-						joinInputs.add(flinkMemo.get(e).get(0));
-					}
-
-					DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
-					for(FlowElement sink : sinks) {
-						flinkMemo.put(sink, Collections.singletonList(joined));
-					}
-
-				}
-				// Input of CoGroup
-				else if(allSourcesBoundaries &&
-						sinks.size() == 1 &&
-						inner.size() == 0 &&
-						sinks.iterator().next() instanceof CoGroup
-						) {
-
-					CoGroup coGroup = (CoGroup)sinks.iterator().next();
-
-					// register input of CoGroup
-					List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(sources.size());
-					for(FlowElement e : getNodeInputsInOrder(node, coGroup)) {
-						coGroupInputs.add(flinkMemo.get(e).get(0));
-					}
-
-					flinkMemo.put(coGroup, coGroupInputs);
-
-				}
-				else {
-					throw new UnsupportedOperationException("No multi-input nodes other than Merge supported right now.");
-				}
-
-
+				throw new RuntimeException("Could not translate this node: "+node.getElementGraph().vertexSet());
 			}
-
 		}
-
 	}
 
 	private DataSet<Tuple> translateSource(FlowNode node, ExecutionEnvironment env) {
@@ -446,38 +424,50 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	private DataSet<Tuple> translateReduce(DataSet<Tuple> input, FlowNode node) {
+	private DataSet<Tuple> translateReduce(List<DataSet<Tuple>> inputs, FlowNode node) {
 
-		GroupBy groupBy = (GroupBy)getSource(node);
+		GroupBy groupBy = (GroupBy) node.getSourceElements().iterator().next();
 
-		Scope inScope = getInScope(node);
 		Scope outScope = getOutScope(node);
+		List<Scope> inScopes = getInputScopes(node, groupBy);
 
-		if(groupBy.getKeySelectors().size() != 1) {
-			throw new RuntimeException("Currently only groupBy with single input supported");
-		}
-
-		// get grouping keys
-		Fields keyFields = groupBy.getKeySelectors().get(inScope.getName());
-		if(keyFields == null) {
-			throw new RuntimeException("No valid key fields found for GroupBy");
-		}
-		String[] groupKeys = registerKeyFields(input, keyFields);
-
-		// get group sorting keys
-		Fields sortKeyFields = groupBy.getSortingSelectors().get(inScope.getName());
-		String[] sortKeys = null;
-		if(sortKeyFields != null) {
-			sortKeys = registerKeyFields(input, sortKeyFields);
-		}
-
-		// get output fields for type info
 		Fields outFields;
 		if(outScope.isEvery()) {
 			outFields = outScope.getOutGroupingFields();
 		}
 		else {
 			outFields = outScope.getOutValuesFields();
+		}
+
+		Fields groupKeyFields = null;
+		Fields sortKeyFields = null;
+
+		DataSet<Tuple> merged = null;
+
+		for(int i=0; i<inputs.size(); i++) {
+
+			// get Flink DataSet
+			DataSet<Tuple> input = inputs.get(i);
+			// get input scope
+			Scope inScope = inScopes.get(i);
+
+			// get grouping keys
+			groupKeyFields = groupBy.getKeySelectors().get(inScope.getName());
+			// get group sorting keys
+			sortKeyFields = groupBy.getSortingSelectors().get(inScope.getName());
+
+			if(merged == null) {
+				merged = input;
+			}
+			else {
+				merged = merged.union(input);
+			}
+		}
+
+		String[] groupKeys = registerKeyFields(merged, groupKeyFields);
+		String[] sortKeys = null;
+		if (sortKeyFields != null) {
+			sortKeys = registerKeyFields(merged, sortKeyFields);
 		}
 
 		Order sortOrder;
@@ -487,7 +477,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			// prepartition and sort input
 			// required because Cascading allows to specifiy the order of grouping keys
 
-			DataSet<Tuple> partitioned = input
+			DataSet<Tuple> partitioned = merged
 					.partitionByHash(groupKeys);
 
 			DataSet<Tuple> sorted = partitioned;
@@ -500,7 +490,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				}
 			}
 
-			input = sorted;
+			merged = sorted;
 		}
 		else {
 			sortOrder = Order.ASCENDING;
@@ -509,7 +499,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		// Reduce without group sorting
 		if(sortKeys == null) {
 
-			return input
+			return merged
 					.groupBy(groupKeys)
 					.reduceGroup(new Reducer(node))
 					.withParameters(this.getConfig())
@@ -518,7 +508,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		// Reduce with group sorting
 		else {
 
-			SortedGrouping<Tuple> grouping = input
+			SortedGrouping<Tuple> grouping = merged
 					.groupBy(groupKeys)
 					.sortGroup(sortKeys[0], sortOrder);
 
@@ -921,6 +911,23 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		return outScopes.iterator().next();
 
+	}
+
+	private boolean allOfType(Set<FlowElement> set, Class<? extends FlowElement> type) {
+
+		for(FlowElement e : set) {
+			if(!(type.isInstance(e))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private <X> X getSingle(Set<X> set) {
+		if(set.size() != 1) {
+			throw new RuntimeException("Set size > 1");
+		}
+		return set.iterator().next();
 	}
 
 	private String[] registerKeyFields(DataSet<Tuple> input, Fields keyFields) {

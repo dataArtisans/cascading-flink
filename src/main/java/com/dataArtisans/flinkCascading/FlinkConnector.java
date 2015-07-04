@@ -62,15 +62,13 @@ import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransfor
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeCoGroupTransformer;
+import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeGroupByTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeHashJoinTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryBeforeSinkTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSourceTapTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryElementFactory;
 import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTransformer;
-import com.dataArtisans.flinkCascading.planning.rules.GroupByAfterCoGroupElementFactory;
-import com.dataArtisans.flinkCascading.planning.rules.MergeBeforeMergingGroupByTransformer;
-import com.dataArtisans.flinkCascading.planning.rules.MergeElementFactory;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.HashMap;
@@ -119,11 +117,10 @@ public class FlinkConnector extends FlowConnector {
 			// Balance
 
 //			addRule( new GroupByAfterCoGroupTransformer() ); // activate for native co-group support
-			// inject merge in front of merging group bys
-			addRule( new MergeBeforeMergingGroupByTransformer() );
 
-			// inject boundaries after source taps and before sink taps
+			// inject boundaries after source taps
 			addRule( new BoundaryAfterSourceTapTransformer() );
+			// inject boundaries before sink taps
 			addRule( new BoundaryBeforeSinkTapTransformer() );
 			// inject boundaries before and after merges
 			addRule( new BoundaryBeforeMergeTransformer() );
@@ -133,6 +130,9 @@ public class FlinkConnector extends FlowConnector {
 			addRule( new BoundaryAfterSplitEdgeTransformer() );
 			// inject boundaries before co groups
 			addRule( new BoundaryBeforeCoGroupTransformer() );
+			// inject boundaries before group bys
+			addRule( new BoundaryBeforeGroupByTransformer() );
+			// inject boundaries before and after hash joins
 			addRule( new BoundaryBeforeHashJoinTransformer() );
 			addRule( new BoundaryAfterHashJoinTransformer() );
 
@@ -155,14 +155,11 @@ public class FlinkConnector extends FlowConnector {
 
 			// PartitionNodes
 
-			// no match with HashJoin inclusion
 			addRule( new TopDownSplitBoundariesNodePartitioner() ); // split from source to multiple sinks
 			addRule( new BottomUpBoundariesNodePartitioner() ); // streamed paths re-partitioned w/ StreamedOnly
 
 			// Element Factories
 			this.addElementFactory(BoundaryElementFactory.BOUNDARY_FACTORY, new BoundaryElementFactory());
-			this.addElementFactory(MergeElementFactory.MERGE_FACTORY, new MergeElementFactory());
-			this.addElementFactory(GroupByAfterCoGroupElementFactory.GROUPBY_FACTORY, new GroupByAfterCoGroupElementFactory());
 		}
 
 	}

@@ -21,49 +21,42 @@ package com.dataArtisans.flinkCascading.planning.rules;
 import cascading.flow.planner.iso.expression.ElementCapture;
 import cascading.flow.planner.iso.expression.ExpressionGraph;
 import cascading.flow.planner.iso.expression.FlowElementExpression;
-import cascading.flow.planner.iso.expression.ScopeExpression;
 import cascading.flow.planner.iso.finder.SearchOrder;
 import cascading.flow.planner.iso.transformer.InsertionGraphTransformer;
 import cascading.flow.planner.rule.RuleExpression;
 import cascading.flow.planner.rule.transformer.RuleInsertionTransformer;
-import cascading.pipe.CoGroup;
-import cascading.pipe.Every;
+import cascading.pipe.GroupBy;
 
 import static cascading.flow.planner.rule.PlanPhase.BalanceAssembly;
 
 /**
- * Injects a Boundary after a splitting node.
+ * Injects a Boundary before a CoGroup in order to split of the CoGroup as a separate node
+ * and have all predecessors in individual pipes.
  */
-public class GroupByAfterCoGroupTransformer extends RuleInsertionTransformer
+public class BoundaryBeforeGroupByTransformer extends RuleInsertionTransformer
 {
-	public GroupByAfterCoGroupTransformer() {
+	public BoundaryBeforeGroupByTransformer() {
 		super(
 				BalanceAssembly,
-				new SplitElementMatcher(),
-				GroupByAfterCoGroupElementFactory.GROUPBY_FACTORY,
-				InsertionGraphTransformer.Insertion.After
+				new GroupByMatcher(),
+				BoundaryElementFactory.BOUNDARY_FACTORY,
+				InsertionGraphTransformer.Insertion.BeforeEachEdge
 		);
 	}
 
-	public static class SplitElementMatcher extends RuleExpression
+	public static class GroupByMatcher extends RuleExpression
 	{
-		public SplitElementMatcher()
+		public GroupByMatcher()
 		{
-			super( new SplitElementGraph() );
+			super( new GroupByGraph() );
 		}
 	}
 
-	public static class SplitElementGraph extends ExpressionGraph {
+	public static class GroupByGraph extends ExpressionGraph {
 
-		public SplitElementGraph() {
+		public GroupByGraph() {
 
-			super(SearchOrder.ReverseTopological);
-
-			arc(
-					new FlowElementExpression(ElementCapture.Primary, CoGroup.class),
-					ScopeExpression.ALL,
-					new FlowElementExpression(Every.class)
-			);
+			super(SearchOrder.ReverseTopological, new FlowElementExpression(ElementCapture.Primary, GroupBy.class));
 
 		}
 	}
