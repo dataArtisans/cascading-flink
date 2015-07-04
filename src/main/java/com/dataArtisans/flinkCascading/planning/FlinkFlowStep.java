@@ -48,6 +48,7 @@ import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
+import com.dataArtisans.flinkCascading.exec.operators.IdMapper;
 import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
 import com.dataArtisans.flinkCascading.exec.operators.Reducer;
@@ -208,28 +209,6 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				}
 
 			}
-			// HASHJOIN (One or more boundary source, single boundary sink, single hashjoin inner)
-			else if(sources.size() > 0 &&
-					allOfType(sources, Boundary.class) &&
-					sinks.size() == 1 &&
-					sinks.iterator().next() instanceof Boundary &&
-					inner.size() == 1 &&
-					inner.iterator().next() instanceof HashJoin
-					) {
-
-				HashJoin join = (HashJoin)inner.iterator().next();
-
-				List<DataSet<Tuple>> joinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
-				for(FlowElement e : getNodeInputsInOrder(node, join)) {
-					joinInputs.add(flinkMemo.get(e).get(0));
-				}
-
-				DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
-				for(FlowElement sink : sinks) {
-					flinkMemo.put(sink, Collections.singletonList(joined));
-				}
-
-			}
 			// INPUT OF GROUPBY (one or more boundary sources, single groupBy sink, no inner)
 			else if(sources.size() > 0 &&
 					allOfType(sources, Boundary.class) &&
@@ -292,10 +271,37 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					inner.size() == 1 &&
 					allOfType(inner, Merge.class)) {
 
-				DataSet<Tuple> unioned = translateMerge(flinkMemo, node);
+				List<DataSet<Tuple>> mergeInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				for(FlowElement e : sources) {
+					mergeInputs.add(flinkMemo.get(e).get(0));
+				}
+
+				DataSet<Tuple> unioned = translateMerge(mergeInputs, node);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(unioned));
 				}
+			}
+			// HASHJOIN (One or more boundary source, single boundary sink, single hashjoin inner)
+			else if(sources.size() > 0 &&
+					allOfType(sources, Boundary.class) &&
+					sinks.size() == 1 &&
+					sinks.iterator().next() instanceof Boundary &&
+					inner.size() == 1 &&
+					inner.iterator().next() instanceof HashJoin
+					) {
+
+				HashJoin join = (HashJoin)inner.iterator().next();
+
+				List<DataSet<Tuple>> joinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				for(FlowElement e : getNodeInputsInOrder(node, join)) {
+					joinInputs.add(flinkMemo.get(e).get(0));
+				}
+
+				DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
+				for(FlowElement sink : sinks) {
+					flinkMemo.put(sink, Collections.singletonList(joined));
+				}
+
 			}
 			// MAP (Single boundary source AND nothing else matches)
 			else if (sources.size() == 1 &&
@@ -524,34 +530,23 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	private DataSet<Tuple> translateMerge(Map<FlowElement, List<DataSet<Tuple>>> flinkFlows, FlowNode node) {
-
-		// check if remaining node is a Merge
-		Set<FlowElement> elements = new HashSet(node.getElementGraph().vertexSet());
-		elements.removeAll(getSources(node));
-		elements.remove(getSink(node));
-
-		for(FlowElement v : elements) {
-			if(!(v instanceof Merge || v instanceof Extent)) {
-				throw new RuntimeException("Unexpected non-merge element found.");
-			}
-		}
-
-		// this node is just a merge wrapped in boundaries.
-		// translate it to a Flink union
-
-		Set<FlowElement> sources = getSources(node);
+	private DataSet<Tuple> translateMerge(List<DataSet<Tuple>> inputs, FlowNode node) {
 
 		DataSet<Tuple> unioned = null;
-		for(FlowElement source : sources) {
+		TypeInformation<Tuple> type = null;
+
+		for(DataSet<Tuple> input : inputs) {
 			if(unioned == null) {
-				unioned = flinkFlows.get(source).get(0);
+				unioned = input;
+				type = input.getType();
 			}
 			else {
-				unioned = unioned.union(flinkFlows.get(source).get(0));
+				unioned = unioned.union(input);
 			}
 		}
-		return unioned;
+		return unioned.mapPartition(new IdMapper())
+				.returns(type);
+
 	}
 
 	private DataSet<Tuple> translateCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
