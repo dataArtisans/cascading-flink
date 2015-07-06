@@ -26,7 +26,7 @@ import cascading.stats.FlowStepStats;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
 

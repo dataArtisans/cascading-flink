@@ -52,7 +52,7 @@ import com.dataArtisans.flinkCascading_old.planning.translation.MergeOperator;
 import com.dataArtisans.flinkCascading_old.planning.translation.Operator;
 import com.dataArtisans.flinkCascading_old.planning.translation.PipeOperator;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.jgrapht.traverse.TopologicalOrderIterator;
 
@@ -104,7 +104,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				continue;
 			}
 
-			this.defaultConfig.setString(key.toString(), value.toString());
+			this.defaultConfig.set(key.toString(), value.toString());
 		}
 
 	}
@@ -274,7 +274,7 @@ public class FlinkFlowPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		}
 
 		for(DataSink s : flinkSinks) {
-			s.getFlinkOperator(env, this.getDefaultConfig());
+			s.getFlinkOperator(env, null);
 		}
 
 		return new FlinkFlow(env, getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());

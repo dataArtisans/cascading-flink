@@ -21,26 +21,26 @@ package com.dataArtisans.flinkCascading.util;
 import cascading.flow.FlowConnector;
 import cascading.flow.FlowProcess;
 import cascading.platform.TestPlatform;
-import cascading.platform.local.LocalConfigDefScheme;
-import cascading.platform.local.LocalFailScheme;
+import cascading.platform.hadoop.HadoopConfigDefScheme;
+import cascading.platform.hadoop.HadoopFailScheme;
 import cascading.platform.local.TestLongComparator;
 import cascading.platform.local.TestStringComparator;
 import cascading.scheme.Scheme;
-import cascading.scheme.local.TextDelimited;
-import cascading.scheme.local.TextLine;
+import cascading.scheme.hadoop.TextDelimited;
+import cascading.scheme.hadoop.TextLine;
 import cascading.scheme.util.DelimitedParser;
 import cascading.scheme.util.FieldTypeResolver;
 import cascading.tap.SinkMode;
 import cascading.tap.Tap;
-import cascading.tap.local.FileTap;
-import cascading.tap.local.PartitionTap;
+import cascading.tap.hadoop.Hfs;
+import cascading.tap.hadoop.PartitionTap;
 import cascading.tap.partition.Partition;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.FlinkConnector;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.conf.Configuration;
 
 import java.io.File;
 import java.io.IOException;
@@ -101,53 +101,57 @@ public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
 	public FlowConnector getFlowConnector(Map<Object, Object> properties) {
-		return new FlinkConnector(ExecutionEnvironment.createLocalEnvironment(), properties);
+
+		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
+		env.setParallelism(1);
+
+		return new FlinkConnector(env, properties);
 	}
 
 	@Override
 	public Tap getTap(Scheme scheme, String filename, SinkMode mode) {
-		return new FileTap(scheme, filename, mode);
+		return new Hfs(scheme, filename, mode);
 	}
 
 	@Override
 	public Tap getTextFile(Fields sourceFields, Fields sinkFields, String filename, SinkMode mode) {
 		if( sourceFields == null ) {
-			return new FileTap(new TextLine(), filename, mode);
+			return new Hfs(new TextLine(), filename, mode);
 		}
 
-		return new FileTap( new TextLine( sourceFields, sinkFields ), filename, mode );
+		return new Hfs( new TextLine( sourceFields, sinkFields ), filename, mode );
 	}
 
 	@Override
 	public Tap getDelimitedFile(Fields fields, boolean hasHeader, String delimiter, String quote,
 								Class[] types, String filename, SinkMode mode) {
-		return new FileTap( new TextDelimited( fields, hasHeader, delimiter, quote, types ), filename, mode );
+		return new Hfs( new TextDelimited( fields, hasHeader, delimiter, quote, types ), filename, mode );
 	}
 
 	@Override
 	public Tap getDelimitedFile(Fields fields, boolean skipHeader, boolean writeHeader, String delimiter,
 								String quote, Class[] types, String filename, SinkMode mode) {
-		return new FileTap( new TextDelimited( fields, skipHeader, writeHeader, delimiter, quote, types ), filename, mode );
+		return new Hfs( new TextDelimited( fields, skipHeader, writeHeader, delimiter, quote, types ), filename, mode );
 	}
 
 	@Override
 	public Tap getDelimitedFile(String delimiter, String quote, FieldTypeResolver fieldTypeResolver, String filename, SinkMode mode) {
-		return new FileTap( new TextDelimited( true, new DelimitedParser( delimiter, quote, fieldTypeResolver ) ), filename, mode );
+		return new Hfs( new TextDelimited( true, new DelimitedParser( delimiter, quote, fieldTypeResolver ) ), filename, mode );
 	}
 
 	@Override
 	public Tap getPartitionTap(Tap sink, Partition partition, int openThreshold) {
-		return new PartitionTap( (FileTap) sink, partition, openThreshold );
+		return new PartitionTap( (Hfs) sink, partition, openThreshold );
 	}
 
 	@Override
 	public Scheme getTestConfigDefScheme() {
-		return new LocalConfigDefScheme( new Fields( "line" ) );
+		return new HadoopConfigDefScheme( new Fields( "line" ), isDAG() );
 	}
 
 	@Override
 	public Scheme getTestFailScheme() {
-		return new LocalFailScheme( new Fields( "line" ) );
+		return new HadoopFailScheme( new Fields( "line" ) );
 	}
 
 	@Override

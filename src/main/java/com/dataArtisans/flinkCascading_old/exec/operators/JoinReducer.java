@@ -73,7 +73,7 @@ public class JoinReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, 
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(config, this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 
 		/// Duct.initialize
 

@@ -76,6 +76,7 @@ import java.util.Map;
 
 public class FlinkConnector extends FlowConnector {
 
+	private ExecutionEnvironment env;
 
 	public FlinkConnector(ExecutionEnvironment env) {
 		this(env, new HashMap<Object, Object>());
@@ -83,6 +84,8 @@ public class FlinkConnector extends FlowConnector {
 
 	public FlinkConnector(ExecutionEnvironment env, Map<Object, Object> properties) {
 		super(properties);
+
+		this.env = env;
 	}
 
 	@Override
@@ -92,7 +95,7 @@ public class FlinkConnector extends FlowConnector {
 
 	@Override
 	protected FlowPlanner createFlowPlanner() {
-		return new FlinkPlanner();
+		return new FlinkPlanner(env);
 	}
 
 	@Override

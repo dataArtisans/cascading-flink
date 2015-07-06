@@ -19,12 +19,19 @@
 
 package com.dataArtisans.flinkCascading.exec.operators;
 
+import cascading.CascadingException;
+import cascading.flow.FlowNode;
 import cascading.flow.SliceCounters;
 import cascading.flow.StepCounters;
-import cascading.flow.hadoop.HadoopFlowProcess;
+import cascading.flow.hadoop.util.HadoopUtil;
+import cascading.flow.stream.duct.DuctException;
+import cascading.flow.stream.element.TrapHandler;
 import cascading.tap.hadoop.Hfs;
+import cascading.tuple.TupleEntry;
 import cascading.tuple.TupleEntryIterator;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.io.FileInputFormat.FileBaseStatistics;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.io.LocatableInputSplitAssigner;
@@ -37,6 +44,7 @@ import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.io.InputSplitAssigner;
+import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.FileInputFormat;
@@ -47,11 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-
-import static cascading.flow.hadoop.util.HadoopUtil.asJobConfInstance;
 
 public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
@@ -59,10 +63,13 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(HadoopInputFormatBase.class);
 
+	private FlowNode node;
+	private Hfs hfs;
+	private Hfs trap;
 
-	private Hfs hfsTap;
-	private transient HadoopFlowProcess ffp;
+	private transient FlinkFlowProcess flowProcess;
 	private transient TupleEntryIterator it;
+	private transient TrapHandler trapHandler;
 
 	private transient org.apache.hadoop.mapred.InputFormat<? extends WritableComparable, ? extends Writable> mapredInputFormat;
 	private transient JobConf jobConf;
@@ -71,17 +78,34 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	private transient boolean hasNext;
 	private transient Tuple next;
 
-	public HfsInputFormat(Hfs hfsTap, org.apache.hadoop.conf.Configuration config) {
+	public HfsInputFormat(Hfs tap, FlowNode node) {
 		super();
-		this.hfsTap = hfsTap;
-		this.jobConf = asJobConfInstance( config );
+
+		this.node = node;
+		this.hfs = tap;
+
+		// check if there is at most one trap
+		if(node.getTraps().size() > 1) {
+			throw new IllegalArgumentException("At most one trap allowed for data source");
+		}
+		if(node.getTraps().size() > 0) {
+			// check if trap is Hfs
+			if (!(node.getTraps().iterator().next() instanceof Hfs)) {
+				throw new IllegalArgumentException("Trap must be of type Hfs");
+			}
+			this.trap = (Hfs) node.getTraps().iterator().next();
+		}
+		else {
+			this.trap = null;
+		}
+
 	}
-	
+
 
 	// --------------------------------------------------------------------------------------------
 	//  InputFormat
 	// --------------------------------------------------------------------------------------------
-	
+
 	@Override
 	public void configure(Configuration parameters) {
 
@@ -97,29 +121,40 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 //			conf = HadoopUtil.removePropertiesFrom(conf, "mapred.input.dir", "mapreduce.input.fileinputformat.inputdir"); // hadoop2
 //			hfsTap.sourceConfInit( ffp, conf );
 //		}
-		this.ffp = new HadoopFlowProcess(jobConf);
+
+		this.jobConf = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(parameters));
+		jobConf.set("mapreduce.input.fileinputformat.inputdir", hfs.getPath().toString());
+
+		// TODO: make RuntimeContext available in InputFormats (and OutputFormats)
+		FakeRuntimeContext rc = new FakeRuntimeContext();
+		rc.setName("Source-"+this.node.getID());
+		rc.setTaskNum(1);
+
+		this.flowProcess = new FlinkFlowProcess(jobConf, rc);
+
+		this.trapHandler = new TrapHandler(flowProcess, this.hfs, this.trap, "MyFunkyName"); // TODO set name
 
 		this.mapredInputFormat = jobConf.getInputFormat();
 
-		if( this.mapredInputFormat instanceof JobConfigurable) {
+		if (this.mapredInputFormat instanceof JobConfigurable) {
 			((JobConfigurable) this.mapredInputFormat).configure(jobConf);
 		}
 
 	}
-	
+
 	@Override
 	public BaseStatistics getStatistics(BaseStatistics cachedStats) throws IOException {
 		// only gather base statistics for FileInputFormats
-		if(!(mapredInputFormat instanceof FileInputFormat)) {
+		if (!(mapredInputFormat instanceof FileInputFormat)) {
 			return null;
 		}
-		
+
 		final FileBaseStatistics cachedFileStats = (cachedStats != null && cachedStats instanceof FileBaseStatistics) ?
 				(FileBaseStatistics) cachedStats : null;
-		
+
 		try {
 			final org.apache.hadoop.fs.Path[] paths = FileInputFormat.getInputPaths(this.jobConf);
-			
+
 			return getFileStats(cachedFileStats, paths, new ArrayList<FileStatus>(1));
 		} catch (IOException ioex) {
 			if (LOG.isWarnEnabled()) {
@@ -132,66 +167,78 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 						+ t.getMessage(), t);
 			}
 		}
-		
+
 		// no statistics available
 		return null;
 	}
-	
+
 	@Override
 	public HadoopInputSplit[] createInputSplits(int minNumSplits)
 			throws IOException {
 
 		org.apache.hadoop.mapred.InputSplit[] splitArray = mapredInputFormat.getSplits(jobConf, minNumSplits);
 		HadoopInputSplit[] hiSplit = new HadoopInputSplit[splitArray.length];
-		for(int i=0;i<splitArray.length;i++){
+		for (int i = 0; i < splitArray.length; i++) {
 			hiSplit[i] = new HadoopInputSplit(i, splitArray[i], jobConf);
 		}
 		return hiSplit;
 	}
-	
+
 	@Override
 	public InputSplitAssigner getInputSplitAssigner(HadoopInputSplit[] inputSplits) {
 		return new LocatableInputSplitAssigner(inputSplits);
 	}
-	
+
 	@Override
 	public void open(HadoopInputSplit split) throws IOException {
-		RecordReader<?,?> recordReader = this.mapredInputFormat.getRecordReader(split.getHadoopInputSplit(), jobConf, new HadoopDummyReporter());
+		RecordReader<?, ?> recordReader = this.mapredInputFormat.getRecordReader(split.getHadoopInputSplit(), jobConf, new HadoopDummyReporter());
 
-//		if (this.recordReader instanceof Configurable) {
-//			((Configurable) this.recordReader).setConf(jobConf);
-//		}
+		if (recordReader instanceof Configurable) {
+			((Configurable) recordReader).setConf(jobConf);
+		}
 
-		this.it = hfsTap.openForRead(this.ffp, recordReader);
+		this.it = hfs.openForRead(this.flowProcess, recordReader);
 		this.fetched = false;
 	}
-	
+
 	@Override
 	public boolean reachedEnd() throws IOException {
-		if(!fetched) {
+		if (!fetched) {
 			fetchNext();
 		}
 		return !hasNext;
 	}
-	
+
 	protected void fetchNext() throws IOException {
-		if(this.it.hasNext()) {
-			this.hasNext = true;
-			this.next = this.it.next().getTuple();
-			this.fetched = true;
-			this.ffp.increment( StepCounters.Tuples_Read, 1 );
-			this.ffp.increment(SliceCounters.Tuples_Read, 1);
-		} else {
+
+		while( this.it.hasNext()) {
+			try {
+				this.hasNext = true;
+				this.next = this.it.next().getTuple();
+				this.fetched = true;
+				this.flowProcess.increment(StepCounters.Tuples_Read, 1);
+				this.flowProcess.increment(SliceCounters.Tuples_Read, 1);
+				break;
+			}
+			catch (OutOfMemoryError error) {
+				handleReThrowableException("out of memory, try increasing task memory allocation", error);
+			} catch (CascadingException exception) {
+				handleException(exception, null);
+			} catch (Throwable throwable) {
+				handleException(new DuctException("internal error", throwable), null);
+			}
+		}
+		if(!fetched) {
 			this.hasNext = false;
 		}
 	}
 
 	@Override
 	public Tuple nextRecord(Tuple record) throws IOException {
-		if(!fetched) {
+		if (!fetched) {
 			fetchNext();
 		}
-		if(!hasNext) {
+		if (!hasNext) {
 			return null;
 		}
 		fetched = false;
@@ -201,31 +248,40 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	@Override
 	public void close() throws IOException {
 		this.it.close();
+		flowProcess.closeTrapCollectors();
 	}
-	
+
+	protected void handleReThrowableException(String message, Throwable throwable) {
+		this.trapHandler.handleReThrowableException( message, throwable );
+	}
+
+	protected void handleException(Throwable exception, TupleEntry tupleEntry) {
+		this.trapHandler.handleException( exception, tupleEntry );
+	}
+
 	// --------------------------------------------------------------------------------------------
 	//  Helper methods
 	// --------------------------------------------------------------------------------------------
-	
+
 	private FileBaseStatistics getFileStats(FileBaseStatistics cachedStats, org.apache.hadoop.fs.Path[] hadoopFilePaths,
-			ArrayList<FileStatus> files) throws IOException {
-		
+											ArrayList<FileStatus> files) throws IOException {
+
 		long latestModTime = 0L;
-		
+
 		// get the file info and check whether the cached statistics are still valid.
-		for(org.apache.hadoop.fs.Path hadoopPath : hadoopFilePaths) {
-			
+		for (org.apache.hadoop.fs.Path hadoopPath : hadoopFilePaths) {
+
 			final Path filePath = new Path(hadoopPath.toUri());
 			final FileSystem fs = FileSystem.get(filePath.toUri());
-			
+
 			final FileStatus file = fs.getFileStatus(filePath);
 			latestModTime = Math.max(latestModTime, file.getModificationTime());
-			
+
 			// enumerate all files and check their modification time stamp.
 			if (file.isDir()) {
 				FileStatus[] fss = fs.listStatus(filePath);
 				files.ensureCapacity(files.size() + fss.length);
-				
+
 				for (FileStatus s : fss) {
 					if (!s.isDir()) {
 						files.add(s);
@@ -236,38 +292,24 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 				files.add(file);
 			}
 		}
-		
+
 		// check whether the cached statistics are still valid, if we have any
 		if (cachedStats != null && latestModTime <= cachedStats.getLastModificationTime()) {
 			return cachedStats;
 		}
-		
+
 		// calculate the whole length
 		long len = 0;
 		for (FileStatus s : files) {
 			len += s.getLen();
 		}
-		
+
 		// sanity check
 		if (len <= 0) {
 			len = BaseStatistics.SIZE_UNKNOWN;
 		}
-		
+
 		return new FileBaseStatistics(latestModTime, len, BaseStatistics.AVG_RECORD_BYTES_UNKNOWN);
-	}
-
-	private void writeObject(ObjectOutputStream out) throws IOException {
-		out.writeObject(this.hfsTap);
-		jobConf.write(out);
-	}
-
-	@SuppressWarnings("unchecked")
-	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-		this.hfsTap = (Hfs)in.readObject();
-		if(jobConf == null) {
-			jobConf = new JobConf();
-		}
-		jobConf.readFields(in);
 	}
 
 }

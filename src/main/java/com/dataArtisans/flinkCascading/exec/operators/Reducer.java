@@ -31,6 +31,7 @@ import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.FlinkReduceStreamGraph;
 import com.dataArtisans.flinkCascading.exec.ducts.GroupByInGate;
+import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
@@ -74,7 +75,7 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(config);
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext());
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {

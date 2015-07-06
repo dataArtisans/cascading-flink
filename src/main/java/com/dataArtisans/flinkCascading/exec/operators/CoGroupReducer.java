@@ -31,6 +31,7 @@ import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.ducts.CoGroupInGate;
 import com.dataArtisans.flinkCascading.exec.FlinkCoGroupReduceStreamGraph;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
@@ -70,7 +71,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(config);
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config));
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {

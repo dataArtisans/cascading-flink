@@ -63,7 +63,7 @@ public class EachFunctionMapper extends RichFlatMapFunction<Tuple, Tuple> {
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(config, this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 		this.function = each.getFunction();
 
 		call = new ConcreteCall( outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields() );

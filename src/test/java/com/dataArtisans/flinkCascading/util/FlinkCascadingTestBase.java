@@ -22,7 +22,9 @@ import cascading.flow.Flow;
 import cascading.flow.FlowDef;
 import cascading.flow.local.LocalFlowConnector;
 import cascading.flow.planner.PlannerException;
+import cascading.scheme.hadoop.TextLine;
 import cascading.tap.Tap;
+import cascading.tap.hadoop.Hfs;
 import cascading.tap.local.FileTap;
 import com.dataArtisans.flinkCascading.FlinkConnector;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -182,14 +184,14 @@ public abstract class FlinkCascadingTestBase {
 
 		for(String inPipe: inPipePathMap.keySet()) {
 			String path = inPipePathMap.get(inPipe);
-			Tap sourceTap = new FileTap(new cascading.scheme.local.TextLine(), path);
+			Tap sourceTap = new Hfs(new TextLine(), path);
 
 			flow.addSource(inPipe, sourceTap);
 		}
 
 		for(String outPipe: flinkOutPipePathMap.keySet()) {
 			String path = flinkOutPipePathMap.get(outPipe);
-			Tap sinkTap = new FileTap(new cascading.scheme.local.TextLine(), path);
+			Tap sinkTap = new Hfs(new TextLine(), path);
 
 			flow.addSink(outPipe, sinkTap);
 		}

@@ -18,41 +18,64 @@
 
 package com.dataArtisans.flinkCascading.exec.operators;
 
+import cascading.CascadingException;
+import cascading.flow.FlowNode;
 import cascading.flow.hadoop.HadoopFlowProcess;
+import cascading.flow.hadoop.util.HadoopUtil;
+import cascading.flow.stream.duct.DuctException;
+import cascading.flow.stream.element.TrapHandler;
 import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import cascading.tuple.TupleEntry;
 import cascading.tuple.TupleEntryCollector;
+import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.configuration.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 
-import static cascading.flow.hadoop.util.HadoopUtil.asJobConfInstance;
-
-public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMaster {
+public class HfsOutputFormat implements OutputFormat<Tuple> {
 
 	private static final long serialVersionUID = 1L;
 
+	private FlowNode node;
+
 	private Hfs hfsTap;
 	private Fields tapFields;
-	private JobConf jobConf;
+	private Hfs trap;
 
+	private transient FlinkFlowProcess flowProcess;
 	private transient TupleEntryCollector tupleEntryCollector;
+	private transient TrapHandler trapHandler;
+
+	private transient JobConf jobConf;
 
 
-	public HfsOutputFormat(Hfs hfs, Fields tapFields, org.apache.hadoop.conf.Configuration config) {
+	public HfsOutputFormat(Hfs hfs, Fields tapFields, FlowNode node) {
 		super();
+
+		this.node = node;
+
 		this.hfsTap = hfs;
 		this.tapFields = tapFields;
-		this.jobConf = asJobConfInstance( config );
-	}
 
-	public JobConf getJobConf() {
-		return jobConf;
+		// check if there is at most one trap
+		if(node.getTraps().size() > 1) {
+			throw new IllegalArgumentException("At most one trap allowed for data source");
+		}
+		if(node.getTraps().size() > 0) {
+			// check if trap is Hfs
+			if (!(node.getTraps().iterator().next() instanceof Hfs)) {
+				throw new IllegalArgumentException("Trap must be of type Hfs");
+			}
+			this.trap = (Hfs) node.getTraps().iterator().next();
+		}
+		else {
+			this.trap = null;
+		}
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -62,6 +85,17 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 	@Override
 	public void configure(Configuration parameters) {
 		// do nothing
+
+		this.jobConf = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(parameters));
+
+		FakeRuntimeContext rc = new FakeRuntimeContext();
+		rc.setName("Sink-"+this.node.getID());
+		rc.setTaskNum(1);
+
+		this.flowProcess = new FlinkFlowProcess(jobConf, rc);
+
+		this.trapHandler = new TrapHandler(flowProcess, this.hfsTap, this.trap, "MyFunkyName"); // TODO set name
+
 	}
 
 	/**
@@ -87,7 +121,16 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 
 	@Override
 	public void writeRecord(Tuple t) throws IOException {
-		this.tupleEntryCollector.add(t);
+		try {
+			this.tupleEntryCollector.add(t);
+		}
+		catch (OutOfMemoryError error) {
+			handleReThrowableException("out of memory, try increasing task memory allocation", error);
+		} catch (CascadingException exception) {
+			handleException(exception, null);
+		} catch (Throwable throwable) {
+			handleException(new DuctException("internal error", throwable), null);
+		}
 	}
 
 	/**
@@ -96,40 +139,15 @@ public class HfsOutputFormat implements OutputFormat<Tuple> { // , FinalizeOnMas
 	@Override
 	public void close() throws IOException {
 		this.tupleEntryCollector.close();
+		flowProcess.closeTrapCollectors();
 	}
 
-//	@Override
-//	public void finalizeGlobal(int parallelism) throws IOException {
-//
-//		try {
-//			JobContext jobContext = HadoopUtils.instantiateJobContext(this.jobConf, new JobID());
-//			FileOutputCommitter fileOutputCommitter = new FileOutputCommitter();
-//
-//			// finalize HDFS output format
-//			fileOutputCommitter.commitJob(jobContext);
-//		} catch (Exception e) {
-//			throw new RuntimeException(e);
-//		}
-//	}
-
-	// --------------------------------------------------------------------------------------------
-	//  Custom serialization methods
-	// --------------------------------------------------------------------------------------------
-
-	private void writeObject(ObjectOutputStream out) throws IOException {
-		out.writeObject(this.hfsTap);
-		out.writeObject(this.tapFields);
-		jobConf.write(out);
+	protected void handleReThrowableException(String message, Throwable throwable) {
+		this.trapHandler.handleReThrowableException( message, throwable );
 	}
 
-	@SuppressWarnings("unchecked")
-	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-		this.hfsTap = (Hfs)in.readObject();
-		this.tapFields = (Fields)in.readObject();
-		if(jobConf == null) {
-			jobConf = new JobConf();
-		}
-		jobConf.readFields(in);
+	protected void handleException(Throwable exception, TupleEntry tupleEntry) {
+		this.trapHandler.handleException( exception, tupleEntry );
 	}
 
 }

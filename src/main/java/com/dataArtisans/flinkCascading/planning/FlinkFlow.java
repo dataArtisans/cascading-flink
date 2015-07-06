@@ -21,10 +21,11 @@ package com.dataArtisans.flinkCascading.planning;
 import cascading.flow.BaseFlow;
 import cascading.flow.FlowDef;
 import cascading.flow.FlowProcess;
+import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 
 import java.util.HashMap;
@@ -52,7 +53,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 			return;
 		}
 
-		config = parentConfig.clone();
+		config = HadoopUtil.copyJobConf(parentConfig);
 	}
 
 
@@ -63,12 +64,12 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 			return;
 		}
 
-		config.setString(key.toString(), value.toString());
+		config.set(key.toString(), value.toString());
 	}
 
 	@Override
 	protected Configuration newConfig(Configuration defaultConfig) {
-		return defaultConfig == null ? new Configuration() : defaultConfig.clone();
+		return defaultConfig == null ? new Configuration() : HadoopUtil.copyJobConf(defaultConfig);
 	}
 
 	@Override
@@ -105,7 +106,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	public Configuration getConfigCopy() {
-		return getConfig().clone();
+		return HadoopUtil.copyJobConf(getConfig());
 	}
 
 	@Override
@@ -113,8 +114,9 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 		Map<Object, Object> props = new HashMap<Object, Object>();
 
 		Configuration conf = getConfig();
-		for(String key : conf.keySet()) {
-			props.put(key, conf.getString(key, null));
+		for(Map.Entry<String, String> e : conf) {
+			String key = e.getKey();
+			props.put(key, conf.get(key));
 		}
 
 		return props;
@@ -122,7 +124,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	public String getProperty(String key) {
-		return getConfig().getString(key, null);
+		return getConfig().get(key);
 
 	}
 

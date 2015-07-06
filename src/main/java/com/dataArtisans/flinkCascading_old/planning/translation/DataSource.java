@@ -73,7 +73,7 @@ public class DataSource extends Operator {
 		conf.set("mapreduce.input.fileinputformat.inputdir", tap.getPath().toString());
 
 		DataSet<Tuple> src = env
-				.createInput(new HfsInputFormat(tap, conf), new TupleTypeInfo(Fields.ALL))
+				.createInput(new HfsInputFormat(tap, null), new TupleTypeInfo(Fields.ALL))
 				.name(tap.getIdentifier());
 
 		return src;

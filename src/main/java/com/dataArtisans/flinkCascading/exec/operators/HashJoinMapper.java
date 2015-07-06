@@ -31,6 +31,7 @@ import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.FlinkHashJoinStreamGraph;
 import com.dataArtisans.flinkCascading.exec.ducts.BoundaryInStage;
+import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
@@ -65,7 +66,7 @@ public class HashJoinMapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(config);
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config));
 
 			FlowElement sourceElement = null;
 

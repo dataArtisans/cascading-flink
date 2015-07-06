@@ -21,17 +21,22 @@ package com.dataArtisans.flinkCascading.exec;
 import cascading.CascadingException;
 import cascading.flow.FlowProcess;
 import cascading.flow.FlowSession;
+import cascading.flow.hadoop.HadoopFlowProcess;
+import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.tap.Tap;
+import cascading.tap.hadoop.Hfs;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
 import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.InstantiationUtil;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -91,12 +96,16 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public Object getProperty( String key ) {
-		return this.conf.getString(key, null);
+		return this.conf.get(key);
 	}
 
 	@Override
 	public Collection<String> getPropertyKeys() {
-		Set<String> keys = conf.keySet();
+		Set<String> keys = new HashSet<String>();
+
+		for( Map.Entry<String, String> entry : this.conf ) {
+			keys.add(entry.getKey());
+		}
 
 		return Collections.unmodifiableSet( keys );
 	}
@@ -174,8 +183,22 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	}
 
 	@Override
-	public TupleEntryCollector openTrapForWrite(Tap tap) throws IOException {
-		return null; // not sure if required for Flink
+	public TupleEntryCollector openTrapForWrite(Tap trap) throws IOException {
+
+		// Hadoop (HDFS)
+		if (trap instanceof Hfs) {
+
+			JobConf jobConf = new JobConf();
+
+			String taskName = this.runtimeContext.getTaskName();
+			String partname = String.format("-%s-%05d-", taskName, this.getCurrentSliceNum());
+			jobConf.set( "cascading.tapcollector.partname", "%s%spart" + partname + "%05d" );
+
+			return trap.openForWrite( new HadoopFlowProcess( jobConf ), null );
+		}
+		else {
+			throw new UnsupportedOperationException("Only Hfs taps are supported as traps");
+		}
 	}
 
 	@Override
@@ -190,21 +213,22 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public Configuration getConfigCopy() {
-		return this.conf.clone();
+		return HadoopUtil.copyJobConf(this.conf);
 	}
 
 	@Override
 	public <C> C copyConfig(C conf) {
-		return (C)((Configuration)conf).clone();
+		return HadoopUtil.copyJobConf(conf);
 	}
 
 	@Override
 	public <C> Map<String, String> diffConfigIntoMap(C defaultConfig, C updatedConfig) {
 
 		Map<String, String> newConf = new HashMap<String, String>();
-		for(String key : ((Configuration)updatedConfig).keySet()) {
-			String val = ((Configuration) updatedConfig).getString(key, null);
-			String defaultVal = ((Configuration)defaultConfig).getString(key, null);
+		for(Map.Entry<String,String> e : ((Configuration)updatedConfig)) {
+			String key = e.getKey();
+			String val = ((Configuration) updatedConfig).get(key);
+			String defaultVal = ((Configuration)defaultConfig).get(key);
 
 			// add keys that are different from default
 			if((val == null && defaultVal == null) || val.equals(defaultVal)) {
@@ -221,9 +245,9 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	@Override
 	public Configuration mergeMapIntoConfig(Configuration defaultConfig, Map<String, String> map) {
 
-		Configuration mergedConf = defaultConfig.clone();
+		Configuration mergedConf = HadoopUtil.copyJobConf(defaultConfig);
 		for(String key : map.keySet()) {
-			mergedConf.setString(key, map.get(key));
+			mergedConf.set(key, map.get(key));
 		}
 		return mergedConf;
 	}

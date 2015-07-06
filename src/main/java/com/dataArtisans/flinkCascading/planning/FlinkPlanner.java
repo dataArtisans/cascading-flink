@@ -29,11 +29,13 @@ import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.tap.Tap;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
@@ -42,6 +44,11 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	private Configuration defaultConfig;
 
 	private ExecutionEnvironment env;
+
+	public FlinkPlanner(ExecutionEnvironment env) {
+		super();
+		this.env = env;
+	}
 
 	@Override
 	public Configuration getDefaultConfig() {
@@ -63,11 +70,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 		super.initialize( flowConnector, properties );
 
-		// TODO: replace by configured ExecutionEnvironment
-		this.env = ExecutionEnvironment.getExecutionEnvironment();
-
-		// TODO: copy properties
-		defaultConfig = new Configuration();
+		defaultConfig = createConfiguration(properties);
 
 		// TODO: set JAR file
 //		Class type = AppProps.getApplicationJarClass(properties);
@@ -102,6 +105,30 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	@Override
 	protected Tap makeTempTap(String prefix, String name) {
 		return null;  // not required for Flink
+	}
+
+	public static Configuration createConfiguration( Map<Object, Object> properties ) {
+		Configuration conf = new Configuration();
+		copyProperties( conf, properties );
+		return conf;
+	}
+
+	public static void copyProperties( Configuration config, Map<Object, Object> properties ) {
+		if( properties instanceof Properties) {
+			Properties props = (Properties) properties;
+			Set<String> keys = props.stringPropertyNames();
+
+			for( String key : keys ) {
+				config.set(key, props.getProperty(key));
+			}
+		}
+		else {
+			for( Map.Entry<Object, Object> entry : properties.entrySet() ) {
+				if( entry.getValue() != null ) {
+					config.set(entry.getKey().toString(), entry.getValue().toString());
+				}
+			}
+		}
 	}
 
 }

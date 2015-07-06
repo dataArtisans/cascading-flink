@@ -79,7 +79,7 @@ public class DataSink extends Operator {
 			org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
 
 			tail
-					.output(new HfsOutputFormat(hfs, tapFields, conf))
+					.output(new HfsOutputFormat(hfs, tapFields, null))
 					.setParallelism(1);
 		}
 		else if(tap instanceof FileTap) {

@@ -41,13 +41,15 @@ import cascading.pipe.joiner.InnerJoin;
 import cascading.pipe.joiner.Joiner;
 import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
+import cascading.tap.hadoop.Hfs;
 import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
-import com.dataArtisans.flinkCascading.exec.operators.FileTapInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
+import com.dataArtisans.flinkCascading.exec.operators.HfsInputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.IdMapper;
 import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
@@ -55,6 +57,7 @@ import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
 import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
 import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
+import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.operators.base.JoinOperatorBase;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -62,10 +65,10 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.MapPartitionOperator;
-import org.apache.flink.api.java.operators.SortedGrouping;
+import org.apache.flink.api.java.operators.SortPartitionOperator;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.conf.Configuration;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -91,10 +94,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	// Configures the MapReduce program for this step
 	public Configuration createInitializedConfig( FlowProcess<Configuration> flowProcess, Configuration parentConfig ) {
 
+		this.setConfig(parentConfig);
 		this.buildFlinkProgram();
 
-		// TODO
-		return null;
+		return parentConfig;
 	}
 
 	protected FlowStepJob<Configuration> createFlowStepJob( ClientState clientState, FlowProcess<Configuration> flowProcess, Configuration initializedStepConfig )
@@ -157,8 +160,6 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	}
 
 	public void buildFlinkProgram() {
-
-		env.setParallelism(1); // TODO: set for tests that count groups
 
 		printFlowStep();
 
@@ -324,11 +325,11 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		FlowElement source = getSource(node);
 
 		// add data source to Flink program
-		if(source instanceof FileTap) {
-			return this.translateFileTapSource((FileTap)source, env);
+		if(source instanceof Hfs) {
+			return this.translateHfsTapSource((Hfs)source, node, env);
 		}
 		else if(source instanceof MultiSourceTap) {
-			return this.translateMultiSourceTap((MultiSourceTap)source, env);
+			return this.translateMultiSourceTap((MultiSourceTap)source, node, env);
 		}
 		else {
 			throw new RuntimeException("Unsupported tap type encountered"); // TODO
@@ -336,20 +337,18 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	private DataSet<Tuple> translateFileTapSource(FileTap tap, ExecutionEnvironment env) {
-
-		Properties conf = new Properties();
-		tap.getScheme().sourceConfInit(null, tap, conf);
+	private DataSet<Tuple> translateHfsTapSource(Hfs hfsTap, FlowNode node, ExecutionEnvironment env) {
 
 		DataSet<Tuple> src = env
-				.createInput(new FileTapInputFormat(tap, conf), new TupleTypeInfo(tap.getSourceFields()))
-				.name(tap.getIdentifier())
-				.setParallelism(1);
+				.createInput(new HfsInputFormat(hfsTap, node), new TupleTypeInfo(hfsTap.getSourceFields()))
+				.name(hfsTap.getIdentifier())
+				.withParameters(getFlinkConfig());
 
 		return src;
+
 	}
 
-	private DataSet<Tuple> translateMultiSourceTap(MultiSourceTap tap, ExecutionEnvironment env) {
+	private DataSet<Tuple> translateMultiSourceTap(MultiSourceTap tap, FlowNode node, ExecutionEnvironment env) {
 
 		Iterator<Tap> childTaps = ((MultiSourceTap)tap).getChildTaps();
 
@@ -358,8 +357,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			Tap childTap = childTaps.next();
 			DataSet source;
 
-			if(childTap instanceof FileTap) {
-				source = translateFileTapSource((FileTap)childTap, env);
+			if(childTap instanceof Hfs) {
+				source = translateHfsTapSource((Hfs)childTap, node, env);
 			}
 			else {
 				throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
@@ -402,16 +401,25 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 		}
 
-		if(sinkTap instanceof FileTap) {
-			translateFileSinkTap(input, (FileTap) sinkTap);
+		if(sinkTap instanceof Hfs) {
+			translateHfsTapSink(input, (Hfs) sinkTap, node);
 		}
 		else {
-			throw new UnsupportedOperationException("Only file taps as sinks suppported right now.");
+			throw new UnsupportedOperationException("Only HFS taps as sinks suppported right now.");
 		}
 
 	}
 
-	private void translateFileSinkTap(DataSet<Tuple> input, FileTap fileSink) {
+	private void translateHfsTapSink(DataSet<Tuple> input, Hfs sink, FlowNode node) {
+		Hfs hfs = (Hfs) sink;
+		org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
+
+		input
+				.output(new HfsOutputFormat(hfs, hfs.getSinkFields(), node))
+				.withParameters(getFlinkConfig());
+	}
+
+	private void translateFileTapSink(DataSet<Tuple> input, FileTap fileSink) {
 
 		Properties props = new Properties();
 		input
@@ -425,8 +433,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		return input
 				.mapPartition(new Mapper(node))
-				.withParameters(this.getConfig())
-				.returns(new TupleTypeInfo(outScope.getOutValuesFields()));
+				.withParameters(this.getFlinkConfig())
+				.returns(new TupleTypeInfo(outScope.getOutValuesFields()))
+				.name("map-"+node.getID());
 
 	}
 
@@ -475,57 +484,60 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		if (sortKeyFields != null) {
 			sortKeys = registerKeyFields(merged, sortKeyFields);
 		}
+		Order sortOrder = groupBy.isSortReversed() ? Order.DESCENDING : Order.ASCENDING;
 
-		Order sortOrder;
-		if(groupBy.isSortReversed()) {
-			sortOrder = Order.DESCENDING;
+		DataSet<Tuple> result = merged;
 
-			// prepartition and sort input
-			// required because Cascading allows to specifiy the order of grouping keys
-
-			DataSet<Tuple> partitioned = merged
+		// hash partition and sort on grouping keys if necessary
+		if(groupKeys != null && groupKeys.length > 0) {
+			// hash partition
+			result = result
 					.partitionByHash(groupKeys);
 
-			DataSet<Tuple> sorted = partitioned;
-			for(int i=0; i<groupKeys.length; i++) {
-				sorted = sorted.sortPartition(groupKeys[i], sortOrder);
+			// sort on grouping keys
+			result = result
+					.sortPartition(groupKeys[0], sortOrder);
+			for(int i=1; i<groupKeys.length; i++) {
+				result = result
+						.sortPartition(groupKeys[i], sortOrder);
 			}
-			if(sortKeys != null) {
-				for(int i=0; i<sortKeys.length; i++) {
-					sorted = sorted.sortPartition(sortKeys[i], sortOrder);
-				}
-			}
-
-			merged = sorted;
-		}
-		else {
-			sortOrder = Order.ASCENDING;
 		}
 
-		// Reduce without group sorting
-		if(sortKeys == null) {
+		// sort on sorting keys if necessary
+		if(sortKeys != null && sortKeys.length > 0) {
 
-			return merged
-					.groupBy(groupKeys)
-					.reduceGroup(new Reducer(node))
-					.withParameters(this.getConfig())
-					.returns(new TupleTypeInfo(outFields));
-		}
-		// Reduce with group sorting
-		else {
-
-			SortedGrouping<Tuple> grouping = merged
-					.groupBy(groupKeys)
-					.sortGroup(sortKeys[0], sortOrder);
-
+			result = result
+					.sortPartition(sortKeys[0], sortOrder);
 			for(int i=1; i<sortKeys.length; i++) {
-				grouping = grouping.sortGroup(sortKeys[i], sortOrder);
+				result = result
+						.sortPartition(sortKeys[i], sortOrder);
+			}
+		}
+
+		// group by reduce
+		if(groupKeys != null && groupKeys.length > 0) {
+
+			return result
+					.groupBy(groupKeys)
+					.reduceGroup(new Reducer(node))
+					.returns(new TupleTypeInfo(outFields))
+					.withParameters(this.getFlinkConfig())
+					.name("reduce-" + node.getID());
+
+		}
+		// all reduce (no group keys)
+		else {
+			// move all data to one partition before sorting
+			if(sortKeys != null && sortKeys.length > 0) {
+				((SortPartitionOperator)result).setParallelism(1);
 			}
 
-			return grouping
+			// group all data
+			return result
 					.reduceGroup(new Reducer(node))
-					.withParameters(this.getConfig())
-					.returns(new TupleTypeInfo(outFields));
+					.returns(new TupleTypeInfo(outFields))
+					.withParameters(this.getFlinkConfig())
+					.name("reduce-"+ node.getID());
 		}
 
 	}
@@ -652,8 +664,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.groupBy("f0.*")
 				.sortGroup(1, Order.DESCENDING)
 				.reduceGroup(new CoGroupReducer(node))
-				.withParameters(getConfig())
-				.returns(new TupleTypeInfo(outFields));
+				.withParameters(getFlinkConfig())
+				.returns(new TupleTypeInfo(outFields))
+				.name("coGroup-" + node.getID());
 
 	}
 
@@ -708,7 +721,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						.returns(new TupleTypeInfo(resultFields))
 //						.withForwardedFieldsFirst(leftJoinKeys) // TODO
 //						.withForwardedFieldsSecond(joinKeys) // TODO
-						.withParameters(this.getConfig());
+						.withParameters(this.getFlinkConfig());
 
 				// TODO: update firstInputJoinKeys, update leftJoinKeys
 
@@ -752,11 +765,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		MapPartitionOperator<Tuple, Tuple> joined = inputs.get(0)
 				.mapPartition(new HashJoinMapper(node, inputIds))
-				.withParameters(this.getConfig());
+				.withParameters(this.getFlinkConfig());
 		for(int i=1; i<inputs.size(); i++) {
 			joined.withBroadcastSet(inputs.get(i), inputIds[i]);
 		}
-		joined.returns(new TupleTypeInfo(outFields));
+		joined.returns(new TupleTypeInfo(outFields))
+				.name("hashjoin-" + node.getID());
 
 		return joined;
 
@@ -928,5 +942,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	private String[] registerKeyFields(DataSet<Tuple> input, Fields keyFields) {
 		return ((TupleTypeInfo)input.getType()).registerKeyFields(keyFields);
 	}
+
+	private org.apache.flink.configuration.Configuration getFlinkConfig() {
+		return FlinkConfigConverter.toFlinkConfig(this.getConfig());
+	}
+
 
 }

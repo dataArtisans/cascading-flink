@@ -81,12 +81,12 @@ under the License.
 			<version>3.0.0-wip-dev</version>
 		</dependency>
 
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-local</artifactId>
-            <version>3.0.0-wip-dev</version>
-            <type>test-jar</type>
-        </dependency>
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-local</artifactId>
+			<version>3.0.0-wip-dev</version>
+			<type>test-jar</type>
+		</dependency>
 
 		<dependency>
 			<groupId>cascading</groupId>
@@ -94,11 +94,11 @@ under the License.
 			<version>3.0.0-wip-dev</version>
 		</dependency>
 
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-hadoop2-tez</artifactId>
-            <version>3.0.0-wip-dev</version>
-        </dependency>
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-hadoop2-tez</artifactId>
+			<version>3.0.0-wip-dev</version>
+		</dependency>
 
 		<dependency>
 			<groupId>cascading</groupId>
@@ -106,24 +106,31 @@ under the License.
 			<version>3.0.0-wip-dev</version>
 		</dependency>
 
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-core</artifactId>
-            <version>3.0.0-wip-dev</version>
-            <type>test-jar</type>
-        </dependency>
-
-        <dependency>
-            <groupId>cascading</groupId>
-            <artifactId>cascading-platform</artifactId>
-            <version>3.0.0-wip-dev</version>
-            <type>test-jar</type>
-        </dependency>
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-core</artifactId>
+			<version>3.0.0-wip-dev</version>
+			<type>test-jar</type>
+		</dependency>
 
 		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-lang3</artifactId>
-			<version>3.3.2</version>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-platform</artifactId>
+			<version>3.0.0-wip-dev</version>
+			<type>test-jar</type>
+		</dependency>
+
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-hadoop</artifactId>
+			<version>3.0.0-wip-dev</version>
+		</dependency>
+
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-hadoop</artifactId>
+			<version>3.0.0-wip-dev</version>
+			<type>test-jar</type>
 		</dependency>
 
 		<dependency>
@@ -138,11 +145,11 @@ under the License.
 			<version>${slf4j.version}</version>
 		</dependency>
 
-        <dependency>
-            <groupId>org.clapper</groupId>
-            <artifactId>grizzled-slf4j_2.10</artifactId>
-            <version>1.0.2</version>
-        </dependency>
+		<dependency>
+			<groupId>org.clapper</groupId>
+			<artifactId>grizzled-slf4j_2.10</artifactId>
+			<version>1.0.2</version>
+		</dependency>
 
 		<dependency>
 			<groupId>log4j</groupId>
@@ -158,12 +165,12 @@ under the License.
 			<!--<scope>test</scope>-->
 		</dependency>
 
-        <dependency>
-            <groupId>com.codahale.metrics</groupId>
-            <artifactId>metrics-core</artifactId>
-            <version>3.0.2</version>
-            <type>jar</type>
-        </dependency>
+		<dependency>
+			<groupId>com.codahale.metrics</groupId>
+			<artifactId>metrics-core</artifactId>
+			<version>3.0.2</version>
+			<type>jar</type>
+		</dependency>
 
 		<dependency>
 			<groupId>org.mockito</groupId>
@@ -197,7 +204,7 @@ under the License.
 			<scope>test</scope>
 		</dependency>
 
-    </dependencies>
+	</dependencies>
 
 	<reporting>
 		<plugins>

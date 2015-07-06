@@ -63,7 +63,7 @@ public class BufferReducer extends RichGroupReduceFunction<Tuple3<Tuple,Tuple,Tu
 	@Override
 	public void open(Configuration config) {
 
-		this.ffp = new FlinkFlowProcess(config, this.getRuntimeContext());
+		this.ffp = new FlinkFlowProcess(new org.apache.hadoop.conf.Configuration(), this.getRuntimeContext());
 		this.buffer = this.every.getBuffer();
 
 		this.call = new ConcreteCall(outgoingScope.getArgumentsDeclarator(), outgoingScope.getOperationDeclaredFields());
