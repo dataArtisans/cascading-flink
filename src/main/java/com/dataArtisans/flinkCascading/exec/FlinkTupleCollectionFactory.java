@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading_old.exec;
+package com.dataArtisans.flinkCascading.exec;
 
 import cascading.flow.FlowProcess;
 import cascading.tuple.Tuple;
@@ -46,7 +46,6 @@ public class FlinkTupleCollectionFactory implements TupleCollectionFactory<Confi
 	public Collection<Tuple> create(FlowProcess<? extends Configuration> flowProcess) {
 
 		// TODO: Replace by a FlinkSplillableTupleList ?
-
 		return new HadoopSpillableTupleList(this.spillThreshold, this.tupleSerialization, this.codec);
 	}
 }

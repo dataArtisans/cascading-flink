@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading_old.exec;
+package com.dataArtisans.flinkCascading.exec;
 
 import cascading.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple3;

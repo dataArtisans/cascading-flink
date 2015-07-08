@@ -28,7 +28,7 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-import com.dataArtisans.flinkCascading_old.exec.FlinkCoGroupClosure;
+import com.dataArtisans.flinkCascading.exec.FlinkCoGroupClosure;
 import org.apache.flink.api.java.tuple.Tuple3;
 
 import java.util.Iterator;
