@@ -168,4 +168,9 @@ public class FlinkTestPlatform extends TestPlatform {
 	public String getHiddenTemporaryPath() {
 		return null;
 	}
+
+	@Override
+	public boolean isDAG() {
+		return true;
+	}
 }

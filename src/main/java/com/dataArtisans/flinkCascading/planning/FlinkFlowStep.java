@@ -39,6 +39,7 @@ import cascading.pipe.Pipe;
 import cascading.pipe.Splice;
 import cascading.pipe.joiner.InnerJoin;
 import cascading.pipe.joiner.Joiner;
+import cascading.tap.MultiSinkTap;
 import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
@@ -385,7 +386,21 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		Tap sinkTap = (Tap)sink;
 
-		Fields tapFields = sinkTap.getSinkFields();
+		if(sinkTap instanceof Hfs) {
+			translateHfsTapSink(input, (Hfs) sinkTap, node);
+		}
+		else if(sinkTap instanceof MultiSinkTap) {
+			translateMultiSinkTap(input, (MultiSinkTap) sinkTap, node);
+		}
+		else {
+			throw new UnsupportedOperationException("Only HFS taps as sinks suppported right now.");
+		}
+
+	}
+
+	private void translateHfsTapSink(DataSet<Tuple> input, Hfs hfs, FlowNode node) {
+
+		Fields tapFields = hfs.getSinkFields();
 		// check that no projection is necessary
 		if(!tapFields.isAll()) {
 
@@ -401,22 +416,25 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 		}
 
-		if(sinkTap instanceof Hfs) {
-			translateHfsTapSink(input, (Hfs) sinkTap, node);
-		}
-		else {
-			throw new UnsupportedOperationException("Only HFS taps as sinks suppported right now.");
-		}
-
-	}
-
-	private void translateHfsTapSink(DataSet<Tuple> input, Hfs sink, FlowNode node) {
-		Hfs hfs = (Hfs) sink;
-		org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
-
 		input
 				.output(new HfsOutputFormat(hfs, hfs.getSinkFields(), node))
 				.withParameters(getFlinkConfig());
+	}
+
+	private void translateMultiSinkTap(DataSet<Tuple> input, MultiSinkTap tap, FlowNode node) {
+
+		Iterator<Tap> childTaps = tap.getChildTaps();
+
+		while(childTaps.hasNext()) {
+			Tap childTap = childTaps.next();
+
+			if(childTap instanceof Hfs) {
+				translateHfsTapSink(input, (Hfs) childTap, node);
+			}
+			else {
+				throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
+			}
+		}
 	}
 
 	private void translateFileTapSink(DataSet<Tuple> input, FileTap fileSink) {
