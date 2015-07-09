@@ -22,7 +22,6 @@ import cascading.CascadingException;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
-import cascading.flow.hadoop.FlowMapper;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.Boundary;
@@ -47,7 +46,7 @@ import java.util.Set;
  */
 public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(FlowMapper.class);
+	private static final Logger LOG = LoggerFactory.getLogger(Mapper.class);
 
 	private FlowNode flowNode;
 
@@ -89,6 +88,8 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 			for( Duct tail : streamGraph.getTails() )
 				LOG.info( "sinking to: " + ( (ElementDuct) tail ).getFlowElement() );
+
+
 		}
 		catch( Throwable throwable ) {
 

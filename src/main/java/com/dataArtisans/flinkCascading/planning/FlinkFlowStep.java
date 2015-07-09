@@ -21,6 +21,7 @@ package com.dataArtisans.flinkCascading.planning;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowNode;
 import cascading.flow.FlowProcess;
+import cascading.flow.hadoop.ConfigurationSetter;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.BaseFlowStep;
 import cascading.flow.planner.FlowStepJob;
@@ -39,23 +40,19 @@ import cascading.pipe.Pipe;
 import cascading.pipe.Splice;
 import cascading.pipe.joiner.InnerJoin;
 import cascading.pipe.joiner.Joiner;
-import cascading.tap.MultiSinkTap;
 import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
-import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import com.dataArtisans.flinkCascading.exec.operators.CascadingOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
-import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
 import com.dataArtisans.flinkCascading.exec.operators.CascadingInputFormat;
-import com.dataArtisans.flinkCascading.exec.operators.CascadingOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.IdMapper;
 import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
 import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
-import com.dataArtisans.flinkCascading.exec.operators.ProjectionMapper;
 import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.operators.Order;
@@ -69,6 +66,7 @@ import org.apache.flink.api.java.operators.SortPartitionOperator;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.mapred.JobConf;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -79,7 +77,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
 public class FlinkFlowStep extends BaseFlowStep<Configuration> {
@@ -94,15 +91,18 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	// Configures the MapReduce program for this step
 	public Configuration createInitializedConfig( FlowProcess<Configuration> flowProcess, Configuration parentConfig ) {
 
-		this.setConfig(parentConfig);
-		this.buildFlinkProgram();
+		Configuration config = parentConfig == null ? new JobConf() : HadoopUtil.copyJobConf( parentConfig );
+		this.setConfig(config);
 
-		return parentConfig;
+		return config;
 	}
 
 	protected FlowStepJob<Configuration> createFlowStepJob( ClientState clientState, FlowProcess<Configuration> flowProcess, Configuration initializedStepConfig )
 	{
 		try {
+
+			this.buildFlinkProgram(flowProcess);
+
 			return new FlinkFlowStepJob(clientState, this, initializedStepConfig);
 		}
 		catch(NoClassDefFoundError error) {
@@ -159,14 +159,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	public void buildFlinkProgram() {
+	public void buildFlinkProgram(FlowProcess flowProcess) {
 
 		printFlowStep();
 
 		FlowNodeGraph flowNodeGraph = getFlowNodeGraph();
 		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator(); // TODO: topologicalIterator is non-deterministically broken!!!
 
-//		Map<FlowElement, DataSet<Tuple>> flinkFlows = new HashMap<FlowElement, DataSet<Tuple>>();
 		Map<FlowElement, List<DataSet<Tuple>>> flinkMemo = new HashMap<FlowElement, List<DataSet<Tuple>>>();
 
 		while(iterator.hasNext()) {
@@ -196,10 +195,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					sinks.size() == 1 &&
 					allOfType(sinks, Tap.class)) {
 
-				Tap sinkTap = (Tap)getSingle(sinks);
-
 				DataSet<Tuple> input = flinkMemo.get(getSingle(sources)).get(0);
-				translateSink(input, sinkTap, node);
+				translateSink(input, node);
 			}
 			// SPLIT or EMPTY NODE (Single boundary source, one or more boundary sinks & no intermediate nodes)
 			else if (sources.size() == 1 &&
@@ -341,7 +338,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		DataSet<Tuple> src = env
 				.createInput(new CascadingInputFormat(tap, node), new TupleTypeInfo(tap.getSourceFields()))
 				.name(tap.getIdentifier())
-				.withParameters(getFlinkConfig());
+				.withParameters(this.getFlinkNodeConfig(node));
 
 		return src;
 
@@ -368,58 +365,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return cur;
 	}
 
-	private void translateSink(DataSet<Tuple> input, Tap sinkTap, FlowNode node) {
-
-		if(sinkTap instanceof MultiSinkTap) {
-			translateMultiSinkTap(input, (MultiSinkTap) sinkTap, node);
-		}
-		else {
-			translateSingleTapSink(input, sinkTap, node);
-		}
-
-	}
-
-	private void translateSingleTapSink(DataSet<Tuple> input, Tap tap, FlowNode node) {
-
-		Fields tapFields = tap.getSinkFields();
-		// check that no projection is necessary
-		if(!tapFields.isAll()) {
-
-			Scope inScope = getInScope(node);
-			Fields tailFields = inScope.getIncomingTapFields();
-
-			// check if we need to project
-			if(!tapFields.equalsFields(tailFields)) {
-				// add projection mapper
-				input = input
-						.map(new ProjectionMapper(tailFields, tapFields))
-						.returns(new TupleTypeInfo(tapFields));
-			}
-		}
+	private void translateSink(DataSet<Tuple> input, FlowNode node) {
 
 		input
-				.output(new CascadingOutputFormat(tap, tap.getSinkFields(), node))
-				.withParameters(getFlinkConfig());
+				.output(new CascadingOutputFormat(node))
+				.withParameters(this.getFlinkNodeConfig(node));
+
 	}
 
-	private void translateMultiSinkTap(DataSet<Tuple> input, MultiSinkTap tap, FlowNode node) {
-
-		Iterator<Tap> childTaps = tap.getChildTaps();
-
-		while(childTaps.hasNext()) {
-			Tap childTap = childTaps.next();
-
-			translateSink(input, childTap, node);
-		}
-	}
-
-	private void translateFileTapSink(DataSet<Tuple> input, FileTap fileSink) {
-
-		Properties props = new Properties();
-		input
-				.output(new FileTapOutputFormat(fileSink, fileSink.getSinkFields(), props))
-				.setParallelism(1);
-	}
 
 	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node) {
 
@@ -427,8 +380,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		return input
 				.mapPartition(new Mapper(node))
-				.withParameters(this.getFlinkConfig())
 				.returns(new TupleTypeInfo(outScope.getOutValuesFields()))
+				.withParameters(this.getFlinkNodeConfig(node))
 				.name("map-"+node.getID());
 
 	}
@@ -515,7 +468,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.groupBy(groupKeys)
 					.reduceGroup(new Reducer(node))
 					.returns(new TupleTypeInfo(outFields))
-					.withParameters(this.getFlinkConfig())
+					.withParameters(this.getFlinkNodeConfig(node))
 					.name("reduce-" + node.getID());
 
 		}
@@ -530,7 +483,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			return result
 					.reduceGroup(new Reducer(node))
 					.returns(new TupleTypeInfo(outFields))
-					.withParameters(this.getFlinkConfig())
+					.withParameters(this.getFlinkNodeConfig(node))
 					.name("reduce-"+ node.getID());
 		}
 
@@ -658,7 +611,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.groupBy("f0.*")
 				.sortGroup(1, Order.DESCENDING)
 				.reduceGroup(new CoGroupReducer(node))
-				.withParameters(getFlinkConfig())
+				.withParameters(this.getFlinkNodeConfig(node))
 				.returns(new TupleTypeInfo(outFields))
 				.name("coGroup-" + node.getID());
 
@@ -715,7 +668,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						.returns(new TupleTypeInfo(resultFields))
 //						.withForwardedFieldsFirst(leftJoinKeys) // TODO
 //						.withForwardedFieldsSecond(joinKeys) // TODO
-						.withParameters(this.getFlinkConfig());
+						.withParameters(this.getFlinkNodeConfig(node));
 
 				// TODO: update firstInputJoinKeys, update leftJoinKeys
 
@@ -759,7 +712,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		MapPartitionOperator<Tuple, Tuple> joined = inputs.get(0)
 				.mapPartition(new HashJoinMapper(node, inputIds))
-				.withParameters(this.getFlinkConfig());
+				.withParameters(this.getFlinkNodeConfig(node));
 		for(int i=1; i<inputs.size(); i++) {
 			joined.withBroadcastSet(inputs.get(i), inputIds[i]);
 		}
@@ -937,9 +890,18 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return ((TupleTypeInfo)input.getType()).registerKeyFields(keyFields);
 	}
 
-	private org.apache.flink.configuration.Configuration getFlinkConfig() {
-		return FlinkConfigConverter.toFlinkConfig(this.getConfig());
+	private org.apache.flink.configuration.Configuration getFlinkNodeConfig(FlowNode node) {
+		return FlinkConfigConverter.toFlinkConfig(this.getNodeConfig(node));
 	}
 
+	private Configuration getNodeConfig(FlowNode node) {
+
+		Configuration nodeConfig = HadoopUtil.copyConfiguration(this.getConfig());
+		ConfigurationSetter configSetter = new ConfigurationSetter(nodeConfig);
+		this.initConfFromNodeConfigDef(node.getElementGraph(), configSetter);
+		this.initConfFromStepConfigDef(configSetter);
+
+		return nodeConfig;
+	}
 
 }

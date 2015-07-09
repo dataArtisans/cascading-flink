@@ -19,115 +19,114 @@
 package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.CascadingException;
+import cascading.flow.FlowElement;
+import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
-import cascading.flow.hadoop.util.HadoopUtil;
-import cascading.flow.stream.duct.DuctException;
-import cascading.flow.stream.element.TrapHandler;
-import cascading.tap.Tap;
-import cascading.tap.hadoop.Hfs;
-import cascading.tuple.Fields;
+import cascading.flow.stream.duct.Duct;
+import cascading.flow.stream.element.ElementDuct;
+import cascading.pipe.Boundary;
 import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
-import cascading.tuple.TupleEntryCollector;
 import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.exec.FlinkSinkStreamGraph;
+import com.dataArtisans.flinkCascading.exec.ducts.SinkBoundaryInStage;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.configuration.Configuration;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.OutputCollector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Set;
 
 public class CascadingOutputFormat implements OutputFormat<Tuple> {
 
 	private static final long serialVersionUID = 1L;
 
+	private static final Logger LOG = LoggerFactory.getLogger(CascadingOutputFormat.class);
+
 	private FlowNode node;
 
-	private Tap<org.apache.hadoop.conf.Configuration, ?, OutputCollector> tap;
-	private Fields tapFields;
-	private Hfs trap;
+	transient private org.apache.hadoop.conf.Configuration config;
+	transient private FlinkFlowProcess flowProcess;
+	transient private FlinkSinkStreamGraph streamGraph;
+	transient private SinkBoundaryInStage sourceStage;
 
-	private transient FlinkFlowProcess flowProcess;
-	private transient TupleEntryCollector tupleEntryCollector;
-	private transient TrapHandler trapHandler;
-
-	private transient JobConf config;
-
-
-	public CascadingOutputFormat(Tap<org.apache.hadoop.conf.Configuration, ?, OutputCollector> tap, Fields tapFields, FlowNode node) {
+	public CascadingOutputFormat(FlowNode node) {
 		super();
 
 		this.node = node;
-
-		this.tap = tap;
-		this.tapFields = tapFields;
-
-		// check if there is at most one trap
-		if(node.getTraps().size() > 1) {
-			throw new IllegalArgumentException("At most one trap allowed for data source");
-		}
-		if(node.getTraps().size() > 0) {
-			// check if trap is Hfs
-			if (!(node.getTraps().iterator().next() instanceof Hfs)) {
-				throw new IllegalArgumentException("Trap must be of type Hfs");
-			}
-			this.trap = (Hfs) node.getTraps().iterator().next();
-		}
-		else {
-			this.trap = null;
-		}
 	}
-
-	// --------------------------------------------------------------------------------------------
-	//  OutputFormat
-	// --------------------------------------------------------------------------------------------
 
 	@Override
-	public void configure(Configuration parameters) {
-		// do nothing
-		this.config = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(parameters));
+	public void configure(Configuration config) {
+
+		this.config = FlinkConfigConverter.toHadoopConfig(config);
 	}
 
-	/**
-	 * create the temporary output file for hadoop RecordWriter.
-	 * @param taskNumber The number of the parallel instance.
-	 * @param numTasks The number of parallel tasks.
-	 * @throws java.io.IOException
-	 */
 	@Override
 	public void open(int taskNumber, int numTasks) throws IOException {
-
-		this.config.setInt("mapred.task.partition", taskNumber + 1);
-		this.config.setNumMapTasks(numTasks);
 
 		FakeRuntimeContext rc = new FakeRuntimeContext();
 		rc.setName("Sink-"+this.node.getID());
 		rc.setTaskNum(1);
 
-		this.flowProcess = new FlinkFlowProcess(config, rc);
-		tap.sinkConfInit(this.flowProcess, this.config);
+		try {
 
-		this.trapHandler = new TrapHandler(flowProcess, this.tap, this.trap, "MyFunkyName"); // TODO set name
+			flowProcess = new FlinkFlowProcess(this.config, rc);
 
-		this.tupleEntryCollector = this.tap.openForWrite(flowProcess, null);
-		if( this.tap.getSinkFields().isAll() )
-		{
-			this.tupleEntryCollector.setFields(tapFields);
+			Set<FlowElement> sources = node.getSourceElements();
+			if(sources.size() != 1) {
+				throw new RuntimeException("FlowNode for Mapper may only have a single source");
+			}
+			FlowElement sourceElement = sources.iterator().next();
+			if(!(sourceElement instanceof Boundary)) {
+				throw new RuntimeException("Source of Mapper must be a Boundary");
+			}
+			Boundary source = (Boundary)sourceElement;
+
+			streamGraph = new FlinkSinkStreamGraph( flowProcess, node, source );
+
+			sourceStage = this.streamGraph.getSourceStage();
+
+			for( Duct head : streamGraph.getHeads() ) {
+				LOG.info("sourcing from: " + ((ElementDuct) head).getFlowElement());
+			}
+
+			for( Duct tail : streamGraph.getTails() ) {
+				LOG.info("sinking to: " + ((ElementDuct) tail).getFlowElement());
+			}
 		}
+		catch( Throwable throwable ) {
+
+			if( throwable instanceof CascadingException) {
+				throw (CascadingException) throwable;
+			}
+
+			throw new FlowException( "internal error during mapper configuration", throwable );
+		}
+
+		streamGraph.prepare();
+
 	}
 
 	@Override
 	public void writeRecord(Tuple t) throws IOException {
+
 		try {
-			this.tupleEntryCollector.add(t);
-		}
-		catch (OutOfMemoryError error) {
-			handleReThrowableException("out of memory, try increasing task memory allocation", error);
-		} catch (CascadingException exception) {
-			handleException(exception, null);
-		} catch (Throwable throwable) {
-			handleException(new DuctException("internal error", throwable), null);
+			sourceStage.run( t );
+		} catch( OutOfMemoryError error ) {
+			throw error;
+		} catch( IOException exception ) {
+//				reportIfLocal( exception );
+			throw exception;
+		} catch( Throwable throwable ) {
+//				reportIfLocal( throwable );
+
+			if( throwable instanceof CascadingException ) {
+				throw (CascadingException) throwable;
+			}
+
+			throw new FlowException( "internal error during mapper execution", throwable );
 		}
 	}
 
@@ -136,16 +135,15 @@ public class CascadingOutputFormat implements OutputFormat<Tuple> {
 	 */
 	@Override
 	public void close() throws IOException {
-		this.tupleEntryCollector.close();
-		flowProcess.closeTrapCollectors();
-	}
+		try {
+			streamGraph.cleanup();
+		}
+		finally {
+			long processEndTime = System.currentTimeMillis();
 
-	protected void handleReThrowableException(String message, Throwable throwable) {
-		this.trapHandler.handleReThrowableException( message, throwable );
-	}
-
-	protected void handleException(Throwable exception, TupleEntry tupleEntry) {
-		this.trapHandler.handleException( exception, tupleEntry );
+//				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
+//				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
+		}
 	}
 
 }

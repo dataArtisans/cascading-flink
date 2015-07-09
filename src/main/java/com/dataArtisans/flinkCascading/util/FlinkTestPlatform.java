@@ -146,7 +146,8 @@ public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
 	public Scheme getTestConfigDefScheme() {
-		return new HadoopConfigDefScheme( new Fields( "line" ), isDAG() );
+		return new HadoopConfigDefScheme( new Fields( "line" ), true );
+
 	}
 
 	@Override
@@ -171,6 +172,6 @@ public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
 	public boolean isDAG() {
-		return true;
+		return false;
 	}
 }

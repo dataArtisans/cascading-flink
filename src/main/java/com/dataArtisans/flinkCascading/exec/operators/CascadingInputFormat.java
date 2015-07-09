@@ -21,10 +21,12 @@ package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.CascadingException;
 import cascading.flow.FlowNode;
+import cascading.flow.FlowProcess;
 import cascading.flow.SliceCounters;
 import cascading.flow.StepCounters;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.stream.duct.DuctException;
+import cascading.flow.stream.element.ElementFlowProcess;
 import cascading.flow.stream.element.TrapHandler;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
@@ -70,7 +72,7 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 	private Tap tap;
 	private Hfs trap;
 
-	private transient FlinkFlowProcess flowProcess;
+	private transient FlowProcess flowProcess;
 	private transient TupleEntryIterator it;
 	private transient TrapHandler trapHandler;
 
@@ -120,12 +122,15 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 		rc.setTaskNum(1);
 
 		this.flowProcess = new FlinkFlowProcess(jobConf, rc);
+		tap.sourceConfInit(flowProcess, jobConf);
+
+		if( tap.hasConfigDef() ) {
+			this.flowProcess = new ElementFlowProcess(flowProcess, tap.getConfigDef());
+		}
 
 		this.trapHandler = new TrapHandler(flowProcess, this.tap, this.trap, "MyFunkyName"); // TODO set name
 
-		tap.sourceConfInit(flowProcess, jobConf);
 		this.mapredInputFormat = jobConf.getInputFormat();
-
 		if (this.mapredInputFormat instanceof JobConfigurable) {
 			((JobConfigurable) this.mapredInputFormat).configure(jobConf);
 		}

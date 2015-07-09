@@ -130,7 +130,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	public FlowProcess getFlowProcess() {
-		return new FlinkFlowProcess(getFlowSession(), new Configuration()); // TODO!!!
+		return new FlinkFlowProcess(getFlowSession(), getConfig()); // TODO!!!
 	}
 
 	@Override
