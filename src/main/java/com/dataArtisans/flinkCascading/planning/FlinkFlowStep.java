@@ -42,15 +42,14 @@ import cascading.pipe.joiner.Joiner;
 import cascading.tap.MultiSinkTap;
 import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
-import cascading.tap.hadoop.Hfs;
 import cascading.tap.local.FileTap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
 import com.dataArtisans.flinkCascading.exec.operators.FileTapOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
-import com.dataArtisans.flinkCascading.exec.operators.HfsInputFormat;
-import com.dataArtisans.flinkCascading.exec.operators.HfsOutputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.CascadingInputFormat;
+import com.dataArtisans.flinkCascading.exec.operators.CascadingOutputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.IdMapper;
 import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
@@ -184,7 +183,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					sinks.size() == 1 &&
 					allOfType(sinks, Boundary.class)) {
 
-				DataSet<Tuple> sourceFlow = translateSource(node, env);
+				Tap sourceTap = (Tap)getSingle(sources);
+
+				DataSet<Tuple> sourceFlow = translateSource(node, sourceTap, env);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(sourceFlow));
 				}
@@ -195,8 +196,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					sinks.size() == 1 &&
 					allOfType(sinks, Tap.class)) {
 
+				Tap sinkTap = (Tap)getSingle(sinks);
+
 				DataSet<Tuple> input = flinkMemo.get(getSingle(sources)).get(0);
-				translateSink(input, node);
+				translateSink(input, sinkTap, node);
 			}
 			// SPLIT or EMPTY NODE (Single boundary source, one or more boundary sinks & no intermediate nodes)
 			else if (sources.size() == 1 &&
@@ -218,7 +221,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sinks, GroupBy.class) &&
 					inner.size() == 0) {
 
-				GroupBy groupBy = (GroupBy)sinks.iterator().next();
+				GroupBy groupBy = (GroupBy)getSingle(sinks);
 
 				// register input of groupBy
 				List<DataSet<Tuple>> groupByInputs = new ArrayList<DataSet<Tuple>>(sources.size());
@@ -245,7 +248,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sinks, CoGroup.class) &&
 					inner.size() == 0) {
 
-				CoGroup coGroup = (CoGroup)sinks.iterator().next();
+				CoGroup coGroup = (CoGroup)getSingle(sinks);
 
 				// register input of CoGroup
 				List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(sources.size());
@@ -287,12 +290,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			else if(sources.size() > 0 &&
 					allOfType(sources, Boundary.class) &&
 					sinks.size() == 1 &&
-					sinks.iterator().next() instanceof Boundary &&
+					allOfType(sinks, Boundary.class) &&
 					inner.size() == 1 &&
-					inner.iterator().next() instanceof HashJoin
+					allOfType(inner, HashJoin.class)
 					) {
 
-				HashJoin join = (HashJoin)inner.iterator().next();
+				HashJoin join = (HashJoin)getSingle(inner);
 
 				List<DataSet<Tuple>> joinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
 				for(FlowElement e : getNodeInputsInOrder(node, join)) {
@@ -321,49 +324,38 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 	}
 
-	private DataSet<Tuple> translateSource(FlowNode node, ExecutionEnvironment env) {
-
-		FlowElement source = getSource(node);
+	private DataSet<Tuple> translateSource(FlowNode node, Tap tap, ExecutionEnvironment env) {
 
 		// add data source to Flink program
-		if(source instanceof Hfs) {
-			return this.translateHfsTapSource((Hfs)source, node, env);
-		}
-		else if(source instanceof MultiSourceTap) {
-			return this.translateMultiSourceTap((MultiSourceTap)source, node, env);
+		if(tap instanceof MultiSourceTap) {
+			return this.translateMultiSourceTap((MultiSourceTap)tap, node, env);
 		}
 		else {
-			throw new RuntimeException("Unsupported tap type encountered"); // TODO
+			return this.translateSingleSourceTap(tap, node, env);
 		}
 
 	}
 
-	private DataSet<Tuple> translateHfsTapSource(Hfs hfsTap, FlowNode node, ExecutionEnvironment env) {
+	private DataSet<Tuple> translateSingleSourceTap(Tap tap, FlowNode node, ExecutionEnvironment env) {
 
 		DataSet<Tuple> src = env
-				.createInput(new HfsInputFormat(hfsTap, node), new TupleTypeInfo(hfsTap.getSourceFields()))
-				.name(hfsTap.getIdentifier())
+				.createInput(new CascadingInputFormat(tap, node), new TupleTypeInfo(tap.getSourceFields()))
+				.name(tap.getIdentifier())
 				.withParameters(getFlinkConfig());
 
 		return src;
 
 	}
 
-	private DataSet<Tuple> translateMultiSourceTap(MultiSourceTap tap, FlowNode node, ExecutionEnvironment env) {
+	private DataSet<Tuple> translateMultiSourceTap(MultiSourceTap multiTap, FlowNode node, ExecutionEnvironment env) {
 
-		Iterator<Tap> childTaps = ((MultiSourceTap)tap).getChildTaps();
+		Iterator<Tap> childTaps = multiTap.getChildTaps();
 
-		DataSet cur = null;
+		DataSet<Tuple> cur = null;
 		while(childTaps.hasNext()) {
-			Tap childTap = childTaps.next();
-			DataSet source;
 
-			if(childTap instanceof Hfs) {
-				source = translateHfsTapSource((Hfs)childTap, node, env);
-			}
-			else {
-				throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
-			}
+			Tap childTap = childTaps.next();
+			DataSet<Tuple> source = translateSource(node, childTap, env);
 
 			if(cur == null) {
 				cur = source;
@@ -376,31 +368,20 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return cur;
 	}
 
-	private void translateSink(DataSet<Tuple> input, FlowNode node) {
+	private void translateSink(DataSet<Tuple> input, Tap sinkTap, FlowNode node) {
 
-		FlowElement sink = getSink(node);
-
-		if(!(sink instanceof Tap)) {
-			throw new IllegalArgumentException("FlowNode is not a sink");
-		}
-
-		Tap sinkTap = (Tap)sink;
-
-		if(sinkTap instanceof Hfs) {
-			translateHfsTapSink(input, (Hfs) sinkTap, node);
-		}
-		else if(sinkTap instanceof MultiSinkTap) {
+		if(sinkTap instanceof MultiSinkTap) {
 			translateMultiSinkTap(input, (MultiSinkTap) sinkTap, node);
 		}
 		else {
-			throw new UnsupportedOperationException("Only HFS taps as sinks suppported right now.");
+			translateSingleTapSink(input, sinkTap, node);
 		}
 
 	}
 
-	private void translateHfsTapSink(DataSet<Tuple> input, Hfs hfs, FlowNode node) {
+	private void translateSingleTapSink(DataSet<Tuple> input, Tap tap, FlowNode node) {
 
-		Fields tapFields = hfs.getSinkFields();
+		Fields tapFields = tap.getSinkFields();
 		// check that no projection is necessary
 		if(!tapFields.isAll()) {
 
@@ -417,7 +398,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 
 		input
-				.output(new HfsOutputFormat(hfs, hfs.getSinkFields(), node))
+				.output(new CascadingOutputFormat(tap, tap.getSinkFields(), node))
 				.withParameters(getFlinkConfig());
 	}
 
@@ -428,12 +409,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		while(childTaps.hasNext()) {
 			Tap childTap = childTaps.next();
 
-			if(childTap instanceof Hfs) {
-				translateHfsTapSink(input, (Hfs) childTap, node);
-			}
-			else {
-				throw new RuntimeException("Tap type "+tap.getClass().getCanonicalName()+" not supported yet.");
-			}
+			translateSink(input, childTap, node);
 		}
 	}
 

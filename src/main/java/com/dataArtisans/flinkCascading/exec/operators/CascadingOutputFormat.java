@@ -20,10 +20,10 @@ package com.dataArtisans.flinkCascading.exec.operators;
 
 import cascading.CascadingException;
 import cascading.flow.FlowNode;
-import cascading.flow.hadoop.HadoopFlowProcess;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.stream.duct.DuctException;
 import cascading.flow.stream.element.TrapHandler;
+import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
@@ -34,16 +34,17 @@ import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.configuration.Configuration;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.OutputCollector;
 
 import java.io.IOException;
 
-public class HfsOutputFormat implements OutputFormat<Tuple> {
+public class CascadingOutputFormat implements OutputFormat<Tuple> {
 
 	private static final long serialVersionUID = 1L;
 
 	private FlowNode node;
 
-	private Hfs hfsTap;
+	private Tap<org.apache.hadoop.conf.Configuration, ?, OutputCollector> tap;
 	private Fields tapFields;
 	private Hfs trap;
 
@@ -51,15 +52,15 @@ public class HfsOutputFormat implements OutputFormat<Tuple> {
 	private transient TupleEntryCollector tupleEntryCollector;
 	private transient TrapHandler trapHandler;
 
-	private transient JobConf jobConf;
+	private transient JobConf config;
 
 
-	public HfsOutputFormat(Hfs hfs, Fields tapFields, FlowNode node) {
+	public CascadingOutputFormat(Tap<org.apache.hadoop.conf.Configuration, ?, OutputCollector> tap, Fields tapFields, FlowNode node) {
 		super();
 
 		this.node = node;
 
-		this.hfsTap = hfs;
+		this.tap = tap;
 		this.tapFields = tapFields;
 
 		// check if there is at most one trap
@@ -85,17 +86,7 @@ public class HfsOutputFormat implements OutputFormat<Tuple> {
 	@Override
 	public void configure(Configuration parameters) {
 		// do nothing
-
-		this.jobConf = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(parameters));
-
-		FakeRuntimeContext rc = new FakeRuntimeContext();
-		rc.setName("Sink-"+this.node.getID());
-		rc.setTaskNum(1);
-
-		this.flowProcess = new FlinkFlowProcess(jobConf, rc);
-
-		this.trapHandler = new TrapHandler(flowProcess, this.hfsTap, this.trap, "MyFunkyName"); // TODO set name
-
+		this.config = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(parameters));
 	}
 
 	/**
@@ -107,13 +98,20 @@ public class HfsOutputFormat implements OutputFormat<Tuple> {
 	@Override
 	public void open(int taskNumber, int numTasks) throws IOException {
 
-		this.jobConf.setInt("mapred.task.partition", taskNumber + 1);
-		this.jobConf.setNumMapTasks(numTasks);
+		this.config.setInt("mapred.task.partition", taskNumber + 1);
+		this.config.setNumMapTasks(numTasks);
 
-		HadoopFlowProcess hfp = new HadoopFlowProcess(jobConf);
+		FakeRuntimeContext rc = new FakeRuntimeContext();
+		rc.setName("Sink-"+this.node.getID());
+		rc.setTaskNum(1);
 
-		this.tupleEntryCollector = this.hfsTap.openForWrite(hfp, null);
-		if( this.hfsTap.getSinkFields().isAll() )
+		this.flowProcess = new FlinkFlowProcess(config, rc);
+		tap.sinkConfInit(this.flowProcess, this.config);
+
+		this.trapHandler = new TrapHandler(flowProcess, this.tap, this.trap, "MyFunkyName"); // TODO set name
+
+		this.tupleEntryCollector = this.tap.openForWrite(flowProcess, null);
+		if( this.tap.getSinkFields().isAll() )
 		{
 			this.tupleEntryCollector.setFields(tapFields);
 		}

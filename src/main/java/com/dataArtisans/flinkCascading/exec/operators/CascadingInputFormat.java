@@ -26,7 +26,9 @@ import cascading.flow.StepCounters;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.stream.duct.DuctException;
 import cascading.flow.stream.element.TrapHandler;
+import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
+import cascading.tap.hadoop.io.MultiInputSplit;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.TupleEntryIterator;
 import cascading.tuple.Tuple;
@@ -48,6 +50,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobConfigurable;
 import org.apache.hadoop.mapred.RecordReader;
@@ -57,14 +60,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 
-public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
+public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger LOG = LoggerFactory.getLogger(HadoopInputFormatBase.class);
 
 	private FlowNode node;
-	private Hfs hfs;
+	private Tap tap;
 	private Hfs trap;
 
 	private transient FlinkFlowProcess flowProcess;
@@ -78,11 +81,11 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	private transient boolean hasNext;
 	private transient Tuple next;
 
-	public HfsInputFormat(Hfs tap, FlowNode node) {
+	public CascadingInputFormat(Tap tap, FlowNode node) {
 		super();
 
 		this.node = node;
-		this.hfs = tap;
+		this.tap = tap;
 
 		// check if there is at most one trap
 		if(node.getTraps().size() > 1) {
@@ -109,21 +112,7 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	@Override
 	public void configure(Configuration parameters) {
 
-		// get Hadoop mapReduce InputFormat
-//		org.apache.hadoop.conf.Configuration conf = ffp.getConfigCopy();
-
-		// prevent collisions of configuration properties set client side if now cluster side
-//		String property = ffp.getStringProperty( "cascading.node.accumulated.source.conf." + Tap.id(hfsTap) );
-//
-//		if( property == null )
-//		{
-//			// default behavior is to accumulate paths, so remove any set prior
-//			conf = HadoopUtil.removePropertiesFrom(conf, "mapred.input.dir", "mapreduce.input.fileinputformat.inputdir"); // hadoop2
-//			hfsTap.sourceConfInit( ffp, conf );
-//		}
-
 		this.jobConf = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(parameters));
-		jobConf.set("mapreduce.input.fileinputformat.inputdir", hfs.getPath().toString());
 
 		// TODO: make RuntimeContext available in InputFormats (and OutputFormats)
 		FakeRuntimeContext rc = new FakeRuntimeContext();
@@ -132,8 +121,9 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
 		this.flowProcess = new FlinkFlowProcess(jobConf, rc);
 
-		this.trapHandler = new TrapHandler(flowProcess, this.hfs, this.trap, "MyFunkyName"); // TODO set name
+		this.trapHandler = new TrapHandler(flowProcess, this.tap, this.trap, "MyFunkyName"); // TODO set name
 
+		tap.sourceConfInit(flowProcess, jobConf);
 		this.mapredInputFormat = jobConf.getInputFormat();
 
 		if (this.mapredInputFormat instanceof JobConfigurable) {
@@ -191,13 +181,19 @@ public class HfsInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
 	@Override
 	public void open(HadoopInputSplit split) throws IOException {
+
+		org.apache.hadoop.fs.Path path = ( (FileSplit) split.getHadoopInputSplit() ).getPath();
+		if( path != null ) {
+			jobConf.set(MultiInputSplit.CASCADING_SOURCE_PATH, path.toString());
+		}
+
 		RecordReader<?, ?> recordReader = this.mapredInputFormat.getRecordReader(split.getHadoopInputSplit(), jobConf, new HadoopDummyReporter());
 
 		if (recordReader instanceof Configurable) {
 			((Configurable) recordReader).setConf(jobConf);
 		}
 
-		this.it = hfs.openForRead(this.flowProcess, recordReader);
+		this.it = tap.openForRead(this.flowProcess, recordReader);
 		this.fetched = false;
 	}
 
