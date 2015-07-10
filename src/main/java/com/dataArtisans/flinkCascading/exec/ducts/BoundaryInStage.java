@@ -84,5 +84,7 @@ public class BoundaryInStage extends ElementStage<Void, TupleEntry> implements I
 
 		}
 
+		next.complete(this);
+
 	}
 }

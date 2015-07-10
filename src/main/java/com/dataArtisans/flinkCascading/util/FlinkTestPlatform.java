@@ -21,7 +21,6 @@ package com.dataArtisans.flinkCascading.util;
 import cascading.flow.FlowConnector;
 import cascading.flow.FlowProcess;
 import cascading.platform.TestPlatform;
-import cascading.platform.hadoop.HadoopConfigDefScheme;
 import cascading.platform.hadoop.HadoopFailScheme;
 import cascading.platform.local.TestLongComparator;
 import cascading.platform.local.TestStringComparator;
@@ -146,8 +145,7 @@ public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
 	public Scheme getTestConfigDefScheme() {
-		return new HadoopConfigDefScheme( new Fields( "line" ), true );
-
+		return new FlinkConfigDefScheme( new Fields( "line" ));
 	}
 
 	@Override
