@@ -27,6 +27,7 @@ import com.dataArtisans.flinkCascading.exec.FlinkFlowProcess;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
+import riffle.process.ProcessConfiguration;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -104,6 +105,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 		return config;
 	}
 
+	@ProcessConfiguration
 	@Override
 	public Configuration getConfigCopy() {
 		return HadoopUtil.copyJobConf(getConfig());
