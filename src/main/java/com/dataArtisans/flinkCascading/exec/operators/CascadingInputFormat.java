@@ -30,7 +30,6 @@ import cascading.flow.stream.element.ElementFlowProcess;
 import cascading.flow.stream.element.TrapHandler;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
-import cascading.tap.hadoop.io.MultiInputSplit;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.TupleEntryIterator;
 import cascading.tuple.Tuple;
@@ -52,7 +51,6 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.FileInputFormat;
-import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobConfigurable;
 import org.apache.hadoop.mapred.RecordReader;
@@ -122,7 +120,6 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 		rc.setTaskNum(1);
 
 		this.flowProcess = new FlinkFlowProcess(jobConf, rc);
-		tap.sourceConfInit(flowProcess, jobConf);
 
 		if( tap.hasConfigDef() ) {
 			this.flowProcess = new ElementFlowProcess(flowProcess, tap.getConfigDef());
@@ -186,11 +183,6 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 
 	@Override
 	public void open(HadoopInputSplit split) throws IOException {
-
-		org.apache.hadoop.fs.Path path = ( (FileSplit) split.getHadoopInputSplit() ).getPath();
-		if( path != null ) {
-			jobConf.set(MultiInputSplit.CASCADING_SOURCE_PATH, path.toString());
-		}
 
 		RecordReader<?, ?> recordReader = this.mapredInputFormat.getRecordReader(split.getHadoopInputSplit(), jobConf, new HadoopDummyReporter());
 

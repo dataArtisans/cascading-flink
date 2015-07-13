@@ -27,7 +27,10 @@ import org.apache.flink.api.common.accumulators.LongCounter;
 import org.apache.flink.api.common.cache.DistributedCache;
 import org.apache.flink.api.common.functions.BroadcastVariableInitializer;
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.api.common.state.OperatorState;
+import org.apache.flink.api.common.state.StateCheckpointer;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
@@ -118,6 +121,16 @@ public class FakeRuntimeContext implements RuntimeContext {
 
 	@Override
 	public DistributedCache getDistributedCache() {
+		return null;
+	}
+
+	@Override
+	public <S, C extends Serializable> OperatorState<S> getOperatorState(String s, S s1, boolean b, StateCheckpointer<S, C> stateCheckpointer) throws IOException {
+		return null;
+	}
+
+	@Override
+	public <S extends Serializable> OperatorState<S> getOperatorState(String s, S s1, boolean b) throws IOException {
 		return null;
 	}
 }

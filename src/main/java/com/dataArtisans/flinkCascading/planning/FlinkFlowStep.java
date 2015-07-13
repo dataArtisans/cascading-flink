@@ -38,10 +38,8 @@ import cascading.pipe.HashJoin;
 import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.pipe.Splice;
-import cascading.pipe.joiner.InnerJoin;
-import cascading.pipe.joiner.Joiner;
-import cascading.tap.MultiSourceTap;
 import cascading.tap.Tap;
+import cascading.tap.hadoop.io.MultiInputFormat;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.operators.CascadingOutputFormat;
@@ -50,13 +48,11 @@ import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
 import com.dataArtisans.flinkCascading.exec.operators.CascadingInputFormat;
 import com.dataArtisans.flinkCascading.exec.operators.IdMapper;
 import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
-import com.dataArtisans.flinkCascading.exec.operators.InnerJoiner;
 import com.dataArtisans.flinkCascading.exec.operators.Reducer;
 import com.dataArtisans.flinkCascading.exec.operators.Mapper;
 import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.operators.Order;
-import org.apache.flink.api.common.operators.base.JoinOperatorBase;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
@@ -182,9 +178,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					sinks.size() == 1 &&
 					allOfType(sinks, Boundary.class)) {
 
-				Tap sourceTap = (Tap)getSingle(sources);
-
-				DataSet<Tuple> sourceFlow = translateSource(node, sourceTap, env);
+				DataSet<Tuple> sourceFlow = translateSource(flowProcess, env, node);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(sourceFlow));
 				}
@@ -196,7 +190,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sinks, Tap.class)) {
 
 				DataSet<Tuple> input = flinkMemo.get(getSingle(sources)).get(0);
-				translateSink(input, node);
+				translateSink(flowProcess, input, node);
 			}
 			// SPLIT or EMPTY NODE (Single boundary source, one or more boundary sinks & no intermediate nodes)
 			else if (sources.size() == 1 &&
@@ -321,55 +315,34 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 	}
 
-	private DataSet<Tuple> translateSource(FlowNode node, Tap tap, ExecutionEnvironment env) {
+	private DataSet<Tuple> translateSource(FlowProcess flowProcess, ExecutionEnvironment env, FlowNode node) {
 
-		// add data source to Flink program
-		if(tap instanceof MultiSourceTap) {
-			return this.translateMultiSourceTap((MultiSourceTap)tap, node, env);
-		}
-		else {
-			return this.translateSingleSourceTap(tap, node, env);
-		}
+		Tap tap = this.getSingle(node.getSourceTaps());
+		JobConf tapConfig = new JobConf(this.getNodeConfig(node));
+		tap.sourceConfInit(flowProcess, tapConfig);
+		tapConfig.set( "cascading.step.source", Tap.id( tap ) );
 
-	}
-
-	private DataSet<Tuple> translateSingleSourceTap(Tap tap, FlowNode node, ExecutionEnvironment env) {
+		JobConf sourceConfig = new JobConf(this.getNodeConfig(node));
+		MultiInputFormat.addInputFormat(sourceConfig, tapConfig);
 
 		DataSet<Tuple> src = env
 				.createInput(new CascadingInputFormat(tap, node), new TupleTypeInfo(tap.getSourceFields()))
 				.name(tap.getIdentifier())
-				.withParameters(this.getFlinkNodeConfig(node));
+				.withParameters(FlinkConfigConverter.toFlinkConfig(new Configuration(sourceConfig)));
 
 		return src;
 
 	}
 
-	private DataSet<Tuple> translateMultiSourceTap(MultiSourceTap multiTap, FlowNode node, ExecutionEnvironment env) {
+	private void translateSink(FlowProcess flowProcess, DataSet<Tuple> input, FlowNode node) {
 
-		Iterator<Tap> childTaps = multiTap.getChildTaps();
-
-		DataSet<Tuple> cur = null;
-		while(childTaps.hasNext()) {
-
-			Tap childTap = childTaps.next();
-			DataSet<Tuple> source = translateSource(node, childTap, env);
-
-			if(cur == null) {
-				cur = source;
-			}
-			else {
-				cur = cur.union(source);
-			}
-		}
-
-		return cur;
-	}
-
-	private void translateSink(DataSet<Tuple> input, FlowNode node) {
+		Tap tap = this.getSingle(node.getSinkTaps());
+		Configuration sinkConfig = this.getNodeConfig(node);
+		tap.sinkConfInit(flowProcess, sinkConfig);
 
 		input
 				.output(new CascadingOutputFormat(node))
-				.withParameters(this.getFlinkNodeConfig(node));
+				.withParameters(FlinkConfigConverter.toFlinkConfig(sinkConfig));
 
 	}
 
@@ -617,6 +590,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
+	/*
 	private DataSet<Tuple> translateInnerCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
 
 		CoGroup coGroup = (CoGroup) node.getSourceElements().iterator().next();
@@ -677,6 +651,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return joined;
 
 	}
+	*/
 
 	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node) {
 
