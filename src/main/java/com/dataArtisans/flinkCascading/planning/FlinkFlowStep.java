@@ -42,14 +42,14 @@ import cascading.tap.Tap;
 import cascading.tap.hadoop.io.MultiInputFormat;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.operators.CascadingOutputFormat;
-import com.dataArtisans.flinkCascading.exec.operators.CoGroupReducer;
-import com.dataArtisans.flinkCascading.exec.operators.HashJoinMapper;
-import com.dataArtisans.flinkCascading.exec.operators.CascadingInputFormat;
-import com.dataArtisans.flinkCascading.exec.operators.IdMapper;
-import com.dataArtisans.flinkCascading.exec.operators.ReducerJoinKeyExtractor;
-import com.dataArtisans.flinkCascading.exec.operators.Reducer;
-import com.dataArtisans.flinkCascading.exec.operators.Mapper;
+import com.dataArtisans.flinkCascading.exec.mapper.Mapper;
+import com.dataArtisans.flinkCascading.exec.sink.CascadingOutputFormat;
+import com.dataArtisans.flinkCascading.exec.coGroup.CoGroupReducer;
+import com.dataArtisans.flinkCascading.exec.hashJoin.HashJoinMapper;
+import com.dataArtisans.flinkCascading.exec.source.CascadingInputFormat;
+import com.dataArtisans.flinkCascading.exec.hashJoin.IdMapper;
+import com.dataArtisans.flinkCascading.exec.coGroup.ReducerJoinKeyExtractor;
+import com.dataArtisans.flinkCascading.exec.reducer.Reducer;
 import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.operators.Order;
@@ -326,7 +326,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		MultiInputFormat.addInputFormat(sourceConfig, tapConfig);
 
 		DataSet<Tuple> src = env
-				.createInput(new CascadingInputFormat(tap, node), new TupleTypeInfo(tap.getSourceFields()))
+				.createInput(new CascadingInputFormat(node), new TupleTypeInfo(tap.getSourceFields()))
 				.name(tap.getIdentifier())
 				.withParameters(FlinkConfigConverter.toFlinkConfig(new Configuration(sourceConfig)));
 
