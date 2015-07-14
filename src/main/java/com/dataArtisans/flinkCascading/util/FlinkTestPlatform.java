@@ -170,6 +170,6 @@ public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
 	public boolean isDAG() {
-		return false;
+		return true;
 	}
 }
