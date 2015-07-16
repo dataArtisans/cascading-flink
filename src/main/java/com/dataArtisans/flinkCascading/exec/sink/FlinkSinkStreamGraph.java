@@ -61,7 +61,6 @@ public class FlinkSinkStreamGraph extends NodeStreamGraph {
 		return sourceStage;
 	}
 
-
 	@Override
 	protected Duct createBoundaryStage( Boundary boundary, IORole role ) {
 

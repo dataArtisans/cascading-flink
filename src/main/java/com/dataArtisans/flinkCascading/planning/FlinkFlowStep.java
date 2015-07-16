@@ -50,6 +50,7 @@ import com.dataArtisans.flinkCascading.exec.source.CascadingInputFormat;
 import com.dataArtisans.flinkCascading.exec.hashJoin.IdMapper;
 import com.dataArtisans.flinkCascading.exec.coGroup.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.reducer.Reducer;
+import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.operators.Order;
@@ -58,6 +59,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.MapPartitionOperator;
+import org.apache.flink.api.java.operators.Operator;
 import org.apache.flink.api.java.operators.SortPartitionOperator;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -88,6 +90,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	public Configuration createInitializedConfig( FlowProcess<Configuration> flowProcess, Configuration parentConfig ) {
 
 		Configuration config = parentConfig == null ? new JobConf() : HadoopUtil.copyJobConf( parentConfig );
+		HadoopUtil.setIsInflow(config);
+
 		this.setConfig(config);
 
 		return config;
@@ -159,6 +163,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		printFlowStep();
 
+		int numMappers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.mappers"));
+		int numReducers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.reducers"));
+
+		numMappers = (numMappers > 0) ? numMappers : env.getParallelism();
+		numReducers = (numReducers > 0) ? numReducers : env.getParallelism();
+
 		FlowNodeGraph flowNodeGraph = getFlowNodeGraph();
 		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator(); // TODO: topologicalIterator is non-deterministically broken!!!
 
@@ -178,7 +188,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					sinks.size() == 1 &&
 					allOfType(sinks, Boundary.class)) {
 
-				DataSet<Tuple> sourceFlow = translateSource(flowProcess, env, node);
+				DataSet<Tuple> sourceFlow = translateSource(flowProcess, env, node, numMappers);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(sourceFlow));
 				}
@@ -227,7 +237,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sources, GroupBy.class)) {
 
 				List<DataSet<Tuple>> inputs = flinkMemo.get(getSingle(sources));
-				DataSet<Tuple> grouped = translateReduce(inputs, node);
+				DataSet<Tuple> grouped = translateReduce(inputs, node, numReducers);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(grouped));
 				}
@@ -254,7 +264,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sources, CoGroup.class)) {
 
 				List<DataSet<Tuple>> inputs = flinkMemo.get(getSingle(sources));
-				DataSet<Tuple> coGrouped = translateCoGroup(inputs, node);
+				DataSet<Tuple> coGrouped = translateCoGroup(inputs, node, numReducers);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(coGrouped));
 				}
@@ -293,7 +303,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					joinInputs.add(flinkMemo.get(e).get(0));
 				}
 
-				DataSet<Tuple> joined = translateHashJoin(joinInputs, node);
+				DataSet<Tuple> joined = translateHashJoin(joinInputs, node, numMappers);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(joined));
 				}
@@ -304,7 +314,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sources, Boundary.class)) {
 
 				DataSet<Tuple> input = flinkMemo.get(getSingle(sources)).get(0);
-				DataSet<Tuple> mapped = translateMap(input, node);
+				DataSet<Tuple> mapped = translateMap(input, node, numMappers);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, Collections.singletonList(mapped));
 				}
@@ -315,7 +325,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 	}
 
-	private DataSet<Tuple> translateSource(FlowProcess flowProcess, ExecutionEnvironment env, FlowNode node) {
+	private DataSet<Tuple> translateSource(FlowProcess flowProcess, ExecutionEnvironment env, FlowNode node, int dop) {
 
 		Tap tap = this.getSingle(node.getSourceTaps());
 		JobConf tapConfig = new JobConf(this.getNodeConfig(node));
@@ -328,6 +338,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		DataSet<Tuple> src = env
 				.createInput(new CascadingInputFormat(node), new TupleTypeInfo(tap.getSourceFields()))
 				.name(tap.getIdentifier())
+				.setParallelism(dop)
 				.withParameters(FlinkConfigConverter.toFlinkConfig(new Configuration(sourceConfig)));
 
 		return src;
@@ -340,14 +351,18 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Configuration sinkConfig = this.getNodeConfig(node);
 		tap.sinkConfInit(flowProcess, sinkConfig);
 
+		int parallelism = ((Operator)input).getParallelism();
+
 		input
 				.output(new CascadingOutputFormat(node))
+				.name(tap.getIdentifier())
+				.setParallelism(parallelism)
 				.withParameters(FlinkConfigConverter.toFlinkConfig(sinkConfig));
 
 	}
 
 
-	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node) {
+	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node, int dop) {
 
 		Scope outScope = getFirstOutScope(node);
 
@@ -355,11 +370,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.mapPartition(new Mapper(node))
 				.returns(new TupleTypeInfo(outScope.getOutValuesFields()))
 				.withParameters(this.getFlinkNodeConfig(node))
-				.name("map-"+node.getID());
+				.setParallelism(dop)
+				.name("map-" + node.getID());
 
 	}
 
-	private DataSet<Tuple> translateReduce(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translateReduce(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		GroupBy groupBy = (GroupBy) node.getSourceElements().iterator().next();
 
@@ -412,14 +428,17 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		if(groupKeys != null && groupKeys.length > 0) {
 			// hash partition
 			result = result
-					.partitionByHash(groupKeys);
+					.partitionByHash(groupKeys)
+					.setParallelism(dop);
 
 			// sort on grouping keys
 			result = result
-					.sortPartition(groupKeys[0], sortOrder);
+					.sortPartition(groupKeys[0], sortOrder)
+					.setParallelism(dop);
 			for(int i=1; i<groupKeys.length; i++) {
 				result = result
-						.sortPartition(groupKeys[i], sortOrder);
+						.sortPartition(groupKeys[i], sortOrder)
+						.setParallelism(dop);
 			}
 		}
 
@@ -427,10 +446,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		if(sortKeys != null && sortKeys.length > 0) {
 
 			result = result
-					.sortPartition(sortKeys[0], sortOrder);
+					.sortPartition(sortKeys[0], sortOrder)
+					.setParallelism(dop);
 			for(int i=1; i<sortKeys.length; i++) {
 				result = result
-						.sortPartition(sortKeys[i], sortOrder);
+						.sortPartition(sortKeys[i], sortOrder)
+						.setParallelism(dop);
 			}
 		}
 
@@ -442,6 +463,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.reduceGroup(new Reducer(node))
 					.returns(new TupleTypeInfo(outFields))
 					.withParameters(this.getFlinkNodeConfig(node))
+					.setParallelism(dop)
 					.name("reduce-" + node.getID());
 
 		}
@@ -457,6 +479,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.reduceGroup(new Reducer(node))
 					.returns(new TupleTypeInfo(outFields))
 					.withParameters(this.getFlinkNodeConfig(node))
+					.setParallelism(dop)
 					.name("reduce-"+ node.getID());
 		}
 
@@ -467,7 +490,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		DataSet<Tuple> unioned = null;
 		TypeInformation<Tuple> type = null;
 
+		int maxDop = -1;
+
 		for(DataSet<Tuple> input : inputs) {
+			maxDop = Math.max(maxDop, ((Operator)input).getParallelism());
 			if(unioned == null) {
 				unioned = input;
 				type = input.getType();
@@ -477,15 +503,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 		}
 		return unioned.mapPartition(new IdMapper())
-				.returns(type);
+				.returns(type)
+				.setParallelism(maxDop);
 
 	}
 
-	private DataSet<Tuple> translateCoGroup(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translateCoGroup(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		CoGroup coGroup = (CoGroup)node.getSourceElements().iterator().next();
 
-		return translateCoGroupAsReduce(inputs, node);
+		return translateCoGroupAsReduce(inputs, node, dop);
 		/*
 
 		Joiner joiner = coGroup.getJoiner();
@@ -521,7 +548,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		*/
 	}
 
-	private DataSet<Tuple> translateCoGroupAsReduce(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translateCoGroupAsReduce(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		CoGroup coGroup = (CoGroup) node.getSourceElements().iterator().next();
 
@@ -585,6 +612,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.sortGroup(1, Order.DESCENDING)
 				.reduceGroup(new CoGroupReducer(node))
 				.withParameters(this.getFlinkNodeConfig(node))
+				.setParallelism(dop)
 				.returns(new TupleTypeInfo(outFields))
 				.name("coGroup-" + node.getID());
 
@@ -653,14 +681,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	}
 	*/
 
-	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		// TODO: add proper HashJoin implementation!
-		return translatHashJoinAsMap(inputs, node);
+		return translatHashJoinAsMap(inputs, node, dop);
 
 	}
 
-	private DataSet<Tuple> translatHashJoinAsMap(List<DataSet<Tuple>> inputs, FlowNode node) {
+	private DataSet<Tuple> translatHashJoinAsMap(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		Set<FlowElement> innerElements = getInnerElements(node);
 		if(innerElements.size() != 1 && !(innerElements.iterator().next() instanceof HashJoin)) {
@@ -687,7 +715,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		MapPartitionOperator<Tuple, Tuple> joined = inputs.get(0)
 				.mapPartition(new HashJoinMapper(node, inputIds))
-				.withParameters(this.getFlinkNodeConfig(node));
+				.withParameters(this.getFlinkNodeConfig(node))
+				.setParallelism(dop);
 		for(int i=1; i<inputs.size(); i++) {
 			joined.withBroadcastSet(inputs.get(i), inputIds[i]);
 		}

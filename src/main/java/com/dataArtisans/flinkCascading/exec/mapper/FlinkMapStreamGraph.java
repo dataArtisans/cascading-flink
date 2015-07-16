@@ -19,7 +19,6 @@
 package com.dataArtisans.flinkCascading.exec.mapper;
 
 import cascading.flow.FlowNode;
-import cascading.flow.FlowProcess;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.duct.Gate;
 import cascading.flow.stream.graph.IORole;

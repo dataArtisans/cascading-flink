@@ -22,6 +22,7 @@ import cascading.CascadingException;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
+import cascading.flow.SliceCounters;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.Boundary;
@@ -66,7 +67,8 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext());
+			String taskId = "map-" + flowNode.getID();
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {
@@ -116,7 +118,7 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		long processBeginTime = System.currentTimeMillis();
 
-//		currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
+		currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
 
 		try {
 			try {
@@ -150,8 +152,8 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 			{
 				long processEndTime = System.currentTimeMillis();
 
-//				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
-//				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
+				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
+				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
 			}
 		}
 

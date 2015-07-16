@@ -44,8 +44,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	private transient RuntimeContext runtimeContext;
 	private Configuration conf;
-	private int numTasks = -1;
-	private int taskId = -1;
+	private String taskId;
 
 	public FlinkFlowProcess() {}
 
@@ -58,40 +57,26 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 		this.conf = conf;
 	}
 
-	public FlinkFlowProcess(Configuration conf, RuntimeContext runtimeContext) {
+	public FlinkFlowProcess(Configuration conf, RuntimeContext runtimeContext, String taskId) {
 
 		this(conf);
 		this.runtimeContext = runtimeContext;
-		this.numTasks = runtimeContext.getNumberOfParallelSubtasks();
-		this.taskId = runtimeContext.getIndexOfThisSubtask();
-	}
-
-	public FlinkFlowProcess(Configuration conf, int numTasks, int taskId) {
-		this(conf);
-		this.numTasks = numTasks;
 		this.taskId = taskId;
-	}
-
-	public FlinkFlowProcess(Configuration conf, FlinkFlowProcess process) {
-		this(conf);
-		this.runtimeContext = process.runtimeContext;
-		this.numTasks = process.numTasks;
-		this.taskId = process.taskId;
 	}
 
 	@Override
 	public int getNumProcessSlices() {
-		return this.numTasks;
+		return this.runtimeContext.getNumberOfParallelSubtasks();
 	}
 
 	@Override
 	public int getCurrentSliceNum() {
-		return this.taskId;
+		return this.runtimeContext.getIndexOfThisSubtask();
 	}
 
 	@Override
 	public FlowProcess copyWith(Configuration config) {
-		return new FlinkFlowProcess(config, this);
+		return new FlinkFlowProcess(config, this.runtimeContext, this.taskId);
 	}
 
 	@Override
@@ -185,13 +170,11 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	@Override
 	public TupleEntryCollector openTrapForWrite(Tap trap) throws IOException {
 
-		// Hadoop (HDFS)
 		if (trap instanceof Hfs) {
 
-			JobConf jobConf = new JobConf();
+			JobConf jobConf = new JobConf(this.getConfigCopy());
 
-			String taskName = this.runtimeContext.getTaskName();
-			String partname = String.format("-%s-%05d-", taskName, this.getCurrentSliceNum());
+			String partname = String.format("-%s-%05d-", this.taskId, this.getCurrentSliceNum());
 			jobConf.set( "cascading.tapcollector.partname", "%s%spart" + partname + "%05d" );
 
 			return trap.openForWrite( new HadoopFlowProcess( jobConf ), null );

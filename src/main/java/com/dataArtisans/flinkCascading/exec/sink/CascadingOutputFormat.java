@@ -22,22 +22,29 @@ import cascading.CascadingException;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
+import cascading.flow.SliceCounters;
+import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.Boundary;
+import cascading.tap.Tap;
+import cascading.tap.hadoop.util.Hadoop18TapUtil;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.util.FakeRuntimeContext;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
+import org.apache.flink.api.common.io.FinalizeOnMaster;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.configuration.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.Set;
 
-public class CascadingOutputFormat implements OutputFormat<Tuple> {
+public class CascadingOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 	private static final long serialVersionUID = 1L;
 
@@ -45,10 +52,12 @@ public class CascadingOutputFormat implements OutputFormat<Tuple> {
 
 	private FlowNode node;
 
-	transient private org.apache.hadoop.conf.Configuration config;
-	transient private FlinkFlowProcess flowProcess;
-	transient private FlinkSinkStreamGraph streamGraph;
-	transient private SinkBoundaryInStage sourceStage;
+	private transient org.apache.hadoop.conf.Configuration config;
+	private transient FlinkFlowProcess flowProcess;
+	private transient FlinkSinkStreamGraph streamGraph;
+	private transient SinkBoundaryInStage sourceStage;
+
+	private transient long processBeginTime;
 
 	public CascadingOutputFormat(FlowNode node) {
 		super();
@@ -65,13 +74,21 @@ public class CascadingOutputFormat implements OutputFormat<Tuple> {
 	@Override
 	public void open(int taskNumber, int numTasks) throws IOException {
 
+		this.processBeginTime = System.currentTimeMillis();
+
 		FakeRuntimeContext rc = new FakeRuntimeContext();
-		rc.setName("Sink-"+this.node.getID());
-		rc.setTaskNum(1);
+		rc.setTaskNum(taskNumber);
+
+		String taskId = "datasink-" + node.getID();
+		BigInteger numId = new BigInteger(node.getID(), 16);
+		String hadoopTaskId = String.format( "attempt_%012d_0000_%s_%06d_0", numId.longValue(), "m", taskNumber );
+
+		this.config.setInt("mapred.task.partition", taskNumber);
+		this.config.set("mapred.task.id", hadoopTaskId);
 
 		try {
 
-			flowProcess = new FlinkFlowProcess(this.config, rc);
+			flowProcess = new FlinkFlowProcess(this.config, rc, taskId);
 
 			Set<FlowElement> sources = node.getSourceElements();
 			if(sources.size() != 1) {
@@ -140,9 +157,20 @@ public class CascadingOutputFormat implements OutputFormat<Tuple> {
 		finally {
 			long processEndTime = System.currentTimeMillis();
 
-//				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
-//				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
+			flowProcess.increment( SliceCounters.Process_End_Time, processEndTime );
+			flowProcess.increment( SliceCounters.Process_Duration, processEndTime - this.processBeginTime );
 		}
 	}
 
+	@Override
+	public void finalizeGlobal(int parallelism) throws IOException {
+
+		org.apache.hadoop.conf.Configuration config = HadoopUtil.copyConfiguration(this.config);
+		Tap tap = this.node.getSinkTaps().iterator().next();
+
+		config.setBoolean(HadoopUtil.CASCADING_FLOW_EXECUTING, false);
+		HadoopUtil.setOutputPath(config, new Path(tap.getIdentifier()));
+
+		Hadoop18TapUtil.cleanupJob( config );
+	}
 }

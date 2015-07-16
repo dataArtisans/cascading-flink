@@ -28,7 +28,6 @@ import cascading.flow.SliceCounters;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
-import cascading.flow.stream.element.SourceStage;
 import cascading.tap.Tap;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
@@ -110,12 +109,15 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 	@Override
 	public void open(HadoopInputSplit split) throws IOException {
 
+		this.jobConf = split.getJobConf();
+
 		// TODO get proper runtime context from DataSource
 		FakeRuntimeContext rc = new FakeRuntimeContext();
-		rc.setName("Source-"+this.node.getID());
 		rc.setTaskNum(split.getSplitNumber());
 
-		this.flowProcess = new FlinkFlowProcess(this.jobConf, rc);
+		String taskId = "datasource-" + node.getID();
+
+		this.flowProcess = new FlinkFlowProcess(this.jobConf, rc, taskId);
 
 		long processBeginTime = System.currentTimeMillis();
 
@@ -196,8 +198,9 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 			throw exception;
 		}
 		catch( Throwable throwable ) {
-			if( throwable instanceof CascadingException )
+			if( throwable instanceof CascadingException ) {
 				throw (CascadingException) throwable;
+			}
 
 			throw new FlowException( "internal error during mapper execution", throwable );
 		}

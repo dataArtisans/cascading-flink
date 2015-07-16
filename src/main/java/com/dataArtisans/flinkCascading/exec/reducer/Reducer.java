@@ -73,7 +73,9 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext());
+			String taskId = "reduce-" + flowNode.getID();
+
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {

@@ -50,7 +50,27 @@ import java.util.Properties;
 public class FlinkTestPlatform extends TestPlatform {
 
 	@Override
-	public void setUp() throws IOException { }
+	public void setUp() throws IOException {
+		if(!this.isUseCluster()) {
+			this.numMappers = 1;
+			this.numGatherPartitions = 1;
+		}
+	}
+
+	@Override
+	public void setNumMapTasks( Map<Object, Object> properties, int numMapTasks ) {
+		this.numMappers = numMapTasks;
+	}
+
+	@Override
+	public void setNumReduceTasks( Map<Object, Object> properties, int numReduceTasks ) {
+		this.numReducers = numReduceTasks;
+	}
+
+	@Override
+	public void setNumGatherPartitionTasks( Map<Object, Object> properties, int numReduceTasks ) {
+		this.numGatherPartitions = numReduceTasks;
+	}
 
 	@Override
 	public Map<Object, Object> getProperties() {
@@ -102,7 +122,9 @@ public class FlinkTestPlatform extends TestPlatform {
 	public FlowConnector getFlowConnector(Map<Object, Object> properties) {
 
 		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
-		env.setParallelism(1);
+
+		properties.put("flink.num.mappers", this.numMappers+"");
+		properties.put("flink.num.reducers", this.numGatherPartitions+"");
 
 		return new FlinkConnector(env, properties);
 	}
