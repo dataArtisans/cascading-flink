@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.util;
+package com.dataArtisans.flinkCascading.platform;
 
 import cascading.flow.FlowConnector;
 import cascading.flow.FlowProcess;
@@ -37,6 +37,7 @@ import cascading.tap.partition.Partition;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.FlinkConnector;
+import com.dataArtisans.flinkCascading.util.FlinkConfigDefScheme;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
