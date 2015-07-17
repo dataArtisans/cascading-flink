@@ -21,7 +21,6 @@ package com.dataArtisans.flinkCascading.exec.util;
 import cascading.CascadingException;
 import cascading.flow.FlowProcess;
 import cascading.flow.FlowSession;
-import cascading.flow.hadoop.HadoopFlowProcess;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
@@ -177,7 +176,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 			String partname = String.format("-%s-%05d-", this.taskId, this.getCurrentSliceNum());
 			jobConf.set( "cascading.tapcollector.partname", "%s%spart" + partname + "%05d" );
 
-			return trap.openForWrite( new HadoopFlowProcess( jobConf ), null );
+			return trap.openForWrite( new FlinkFlowProcess( jobConf ), null );
 		}
 		else {
 			throw new UnsupportedOperationException("Only Hfs taps are supported as traps");

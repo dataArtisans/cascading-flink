@@ -23,7 +23,6 @@ import cascading.flow.FlowElement;
 import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
 import cascading.flow.SliceCounters;
-import cascading.flow.hadoop.FlowMapper;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.GroupBy;
@@ -48,7 +47,7 @@ import static cascading.util.LogUtil.logMemory;
  */
 public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(FlowMapper.class);
+	private static final Logger LOG = LoggerFactory.getLogger(Reducer.class);
 
 	private FlowNode flowNode;
 

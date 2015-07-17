@@ -19,7 +19,6 @@
 package com.dataArtisans.flinkCascading.exec.coGroup;
 
 import cascading.flow.FlowProcess;
-import cascading.flow.hadoop.util.FalseCollection;
 import cascading.pipe.joiner.JoinerClosure;
 import cascading.provider.FactoryLoader;
 import cascading.tuple.Fields;
@@ -38,6 +37,7 @@ import org.apache.hadoop.io.compress.GzipCodec;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -393,6 +393,95 @@ public class FlinkCoGroupClosure extends JoinerClosure {
 
 			return flinkIterator.next().f2;
 		}
+	}
+
+	private static class FalseCollection implements Collection<Tuple> {
+
+		boolean returnedIterator = false;
+		Iterator<Tuple> iterator;
+
+		public void reset(Iterator<Tuple> iterator) {
+			this.returnedIterator = false;
+			this.iterator = iterator;
+		}
+
+		@Override
+		public int size() {
+			return 0;
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return iterator == null || !iterator.hasNext();
+		}
+
+		@Override
+		public boolean contains(Object o) {
+			return false;
+		}
+
+		@Override
+		public Iterator<Tuple> iterator() {
+			if (returnedIterator) {
+				throw new IllegalStateException("may not iterate this tuple stream more than once");
+			}
+
+			try {
+				if (iterator == null) {
+					return Collections.emptyIterator();
+				}
+
+				return iterator;
+			} finally {
+				returnedIterator = true;
+			}
+		}
+
+		@Override
+		public Object[] toArray() {
+			return new Object[0];
+		}
+
+		@Override
+		public <T> T[] toArray(T[] a) {
+			return null;
+		}
+
+		@Override
+		public boolean add(Tuple tuple) {
+			return false;
+		}
+
+		@Override
+		public boolean remove(Object o) {
+			return false;
+		}
+
+		@Override
+		public boolean containsAll(Collection<?> c) {
+			return false;
+		}
+
+		@Override
+		public boolean addAll(Collection<? extends Tuple> c) {
+			return false;
+		}
+
+		@Override
+		public boolean removeAll(Collection<?> c) {
+			return false;
+		}
+
+		@Override
+		public boolean retainAll(Collection<?> c) {
+			return false;
+		}
+
+		@Override
+		public void clear() {
+			iterator = null;
+		}
+
 	}
 
 }

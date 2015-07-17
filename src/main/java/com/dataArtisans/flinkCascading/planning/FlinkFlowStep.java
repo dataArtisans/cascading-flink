@@ -21,7 +21,6 @@ package com.dataArtisans.flinkCascading.planning;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowNode;
 import cascading.flow.FlowProcess;
-import cascading.flow.hadoop.ConfigurationSetter;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.BaseFlowStep;
 import cascading.flow.planner.FlowStepJob;
@@ -38,6 +37,7 @@ import cascading.pipe.HashJoin;
 import cascading.pipe.Merge;
 import cascading.pipe.Pipe;
 import cascading.pipe.Splice;
+import cascading.property.ConfigDef;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.io.MultiInputFormat;
 import cascading.tuple.Fields;
@@ -906,6 +906,49 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		this.initConfFromStepConfigDef(configSetter);
 
 		return nodeConfig;
+	}
+
+	private static class ConfigurationSetter implements ConfigDef.Setter
+	{
+		private final Configuration conf;
+
+		public ConfigurationSetter( Configuration conf )
+		{
+			this.conf = conf;
+		}
+
+		@Override
+		public String set( String key, String value ) {
+			String oldValue = get( key );
+			conf.set( key, value );
+
+			return oldValue;
+		}
+
+		@Override
+		public String update( String key, String value ) {
+			String oldValue = get( key );
+
+			if( oldValue == null ) {
+				conf.set(key, value);
+			}
+			else if( !oldValue.contains( value ) ) {
+				conf.set(key, oldValue + "," + value);
+			}
+
+			return oldValue;
+		}
+
+		@Override
+		public String get( String key ) {
+			String value = conf.get( key );
+
+			if( value == null || value.isEmpty() ) {
+				return null;
+			}
+
+			return value;
+		}
 	}
 
 }

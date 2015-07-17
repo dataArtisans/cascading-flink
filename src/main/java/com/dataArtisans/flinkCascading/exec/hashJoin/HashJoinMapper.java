@@ -22,7 +22,6 @@ import cascading.CascadingException;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
-import cascading.flow.hadoop.FlowMapper;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.Boundary;
@@ -41,7 +40,7 @@ import java.io.IOException;
 
 public class HashJoinMapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(FlowMapper.class);
+	private static final Logger LOG = LoggerFactory.getLogger(HashJoinMapper.class);
 
 	private FlowNode flowNode;
 	private String[] inputIds;
@@ -65,7 +64,8 @@ public class HashJoinMapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config));
+			String taskId = "hashJoin-" + flowNode.getID();
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), this.getRuntimeContext(), taskId);
 
 			FlowElement sourceElement = null;
 

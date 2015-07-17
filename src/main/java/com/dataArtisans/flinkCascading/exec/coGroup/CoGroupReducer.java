@@ -23,7 +23,6 @@ import cascading.flow.FlowElement;
 import cascading.flow.FlowException;
 import cascading.flow.FlowNode;
 import cascading.flow.SliceCounters;
-import cascading.flow.hadoop.FlowMapper;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.CoGroup;
@@ -44,7 +43,7 @@ import static cascading.util.LogUtil.logMemory;
 
 public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(FlowMapper.class);
+	private static final Logger LOG = LoggerFactory.getLogger(CoGroupReducer.class);
 
 	private FlowNode flowNode;
 
@@ -69,7 +68,8 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 
 		try {
 
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config));
+			String taskId = "coGroup-" + flowNode.getID();
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {
