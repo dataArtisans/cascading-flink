@@ -47,7 +47,7 @@ import com.dataArtisans.flinkCascading.exec.sink.CascadingOutputFormat;
 import com.dataArtisans.flinkCascading.exec.coGroup.CoGroupReducer;
 import com.dataArtisans.flinkCascading.exec.hashJoin.HashJoinMapper;
 import com.dataArtisans.flinkCascading.exec.source.CascadingInputFormat;
-import com.dataArtisans.flinkCascading.exec.hashJoin.IdMapper;
+import com.dataArtisans.flinkCascading.exec.util.IdMapper;
 import com.dataArtisans.flinkCascading.exec.coGroup.ReducerJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.exec.reducer.Reducer;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;

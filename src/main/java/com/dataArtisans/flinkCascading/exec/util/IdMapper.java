@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.hashJoin;
+package com.dataArtisans.flinkCascading.exec.util;
 
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
