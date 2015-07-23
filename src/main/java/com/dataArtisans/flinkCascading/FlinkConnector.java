@@ -56,10 +56,9 @@ public class FlinkConnector extends FlowConnector {
 	private ExecutionEnvironment env;
 
 
-	public FlinkConnector(ExecutionEnvironment env, Map<Object, Object> properties) {
+	public FlinkConnector(Map<Object, Object> properties) {
 		super(properties);
-
-		this.env = env;
+		this.env = ExecutionEnvironment.getExecutionEnvironment();
 	}
 
 	@Override

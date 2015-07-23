@@ -124,12 +124,10 @@ public class FlinkTestPlatform extends TestPlatform {
 	@Override
 	public FlowConnector getFlowConnector(Map<Object, Object> properties) {
 
-		ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment();
-
 		properties.put("flink.num.mappers", this.numMappers+"");
 		properties.put("flink.num.reducers", this.numGatherPartitions+"");
 
-		return new FlinkConnector(env, properties);
+		return new FlinkConnector(properties);
 	}
 
 	@Override

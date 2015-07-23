@@ -56,8 +56,8 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 }
 
 	@Override
-	public PlannerInfo getPlannerInfo(String s) {
-		return new PlannerInfo("Flink Planner", "Apache Flink", "???"); // TODO
+	public PlannerInfo getPlannerInfo(String registryName) {
+		return new PlannerInfo(getClass().getSimpleName(), "Apache Flink", registryName);
 	}
 
 	@Override
