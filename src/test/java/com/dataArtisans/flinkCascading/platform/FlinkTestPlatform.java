@@ -38,6 +38,7 @@ import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.FlinkConnector;
 import com.dataArtisans.flinkCascading.util.FlinkConfigDefScheme;
+import data.InputData;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
@@ -56,6 +57,7 @@ public class FlinkTestPlatform extends TestPlatform {
 			this.numMappers = 1;
 			this.numGatherPartitions = 1;
 		}
+		System.getProperties().setProperty(InputData.TEST_DATA_PATH, ClassLoader.getSystemResource("data").getPath() + "/");
 	}
 
 	@Override
