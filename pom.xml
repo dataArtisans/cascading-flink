@@ -296,6 +296,7 @@ under the License.
 						<!-- Generated content -->
 						<exclude>**/target/**</exclude>
 						<exclude>**/build/**</exclude>
+						<exclude>**/resources/data/**</exclude>
 					</excludes>
 				</configuration>
 			</plugin>
