@@ -25,6 +25,7 @@ import cascading.flow.planner.FlowStepJob;
 import cascading.management.state.ClientState;
 import cascading.stats.FlowNodeStats;
 import cascading.stats.FlowStepStats;
+import com.dataArtisans.flinkCascading.FlinkConnector;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.Plan;
@@ -34,6 +35,7 @@ import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.ContextEnvironment;
 import org.apache.flink.client.program.ProgramInvocationException;
 import org.apache.flink.configuration.ConfigConstants;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.optimizer.DataStatistics;
 import org.apache.flink.optimizer.Optimizer;
 import org.apache.flink.optimizer.plan.OptimizedPlan;
@@ -51,6 +53,7 @@ import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -73,15 +76,19 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	private JobID jobID;
 	private Throwable jobException;
 
-	public FlinkFlowStepJob( ClientState clientState, FlinkFlowStep flowStep, Configuration currentConf )
+	private List<String> classPath;
+
+	public FlinkFlowStepJob( ClientState clientState, FlinkFlowStep flowStep, Configuration currentConf, List<String> classPath )
 	{
 		super( clientState, currentConf, flowStep, 1000, 1000 );
 		this.currentConf = currentConf;
 		this.env = ((FlinkFlowStep)this.flowStep).getExecutionEnvironment();
+		this.classPath = classPath;
 
 		if( flowStep.isDebugEnabled() ) {
 			flowStep.logDebug("using polling interval: " + pollingInterval);
 		}
+
 	}
 
 	@Override
@@ -125,6 +132,10 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		OptimizedPlan optimizedPlan = optimizer.compile(plan);
 
 		final JobGraph jobGraph = new JobGraphGenerator().compileJobGraph(optimizedPlan);
+		for (String jarPath : classPath) {
+			jobGraph.addJar(new Path(jarPath));
+		}
+
 		jobID = jobGraph.getJobID();
 
 		Callable<Object> callable;
@@ -134,8 +145,9 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			final ActorSystem actorSystem = JobClient.startJobClientActorSystem(new org.apache.flink.configuration.Configuration());
 
 			startLocalCluster();
-
 			final ActorGateway jobManager = localCluster.getJobManagerGateway();
+
+			JobClient.uploadJarFiles(jobGraph, jobManager, new FiniteDuration(10, TimeUnit.SECONDS));
 
 			callable = new Callable<Object>() {
 				@Override

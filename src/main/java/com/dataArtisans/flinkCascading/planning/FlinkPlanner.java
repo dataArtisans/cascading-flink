@@ -33,6 +33,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -44,10 +45,12 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	private Configuration defaultConfig;
 
 	private ExecutionEnvironment env;
+	private List<String> classPath;
 
-	public FlinkPlanner(ExecutionEnvironment env) {
+	public FlinkPlanner(ExecutionEnvironment env, List<String> classPath) {
 		super();
 		this.env = env;
+		this.classPath = classPath;
 	}
 
 	@Override
@@ -69,23 +72,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	public void initialize( FlowConnector flowConnector, Map<Object, Object> properties ) {
 
 		super.initialize( flowConnector, properties );
-
 		defaultConfig = createConfiguration(properties);
-
-		// TODO: set JAR file
-//		Class type = AppProps.getApplicationJarClass(properties);
-//		if( defaultConfig.getJar() == null && type != null ) {
-//			defaultJobConf.setJarByClass(type);
-//		}
-//		String path = AppProps.getApplicationJarPath(properties);
-//		if( defaultJobConf.getJar() == null && path != null ) {
-//			defaultJobConf.setJar(path);
-//		}
-//		if( defaultJobConf.getJar() == null ) {
-//			defaultJobConf.setJarByClass(HadoopUtil.findMainClass(HadoopPlanner.class));
-//		}
-//		AppProps.setApplicationJarPath(properties, defaultJobConf.getJar());
-//		LOG.info( "using application jar: {}", defaultJobConf.getJar() );
 }
 
 	@Override
@@ -94,7 +81,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	}
 
 	public FlowStep<Configuration> createFlowStep( ElementGraph stepElementGraph, FlowNodeGraph flowNodeGraph ) {
-		return new FlinkFlowStep( env, stepElementGraph, flowNodeGraph );
+		return new FlinkFlowStep( env, stepElementGraph, flowNodeGraph, classPath );
 	}
 
 	@Override

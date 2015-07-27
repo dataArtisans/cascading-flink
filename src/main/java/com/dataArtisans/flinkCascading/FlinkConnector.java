@@ -18,7 +18,9 @@
 
 package com.dataArtisans.flinkCascading;
 
+import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
+import cascading.flow.FlowDef;
 import cascading.flow.planner.FlowPlanner;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.flow.planner.rule.RuleRegistrySet;
@@ -49,16 +51,20 @@ import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTrans
 import com.dataArtisans.flinkCascading.planning.rules.TopDownSplitBoundariesNodePartitioner;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class FlinkConnector extends FlowConnector {
 
-	private ExecutionEnvironment env;
+	List<String> classPath = new ArrayList<String>();
+	private ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
+	public FlinkConnector() {
+	}
 
 	public FlinkConnector(Map<Object, Object> properties) {
 		super(properties);
-		this.env = ExecutionEnvironment.getExecutionEnvironment();
 	}
 
 	@Override
@@ -68,13 +74,19 @@ public class FlinkConnector extends FlowConnector {
 
 	@Override
 	protected FlowPlanner createFlowPlanner() {
-		return new FlinkPlanner(env);
+		return new FlinkPlanner(env, classPath);
 	}
 
 	@Override
 	protected RuleRegistrySet createDefaultRuleRegistrySet() {
 
 		return new RuleRegistrySet(new FlinkDagRuleRegistry());
+	}
+
+	@Override
+	public Flow connect(FlowDef flowDef) {
+		classPath.addAll(flowDef.getClassPath());
+		return super.connect(flowDef);
 	}
 
 	public static class FlinkDagRuleRegistry extends RuleRegistry {

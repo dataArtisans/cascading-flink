@@ -80,10 +80,12 @@ import java.util.Set;
 public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private ExecutionEnvironment env;
+	private List<String> classPath;
 
-	public FlinkFlowStep(ExecutionEnvironment env, ElementGraph elementGraph, FlowNodeGraph flowNodeGraph) {
+	public FlinkFlowStep(ExecutionEnvironment env, ElementGraph elementGraph, FlowNodeGraph flowNodeGraph, List<String> classPath) {
 		super( elementGraph, flowNodeGraph );
 		this.env = env;
+		this.classPath = classPath;
 	}
 
 	// Configures the MapReduce program for this step
@@ -103,7 +105,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			this.buildFlinkProgram(flowProcess);
 
-			return new FlinkFlowStepJob(clientState, this, initializedStepConfig);
+			return new FlinkFlowStepJob(clientState, this, initializedStepConfig, classPath);
 		}
 		catch(NoClassDefFoundError error) {
 			PlatformInfo platformInfo = HadoopUtil.getPlatformInfo();
