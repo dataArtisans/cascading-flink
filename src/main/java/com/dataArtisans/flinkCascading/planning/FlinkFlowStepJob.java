@@ -18,9 +18,7 @@
 
 package com.dataArtisans.flinkCascading.planning;
 
-import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import akka.pattern.Patterns;
 import akka.util.Timeout;
 import cascading.flow.FlowException;
 import cascading.flow.planner.FlowStepJob;
@@ -28,8 +26,13 @@ import cascading.management.state.ClientState;
 import cascading.stats.FlowNodeStats;
 import cascading.stats.FlowStepStats;
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.LocalEnvironment;
+import org.apache.flink.client.program.Client;
+import org.apache.flink.client.program.ContextEnvironment;
+import org.apache.flink.client.program.ProgramInvocationException;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.optimizer.DataStatistics;
 import org.apache.flink.optimizer.Optimizer;
@@ -38,6 +41,7 @@ import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
 import org.apache.flink.runtime.client.JobClient;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.client.SerializedJobExecutionResult;
+import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.JobManagerMessages;
 import org.apache.flink.runtime.minicluster.FlinkMiniCluster;
@@ -58,14 +62,13 @@ import java.util.concurrent.TimeoutException;
 
 public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 {
-
 	private final Configuration currentConf;
 
-	private Future<SerializedJobExecutionResult> jobSubmission;
+	private Future<Object> jobSubmission;
 
 	private ExecutionEnvironment env;
 
-	private FlinkMiniCluster localCluster;
+	private static FlinkMiniCluster localCluster;
 
 	private JobID jobID;
 	private Throwable jobException;
@@ -93,22 +96,25 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	protected void internalBlockOnStop() throws IOException {
 		if (jobSubmission != null && !jobSubmission.isDone()) {
-			final ActorRef jobManager;
+			if (isLocalExecution()) {
+				final ActorGateway jobManager = localCluster.getJobManagerGateway();
 
-			if (env.localExecutionIsAllowed()) {
-				jobManager = localCluster.getJobManager();
+				scala.concurrent.Future<Object> response = jobManager.ask(new JobManagerMessages.CancelJob(jobID), new Timeout(10, TimeUnit.SECONDS).duration());
+
+				try {
+					Await.result(response, new Timeout(60, TimeUnit.SECONDS).duration());
+				} catch (Exception e) {
+					throw new IOException("Canceling the job with ID " + jobID + " failed.", e);
+				}
 			} else {
-				jobManager = null; //TODO cluster
-			}
-
-			scala.concurrent.Future<Object> response = Patterns.ask(jobManager, new JobManagerMessages.CancelJob(jobID), new Timeout(10, TimeUnit.SECONDS));
-
-			try {
-				Await.result(response, new Timeout(60, TimeUnit.SECONDS).duration());
-			} catch (Exception e) {
-				throw new IOException("Canceling the job with ID " + jobID + " failed.", e);
+				try {
+					((ContextEnvironment) env).getClient().cancel(jobID);
+				} catch (Exception e) {
+					throw new IOException("An exception occurred while stopping the Flink job:\n" + e.getMessage());
+				}
 			}
 		}
+
 	}
 
 	protected void internalNonBlockingStart() throws IOException {
@@ -121,36 +127,43 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		final JobGraph jobGraph = new JobGraphGenerator().compileJobGraph(optimizedPlan);
 		jobID = jobGraph.getJobID();
 
-		final ActorSystem actorSystem = JobClient.startJobClientActorSystem(new org.apache.flink.configuration.Configuration());
+		Callable<Object> callable;
 
-		final ActorRef jobManager;
+		if (isLocalExecution()) {
 
-		// read remote / local configuration here
-		org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
+			final ActorSystem actorSystem = JobClient.startJobClientActorSystem(new org.apache.flink.configuration.Configuration());
 
-		if (env.localExecutionIsAllowed()) {
-			configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism());
+			startLocalCluster();
 
-			localCluster = new LocalFlinkMiniCluster(configuration);
-			jobManager = localCluster.getJobManager();
+			final ActorGateway jobManager = localCluster.getJobManagerGateway();
+
+			callable = new Callable<Object>() {
+				@Override
+				public SerializedJobExecutionResult call() throws JobExecutionException {
+					return JobClient.submitJobAndWait(actorSystem, jobManager, jobGraph, new FiniteDuration(10, TimeUnit.SECONDS), true);
+				}
+			};
 
 		} else {
-			jobManager = null;
-			// TODO cluster
+
+			final Client client = ((ContextEnvironment) env).getClient();
+
+			callable = new Callable<Object>() {
+				@Override
+				public JobSubmissionResult call() throws Exception {
+					return client.run(jobGraph, true);
+				}
+			};
+
 			try {
-				//env.execute();
-			} catch (Exception e) {
-				jobException = e;
+				client.run(jobGraph, true);
+			} catch (ProgramInvocationException e) {
+				throw new IOException("Could not submit the Flink job to the cluster because of:\n" + e.getMessage());
 			}
 		}
 
+
 		ExecutorService executor = Executors.newFixedThreadPool(1);
-		Callable<SerializedJobExecutionResult> callable = new Callable<SerializedJobExecutionResult>() {
-			@Override
-			public SerializedJobExecutionResult call() throws JobExecutionException {
-				return JobClient.submitJobAndWait(actorSystem, jobManager, jobGraph, new FiniteDuration(10, TimeUnit.SECONDS), true);
-			}
-		};
 		jobSubmission = executor.submit(callable);
 
 		flowStep.logInfo("submitted Flink job: " + jobID);
@@ -227,22 +240,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			return false;
 		} catch (ExecutionException e) {
 			jobException = e.getCause();
+			return false;
 		} catch (TimeoutException e) {
 			return false;
 		}
 
-		boolean status = jobSubmission.isDone() && jobException == null;
-
-		if (localCluster != null && status) {
-			localCluster.stop();
-			localCluster = null;
-		}
-		return status;
+		return jobSubmission.isDone();
 	}
 
 	@Override
 	protected boolean isRemoteExecution() {
-		return !env.localExecutionIsAllowed(); // TODO
+		return isLocalExecution();
 	}
 
 	@Override
@@ -288,6 +296,19 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	protected boolean internalIsStartedRunning() {
 		return jobSubmission != null;
+	}
+
+	private boolean isLocalExecution() {
+		return env instanceof LocalEnvironment;
+	}
+
+	private void startLocalCluster() {
+		if (localCluster == null) {
+			org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
+			configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism() * 2);
+//			configuration.setInteger(ConfigConstants.TASK_MANAGER_MEMORY_SIZE_KEY, 128);
+			localCluster = new LocalFlinkMiniCluster(configuration);
+		}
 	}
 
 }
