@@ -28,7 +28,6 @@ import cascading.tuple.util.TupleBuilder;
 import cascading.tuple.util.TupleHasher;
 import org.apache.flink.api.common.functions.BroadcastVariableInitializer;
 import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
