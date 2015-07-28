@@ -93,7 +93,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	protected int getMaxNumParallelSteps() {
-		return flinkEnv.getParallelism();
+		return 1; // TODO flinkEnv.getParallelism();
 	}
 
 	@Override
@@ -139,4 +139,6 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	public boolean stepsAreLocal() {
 		return false;
 	}
+
+
 }
