@@ -96,6 +96,10 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 
 		this.jobConf = HadoopUtil.asJobConfInstance(FlinkConfigConverter.toHadoopConfig(config));
 
+		// set the correct class loader
+		// not necessary for Flink versions >= 0.10 but we set this anyway to be on the safe side
+		jobConf.setClassLoader(this.getClass().getClassLoader());
+
 		this.mapredInputFormat = jobConf.getInputFormat();
 		if (this.mapredInputFormat instanceof JobConfigurable) {
 			((JobConfigurable) this.mapredInputFormat).configure(jobConf);
