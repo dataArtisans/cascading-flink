@@ -19,7 +19,6 @@
 package com.dataArtisans.flinkCascading.planning;
 
 import akka.actor.ActorSystem;
-import akka.util.Timeout;
 import cascading.flow.FlowException;
 import cascading.flow.planner.FlowStepJob;
 import cascading.management.state.ClientState;
@@ -32,7 +31,6 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.LocalEnvironment;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.ContextEnvironment;
-import org.apache.flink.client.program.JobWithJars;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.optimizer.DataStatistics;
@@ -169,19 +167,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 			try {
 				String path = this.getClass().getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-				classPath.add(path);
+				jobGraph.addJar(new Path(path));
 			} catch (URISyntaxException e) {
 				throw new IOException("Could not add the submission JAR as a dependency.");
 			}
-
-			final JobWithJars jobWithJars = new JobWithJars(plan, classPath);
 
 			final Client client = ((ContextEnvironment) env).getClient();
 
 			callable = new Callable<Object>() {
 				@Override
 				public JobSubmissionResult call() throws Exception {
-					return client.run(jobWithJars, -1, true);
+					return client.run(jobGraph, true);
 				}
 			};
 		}

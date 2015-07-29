@@ -37,7 +37,6 @@ import org.apache.flink.api.common.io.FileInputFormat.FileBaseStatistics;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.io.LocatableInputSplitAssigner;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
-import org.apache.flink.api.java.hadoop.mapred.HadoopInputFormatBase;
 import org.apache.flink.api.java.hadoop.mapred.wrapper.HadoopDummyReporter;
 import org.apache.flink.api.java.hadoop.mapred.wrapper.HadoopInputSplit;
 import org.apache.flink.configuration.Configuration;
@@ -66,7 +65,7 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 
 	private static final long serialVersionUID = 1L;
 
-	private static final Logger LOG = LoggerFactory.getLogger(HadoopInputFormatBase.class);
+	private static final Logger LOG = LoggerFactory.getLogger(CascadingInputFormat.class);
 
 	private FlowNode node;
 
@@ -119,7 +118,7 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 
 		this.flowProcess = new FlinkFlowProcess(this.jobConf, rc, taskId);
 
-		long processBeginTime = System.currentTimeMillis();
+		processBeginTime = System.currentTimeMillis();
 
 		flowProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
 
