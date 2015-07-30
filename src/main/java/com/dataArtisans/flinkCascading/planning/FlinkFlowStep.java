@@ -165,8 +165,19 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		printFlowStep();
 
-		int numMappers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.mappers"));
-		int numReducers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.reducers"));
+		int numMappers;
+		try {
+			numMappers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.mappers"));
+		} catch (NumberFormatException e) {
+			numMappers = -1;
+		}
+
+		int numReducers;
+		try {
+			numReducers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.reducers"));
+		} catch (NumberFormatException e) {
+			numReducers = -1;
+		}
 
 		numMappers = (numMappers > 0) ? numMappers : env.getParallelism();
 		numReducers = (numReducers > 0) ? numReducers : env.getParallelism();
