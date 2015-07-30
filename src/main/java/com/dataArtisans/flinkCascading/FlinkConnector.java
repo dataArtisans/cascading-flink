@@ -50,10 +50,15 @@ import com.dataArtisans.flinkCascading.planning.rules.BoundaryElementFactory;
 import com.dataArtisans.flinkCascading.planning.rules.DoubleBoundaryRemovalTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.TopDownSplitBoundariesNodePartitioner;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.client.CliFrontend;
+import org.apache.flink.configuration.ConfigConstants;
+import org.apache.flink.configuration.GlobalConfiguration;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 public class FlinkConnector extends FlowConnector {
 
@@ -61,10 +66,23 @@ public class FlinkConnector extends FlowConnector {
 	private ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
 	public FlinkConnector() {
+		this(new Properties());
 	}
 
 	public FlinkConnector(Map<Object, Object> properties) {
 		super(properties);
+
+		if (env.getParallelism() <= 0) {
+			GlobalConfiguration.loadConfiguration(new File(CliFrontend.getConfigurationDirectoryFromEnv()).getAbsolutePath());
+			org.apache.flink.configuration.Configuration configuration = GlobalConfiguration.getConfiguration();
+			int parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY_OLD, -1);
+			parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY, parallelism);
+			if (parallelism <= 0) {
+				throw new RuntimeException("Please set the default parallelism via the -p command-line flag");
+			} else {
+				env.setParallelism(parallelism);
+			}
+		}
 	}
 
 	@Override
