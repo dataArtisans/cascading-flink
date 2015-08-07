@@ -73,7 +73,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {
-				throw new RuntimeException("FlowNode for Mapper may only have a single source");
+				throw new RuntimeException("FlowNode for CoGroup may only have a single source");
 			}
 			FlowElement sourceElement = sources.iterator().next();
 			if(!(sourceElement instanceof CoGroup)) {

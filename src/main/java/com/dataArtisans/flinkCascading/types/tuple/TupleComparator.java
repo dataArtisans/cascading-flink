@@ -213,12 +213,14 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 
 	@Override
 	public TypeComparator[] getFlatComparators() {
-		return new TypeComparator[0];
+		return this.comparators;
 	}
 
 	@Override
 	public void getFlatComparator(List<TypeComparator> list) {
-
+		for(TypeComparator tc : this.comparators) {
+			list.add(tc.duplicate());
+		}
 	}
 
 	public TypeComparator<Tuple> duplicate() {
