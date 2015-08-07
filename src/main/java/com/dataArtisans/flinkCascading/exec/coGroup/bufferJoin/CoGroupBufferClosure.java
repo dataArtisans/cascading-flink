@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.coGroup;
+package com.dataArtisans.flinkCascading.exec.coGroup.bufferJoin;
 
 import cascading.flow.FlowProcess;
 import cascading.pipe.joiner.JoinerClosure;
@@ -43,7 +43,7 @@ import java.util.NoSuchElementException;
 
 import static cascading.tuple.collect.TupleCollectionFactory.TUPLE_COLLECTION_FACTORY;
 
-public class FlinkCoGroupClosure extends JoinerClosure {
+public class CoGroupBufferClosure extends JoinerClosure {
 
 	protected Iterator[] values;
 	protected Collection<Tuple>[] collections;
@@ -59,7 +59,7 @@ public class FlinkCoGroupClosure extends JoinerClosure {
 
 	private final TupleCollectionFactory<Configuration> tupleCollectionFactory;
 
-	public FlinkCoGroupClosure(FlowProcess flowProcess, int numSelfJoins, Fields[] joinFields, Fields[] valueFields) {
+	public CoGroupBufferClosure(FlowProcess flowProcess, int numSelfJoins, Fields[] joinFields, Fields[] valueFields) {
 		super(flowProcess, joinFields, valueFields);
 		this.numSelfJoins = numSelfJoins;
 
@@ -304,7 +304,7 @@ public class FlinkCoGroupClosure extends JoinerClosure {
 	}
 
 	static interface TupleBuilder {
-		Tuple makeResult( Tuple[] tuples );
+		Tuple makeResult(Tuple[] tuples);
 	}
 
 	private class SpillListener implements Spillable.SpillListener {

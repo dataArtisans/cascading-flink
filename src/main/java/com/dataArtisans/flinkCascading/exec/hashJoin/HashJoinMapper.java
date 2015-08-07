@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.mapper;
+package com.dataArtisans.flinkCascading.exec.hashJoin;
 
 import cascading.CascadingException;
 import cascading.flow.FlowElement;
@@ -27,10 +27,10 @@ import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.Boundary;
 import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryInStage;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
@@ -39,26 +39,21 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Set;
 
-/**
- *
- * Corresponds to FlowMapper
- *
- */
-public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
+public class HashJoinMapper extends RichMapPartitionFunction<Tuple2<Tuple, Tuple[]>, Tuple> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(Mapper.class);
+	private static final Logger LOG = LoggerFactory.getLogger(HashJoinMapper.class);
 
 	private FlowNode flowNode;
 
-	private MapStreamGraph streamGraph;
+	private HashJoinStreamGraph streamGraph;
 
-	private BoundaryInStage sourceStage;
+	private JoinBoundaryInStage sourceStage;
 
 	private FlinkFlowProcess currentProcess;
 
-	public Mapper() {}
+	public HashJoinMapper() {}
 
-	public Mapper(FlowNode flowNode) {
+	public HashJoinMapper(FlowNode flowNode) {
 		this.flowNode = flowNode;
 	}
 
@@ -67,22 +62,19 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		try {
 
-			String taskId = "map-" + flowNode.getID();
+			String taskId = "hashjoin-" + flowNode.getID();
 			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
-			if(sources.size() != 1) {
-				throw new RuntimeException("FlowNode for Mapper may only have a single source");
-			}
-
+			// pick one (arbitrary) source
 			FlowElement sourceElement = sources.iterator().next();
 			if(!(sourceElement instanceof Boundary)) {
-				throw new RuntimeException("Source of Mapper must be a Boundary");
+				throw new RuntimeException("Source of HashJoin must be a Boundary");
 			}
 
 			Boundary source = (Boundary)sourceElement;
 
-			streamGraph = new MapStreamGraph( currentProcess, flowNode, source );
+			streamGraph = new HashJoinStreamGraph( currentProcess, flowNode, source );
 
 			sourceStage = this.streamGraph.getSourceStage();
 
@@ -108,9 +100,7 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 	}
 
 	@Override
-	public void mapPartition(Iterable<Tuple> input, Collector<Tuple> output) throws Exception {
-
-//		currentProcess.setReporter( reporter );
+	public void mapPartition(Iterable<Tuple2<Tuple, Tuple[]>> input, Collector<Tuple> output) throws Exception {
 
 		this.streamGraph.setTupleCollector(output);
 
@@ -129,11 +119,9 @@ public class Mapper extends RichMapPartitionFunction<Tuple, Tuple> {
 				throw error;
 			}
 			catch( IOException exception ) {
-//				reportIfLocal( exception );
 				throw exception;
 			}
 			catch( Throwable throwable ) {
-//				reportIfLocal( throwable );
 
 				if( throwable instanceof CascadingException ) {
 					throw (CascadingException) throwable;

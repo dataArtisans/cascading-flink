@@ -22,35 +22,40 @@ import cascading.flow.FlowProcess;
 import cascading.pipe.joiner.JoinerClosure;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import cascading.tuple.Tuples;
+import cascading.tuple.util.TupleBuilder;
+import cascading.tuple.util.TupleViews;
 import org.apache.flink.api.java.tuple.Tuple2;
 
+import java.util.Arrays;
 import java.util.Iterator;
 
 public class FlinkJoinClosure extends JoinerClosure {
 
 	private Tuple2<Tuple, Tuple[]> tupleJoinList;
-
 	private SingleTupleIterator[] iterators;
+
+	private Tuple joinedKeysTuple = new Tuple();
+	private final Tuple emptyKeyTuple;
+	private final Tuple[] keyTuples;
+	private final TupleBuilder joinedKeysTupleBuilder;
 
 	public FlinkJoinClosure(FlowProcess flowProcess, Fields[] joinFields, Fields[] valueFields) {
 		super(flowProcess, joinFields, valueFields);
+		this.emptyKeyTuple = Tuple.size( joinFields[0].size() );
+		this.keyTuples = new Tuple[joinFields.length];
+		this.joinedKeysTupleBuilder = makeJoinedBuilder( joinFields );
 	}
 
 	public void reset(Tuple2<Tuple, Tuple[]> tupleJoinList) {
 		this.tupleJoinList = tupleJoinList;
 
 		if(this.iterators == null) {
-			this.iterators = new SingleTupleIterator[tupleJoinList.f1.length+1];
+			this.iterators = new SingleTupleIterator[tupleJoinList.f1.length];
 			for(int i=0; i < iterators.length; i++) {
 				iterators[i] = new SingleTupleIterator();
 			}
 		}
-
-		iterators[0].reset(tupleJoinList.f0);
-		for(int i=1; i < iterators.length; i++) {
-			iterators[i].reset(tupleJoinList.f1[i-1]);
-		}
-
 	}
 
 	@Override
@@ -60,17 +65,51 @@ public class FlinkJoinClosure extends JoinerClosure {
 
 	@Override
 	public Iterator<Tuple> getIterator(int pos) {
+
+		iterators[pos].reset(tupleJoinList.f1[pos]);
 		return iterators[pos];
 	}
 
 	@Override
 	public boolean isEmpty(int pos) {
-		return false;
+		return this.tupleJoinList.f1[pos] == null;
 	}
 
 	@Override
 	public Tuple getGroupTuple(Tuple keysTuple) {
-		throw new UnsupportedOperationException();
+		Tuples.asModifiable(joinedKeysTuple);
+
+		for( int i = 0; i < this.keyTuples.length; i++ ) {
+			keyTuples[i] = this.tupleJoinList.f1[i] == null ? emptyKeyTuple : tupleJoinList.f0;
+		}
+
+		joinedKeysTuple = joinedKeysTupleBuilder.makeResult( keyTuples );
+
+		return joinedKeysTuple;
+	}
+
+	static interface TupleBuilder {
+		Tuple makeResult(Tuple[] tuples);
+	}
+
+	private TupleBuilder makeJoinedBuilder( final Fields[] joinFields )
+	{
+		final Fields[] fields = isSelfJoin() ? new Fields[ size() ] : joinFields;
+
+		if( isSelfJoin() ) {
+			Arrays.fill(fields, 0, fields.length, joinFields[0]);
+		}
+
+		return new TupleBuilder()
+		{
+			Tuple result = TupleViews.createComposite(fields);
+
+			@Override
+			public Tuple makeResult( Tuple[] tuples )
+			{
+				return TupleViews.reset( result, tuples );
+			}
+		};
 	}
 
 	private class SingleTupleIterator implements Iterator<Tuple> {

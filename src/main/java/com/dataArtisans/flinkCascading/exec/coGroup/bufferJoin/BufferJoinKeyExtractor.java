@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.coGroup;
+package com.dataArtisans.flinkCascading.exec.coGroup.bufferJoin;
 
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 
-public class ReducerJoinKeyExtractor implements MapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
+public class BufferJoinKeyExtractor implements MapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
 
 	private int[] keyPos;
 	private Tuple3<Tuple, Integer, Tuple> outT;
 	private Tuple defaultKey = new Tuple(1);
 
-	public ReducerJoinKeyExtractor(int inputId, int[] keyPos) {
+	public BufferJoinKeyExtractor(int inputId, int[] keyPos) {
 		this.keyPos = keyPos;
 		this.outT = new Tuple3<Tuple, Integer, Tuple>(null, inputId, null);
 	}

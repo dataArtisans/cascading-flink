@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.mapper;
+package com.dataArtisans.flinkCascading.exec.hashJoin;
 
 import cascading.flow.FlowNode;
 import cascading.flow.stream.duct.Duct;
@@ -28,19 +28,17 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
 import cascading.pipe.HashJoin;
 import cascading.tuple.Tuple;
-import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryInStage;
+import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryOutStage;
 import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryOutStage;
-import com.dataArtisans.flinkCascading.exec.genericDucts.GroupByOutGate;
 import org.apache.flink.util.Collector;
 
-public class FlinkMapStreamGraph extends NodeStreamGraph {
+public class HashJoinStreamGraph extends NodeStreamGraph {
 
-	private BoundaryInStage sourceStage;
+	private JoinBoundaryInStage sourceStage;
 	private FlinkCollectorOutput sinkStage;
 
-	public FlinkMapStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary source) {
+	public HashJoinStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary source) {
 
 		super(flowProcess, node);
 
@@ -49,7 +47,7 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 		setTraps();
 		setScopes();
 
-		printGraph( node.getID(), "map", flowProcess.getCurrentSliceNum() );
+		printGraph( node.getID(), "hashjoin", flowProcess.getCurrentSliceNum() );
 		bind();
 	}
 
@@ -57,14 +55,14 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 		this.sinkStage.setTupleCollector(tupleCollector);
 	}
 
-	public BoundaryInStage getSourceStage() {
+	public JoinBoundaryInStage getSourceStage() {
 		return this.sourceStage;
 	}
 
 
-	private BoundaryInStage handleHead( Boundary boundary) {
+	private JoinBoundaryInStage handleHead( Boundary boundary) {
 
-		BoundaryInStage sourceStage = (BoundaryInStage)createBoundaryStage(boundary, IORole.source);
+		JoinBoundaryInStage sourceStage = (JoinBoundaryInStage)createBoundaryStage(boundary, IORole.source);
 
 		addHead( sourceStage );
 
@@ -79,7 +77,7 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 	{
 
 		if(role == IORole.source) {
-			this.sourceStage = new BoundaryInStage(this.flowProcess, boundary );
+			this.sourceStage = new JoinBoundaryInStage(this.flowProcess, boundary );
 			return this.sourceStage;
 		}
 		else if(role == IORole.sink) {
@@ -94,28 +92,25 @@ public class FlinkMapStreamGraph extends NodeStreamGraph {
 	@Override
 	protected Gate createCoGroupGate(CoGroup coGroup, IORole ioRole) {
 		if(ioRole == IORole.sink) {
-			// TODO create map out gate
-			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a HashJoinStreamGraph");
 		}
 		else {
-			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a MapStreamGraph");
+			throw new UnsupportedOperationException("Cannot create a CoGroup gate in a HashJoinStreamGraph");
 		}
 	}
 
 	@Override
 	protected Gate createGroupByGate(GroupBy groupBy, IORole ioRole) {
 		if(ioRole == IORole.sink) {
-			this.sinkStage = new GroupByOutGate(flowProcess, groupBy, ioRole);
-			return (GroupByOutGate)this.sinkStage;
+			throw new UnsupportedOperationException("Cannot create a GroupBy gate in a HashJoinStreamGraph");
 		}
 		else {
-			throw new UnsupportedOperationException("Cannot create a GroupBy gate in a MapStreamGraph");
+			throw new UnsupportedOperationException("Cannot create a GroupBy gate in a HashJoinStreamGraph");
 		}
 	}
 
 	protected Gate createHashJoinGate( HashJoin join ) {
-
-		throw new UnsupportedOperationException("HashJoin not supported at this place.");
+		return new HashJoinGate(this.flowProcess, join);
 	}
 
 }

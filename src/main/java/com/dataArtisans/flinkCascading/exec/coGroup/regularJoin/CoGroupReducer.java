@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.coGroup;
+package com.dataArtisans.flinkCascading.exec.coGroup.regularJoin;
 
 import cascading.CascadingException;
 import cascading.flow.FlowElement;
@@ -30,7 +30,7 @@ import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
-import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
@@ -41,19 +41,21 @@ import java.util.Set;
 import static cascading.util.LogUtil.logCounters;
 import static cascading.util.LogUtil.logMemory;
 
-public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Integer, Tuple>, Tuple> {
+public class CoGroupReducer extends RichGroupReduceFunction<Tuple2<Tuple, Tuple[]>, Tuple> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(CoGroupReducer.class);
 
 	private FlowNode flowNode;
 
-	private FlinkCoGroupReduceStreamGraph streamGraph;
+	private CoGroupReduceStreamGraph streamGraph;
 
 	private CoGroupInGate groupSource;
 
 	private FlinkFlowProcess currentProcess;
 
 	private boolean calledPrepare;
+
+	private long processBeginTime;
 
 	public CoGroupReducer() {}
 
@@ -81,7 +83,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 			}
 			CoGroup source = (CoGroup)sourceElement;
 
-			streamGraph = new FlinkCoGroupReduceStreamGraph( currentProcess, flowNode, source );
+			streamGraph = new CoGroupReduceStreamGraph( currentProcess, flowNode, source );
 
 			groupSource = this.streamGraph.getGroupSource();
 
@@ -105,9 +107,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 	}
 
 	@Override
-	public void reduce(Iterable<Tuple3<Tuple, Integer, Tuple>> input, Collector<Tuple> output) throws Exception {
-
-		//		currentProcess.setReporter( reporter );
+	public void reduce(Iterable<Tuple2<Tuple, Tuple[]>> input, Collector<Tuple> output) throws Exception {
 
 		this.streamGraph.setTupleCollector(output);
 
@@ -118,20 +118,17 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 			this.groupSource.start(this.groupSource);
 		}
 
-		long processBeginTime = System.currentTimeMillis();
+		this.processBeginTime = System.currentTimeMillis();
 
-//		currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
+		currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
 
-		try
-		{
+		try {
 			this.groupSource.run(input.iterator());
 		}
-		catch( OutOfMemoryError error )
-		{
+		catch( OutOfMemoryError error ) {
 			throw error;
 		}
-		catch( Throwable throwable )
-		{
+		catch( Throwable throwable ) {
 			if( throwable instanceof CascadingException ) {
 				throw (CascadingException) throwable;
 			}
@@ -145,19 +142,17 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple3<Tuple, Intege
 	public void close() {
 
 		try {
-			if( this.calledPrepare)
-			{
+			if( this.calledPrepare) {
 				this.groupSource.complete(this.groupSource);
 
 				this.streamGraph.cleanup();
 			}
 		}
 		finally {
-			if( currentProcess != null )
-			{
+			if( currentProcess != null ) {
 				long processEndTime = System.currentTimeMillis();
 				currentProcess.increment( SliceCounters.Process_End_Time, processEndTime );
-//				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
+				currentProcess.increment( SliceCounters.Process_Duration, processEndTime - processBeginTime );
 			}
 
 			String message = "flow node id: " + flowNode.getID();

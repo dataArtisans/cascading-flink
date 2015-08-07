@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.coGroup;
+package com.dataArtisans.flinkCascading.exec.coGroup.bufferJoin;
 
 import cascading.flow.FlowNode;
 import cascading.flow.FlowProcess;
@@ -29,18 +29,18 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
 import cascading.tuple.Tuple;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
-import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
-import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryOutStage;
 import com.dataArtisans.flinkCascading.exec.genericDucts.GroupByOutGate;
+import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
+import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import org.apache.flink.util.Collector;
 
-public class FlinkCoGroupReduceStreamGraph extends NodeStreamGraph {
+public class CoGroupBufferReduceStreamGraph extends NodeStreamGraph {
 
-	private CoGroupInGate sourceStage;
+	private CoGroupBufferInGate sourceStage;
 	private FlinkCollectorOutput sinkStage;
 
-	public FlinkCoGroupReduceStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, CoGroup coGroup) {
+	public CoGroupBufferReduceStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, CoGroup coGroup) {
 
 		super(flowProcess, node);
 
@@ -57,14 +57,14 @@ public class FlinkCoGroupReduceStreamGraph extends NodeStreamGraph {
 		this.sinkStage.setTupleCollector(tupleCollector);
 	}
 
-	public CoGroupInGate getGroupSource() {
+	public CoGroupBufferInGate getGroupSource() {
 		return this.sourceStage;
 	}
 
 
 	private void buildGraph( CoGroup coGroup, FlowProcess flowProcess ) {
 
-		this.sourceStage = new CoGroupInGate(flowProcess, coGroup, IORole.source);
+		this.sourceStage = new CoGroupBufferInGate(flowProcess, coGroup, IORole.source);
 
 		addHead( sourceStage );
 

@@ -36,7 +36,6 @@ import cascading.flow.planner.rule.transformer.RemoveNoOpPipeTransformer;
 import cascading.scheme.Scheme;
 import com.dataArtisans.flinkCascading.planning.FlinkPlanner;
 import com.dataArtisans.flinkCascading.planning.rules.BottomUpBoundariesNodePartitioner;
-import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterHashJoinTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterMergeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitEdgeTransformer;
 import com.dataArtisans.flinkCascading.planning.rules.BoundaryAfterSplitNodeTransformer;
@@ -138,7 +137,6 @@ public class FlinkConnector extends FlowConnector {
 			addRule( new BoundaryBeforeGroupByTransformer() );
 			// inject boundaries before and after hash joins
 			addRule( new BoundaryBeforeHashJoinTransformer() );
-			addRule( new BoundaryAfterHashJoinTransformer() );
 
 			// remove duplicate boundaries
 			addRule( new DoubleBoundaryRemovalTransformer() );

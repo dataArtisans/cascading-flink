@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.coGroup;
+package com.dataArtisans.flinkCascading.exec.coGroup.bufferJoin;
 
 import cascading.flow.FlowProcess;
 import cascading.flow.stream.duct.Duct;
@@ -33,13 +33,13 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
+public class CoGroupBufferInGate extends GroupingSpliceGate implements InputSource {
 
-	private FlinkCoGroupClosure closure;
+	private CoGroupBufferClosure closure;
 
 	private final boolean isBufferJoin;
 
-	public CoGroupInGate(FlowProcess flowProcess, CoGroup splice, IORole ioRole) {
+	public CoGroupBufferInGate(FlowProcess flowProcess, CoGroup splice, IORole ioRole) {
 		super(flowProcess, splice, ioRole);
 
 		this.isBufferJoin = splice.getJoiner() instanceof BufferJoin;
@@ -67,7 +67,7 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 		}
 
 		if( role != IORole.sink ) {
-			closure = new FlinkCoGroupClosure(flowProcess, this.getSplice().getNumSelfJoins(), keyFields, valuesFields); // TODO what to do for CoGroupGates
+			closure = new CoGroupBufferClosure(flowProcess, this.getSplice().getNumSelfJoins(), keyFields, valuesFields); // TODO what to do for CoGroupGates
 		}
 
 		if( grouping != null && splice.getJoinDeclaredFields() != null && splice.getJoinDeclaredFields().isNone() ) {
