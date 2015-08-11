@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.types.tuple;
 
+import cascading.flow.FlowException;
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputView;
@@ -30,55 +31,12 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	private static final long serialVersionUID = 1L;
 	private boolean[] nullFields;
 	private TypeSerializer fieldSer;
-//	private int[] serPos;
-	private int minLength;
+	private final int length;
 
-	public TupleSerializer(TypeSerializer fieldSer, int minLength) {
+	public TupleSerializer(TypeSerializer fieldSer, int length) {
 		this.fieldSer = fieldSer;
-		this.minLength = minLength;
+		this.length = length;
 	}
-
-//	public TupleSerializer(TypeSerializer fieldSer, int[] serPos) {
-//		this.fieldSer = fieldSer;
-//		this.init(serPos);
-//	}
-
-//	private void init(int[] serPos) {
-//
-//		int max = 0;
-//		for(int i=0;i<serPos.length; i++) {
-//			max = (serPos[i] > max) ? serPos[i] : max;
-//		}
-//
-//		this.minLength = max + 1;
-//
-//		if(max + 1 > serPos.length) {
-//
-//			int[] serPosExtd = Arrays.copyOf(serPos, max + 1);
-//			for(int i=serPos.length; i < max+1; i++) {
-//
-//				// find next field to serialize
-//				for(int j=0; j<max+1; j++) {
-//					// check if already set
-//					boolean found = false;
-//					for(int k=0; k<serPos.length; k++) {
-//						if(k == j) {
-//							found = true;
-//							break;
-//						}
-//					}
-//					if(found) {
-//						serPosExtd[i] = j;
-//						break;
-//					}
-//				}
-//			}
-//			this.serPos = serPosExtd;
-//		}
-//		else {
-//			this.serPos = serPos;
-//		}
-//	}
 
 	@Override
 	public boolean isImmutableType() {
@@ -88,13 +46,18 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public TupleSerializer duplicate() {
 //		return new TupleSerializer(this.fieldSer.duplicate(), serPos);
-		return new TupleSerializer(this.fieldSer.duplicate(), minLength);
+		return new TupleSerializer(this.fieldSer.duplicate(), length);
 	}
 
 	@Override
 	public Tuple createInstance() {
 		try {
-			return Tuple.size(minLength);
+			if(length > 0) {
+				return Tuple.size(length);
+			}
+			else {
+				return Tuple.size(0);
+			}
 		} catch (Exception e) {
 			throw new RuntimeException("Cannot instantiate tuple.", e);
 		}
@@ -129,32 +92,21 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public void serialize(Tuple value, DataOutputView target) throws IOException {
 
-		// write length
-		target.writeInt(value.size());
+		// write length only if length is unknown
+		if(this.length < 0) {
+			target.writeInt(value.size());
+		}
+		else {
+			if(value.size() != length) {
+				throw new FlowException("Size of tuple "+value+" is not correspond to specified size ("+length+").");
+			}
+		}
 
-		// write null markers TODO: use bit mask
-//		for (int i = 0; i < this.serPos.length; i++) {
-//			target.writeBoolean(value.getObject(this.serPos[i]) == null);
-//		}
-//		for (int i = this.serPos.length; i < value.size(); i++) {
-//			target.writeBoolean(value.getObject(i) == null);
-//		}
+		// write null markers TODO: use bit mask instead of boolean array
 		for (int i = 0; i < value.size(); i++) {
 			target.writeBoolean(value.getObject(i) == null);
 		}
 
-//		for (int i = 0; i < this.serPos.length; i++) {
-//			Object o = value.getObject(this.serPos[i]);
-//			if(o != null) {
-//				fieldSer.serialize(o, target);
-//			}
-//		}
-//		for (int i = this.serPos.length; i < value.size(); i++) {
-//			Object o = value.getObject(i);
-//			if(o != null) {
-//				fieldSer.serialize(o, target);
-//			}
-//		}
 		for (int i = 0; i < value.size(); i++) {
 			Object o = value.getObject(i);
 			if(o != null) {
@@ -166,12 +118,14 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public Tuple deserialize(DataInputView source) throws IOException {
 
-		int arity = source.readInt();
+		// read length only if unknown
+		int arity = this.length < 0 ? source.readInt() : this.length;
+
 		if(this.nullFields == null || this.nullFields.length < arity) {
 			this.nullFields = new boolean[arity];
 		}
 
-		// TODO: read more efficient bit mask
+		// TODO: read bit mask instead of boolean array
 		for (int i = 0; i < arity; i++) {
 			this.nullFields[i] = source.readBoolean();
 		}
@@ -185,12 +139,6 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 			else {
 				field = null;
 			}
-//			if(i < this.serPos.length) {
-//				tuple.set(this.serPos[i], field);
-//			}
-//			else {
-//				tuple.set(i, field);
-//			}
 			tuple.set(i, field);
 		}
 
@@ -200,7 +148,9 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public Tuple deserialize(Tuple reuse, DataInputView source) throws IOException {
 
-		int arity = source.readInt();
+		// read length only if unknown
+		int arity = this.length < 0 ? source.readInt() : this.length;
+
 		if(this.nullFields == null || this.nullFields.length < arity) {
 			this.nullFields = new boolean[arity];
 		}
@@ -208,7 +158,7 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 			reuse = Tuple.size(arity);
 		}
 
-		// TODO: read more efficient bit mask
+		// TODO: read bit mask instead of boolean array
 		for (int i = 0; i < arity; i++) {
 			this.nullFields[i] = source.readBoolean();
 		}
@@ -221,12 +171,6 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 			else {
 				field = null;
 			}
-//			if(i < this.serPos.length) {
-//				reuse.set(this.serPos[i], field);
-//			}
-//			else {
-//				reuse.set(i, field);
-//			}
 			reuse.set(i, field);
 		}
 
@@ -236,12 +180,16 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public void copy(DataInputView source, DataOutputView target) throws IOException {
 
-		int arity = source.readInt();
+		// read length only if unknown
+		int arity = this.length < 0 ? source.readInt() : this.length;
+
 		if(this.nullFields == null || this.nullFields.length < arity) {
 			this.nullFields = new boolean[arity];
 		}
 
-		target.writeInt(arity);
+		if(this.length < 0) {
+			target.writeInt(arity);
+		}
 
 		for (int i = 0; i < arity; i++) {
 			this.nullFields[i] = source.readBoolean();

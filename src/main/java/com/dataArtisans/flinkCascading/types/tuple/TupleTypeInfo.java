@@ -18,6 +18,7 @@
 
 package com.dataArtisans.flinkCascading.types.tuple;
 
+import cascading.flow.FlowException;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.types.field.FieldTypeInfo;
@@ -35,7 +36,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	private Fields fields;
 
-	private int minLength;
+	private final int length;
 	private String[] fieldNames;
 	private FieldTypeInfo[] fieldTypes;
 
@@ -51,13 +52,13 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		this.fields = fields;
 
 		if(fields.isDefined()) {
-			this.minLength = fields.size();
-			this.fieldNames = new String[minLength];
-			this.fieldTypes = new FieldTypeInfo[minLength];
+			this.length = fields.size();
+			this.fieldNames = new String[length];
+			this.fieldTypes = new FieldTypeInfo[length];
 
 			Comparator[] comps = fields.getComparators();
 
-			for(int i=0; i<minLength; i++) {
+			for(int i=0; i<length; i++) {
 				this.fieldNames[i] = Integer.toString(i);
 				this.fieldTypes[i] = new FieldTypeInfo();
 				if(comps != null && comps.length > i && comps[i] != null) {
@@ -67,7 +68,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		}
 		else {
 			if(fields.isUnknown()) {
-				this.minLength = 1;
+				this.length = -1;
 				this.fieldNames = new String[]{"0"};
 				this.fieldTypes = new FieldTypeInfo[] {new FieldTypeInfo()};
 			}
@@ -76,33 +77,6 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			}
 		}
 	}
-
-//	public String[] registerKeyFields(Fields keyFields) {
-//
-//		String[] serdePos = new String[keyFields.size()];
-//
-//		int[] keyPos = this.fields.getPos(keyFields);
-//		Comparator[] comps = keyFields.getComparators();
-//
-//		int oldLen = this.keyIdxs.length;
-//		this.keyIdxs = Arrays.copyOf(this.keyIdxs, oldLen + keyPos.length);
-//		for(int j=0; j<keyPos.length; j++) {
-//			// update min length
-//			updateMinLength(keyPos[j] + 1);
-//
-//			// set serde position
-//			this.keyIdxs[oldLen + j] = keyPos[j];
-//			serdePos[j] = Integer.toString(oldLen + j);
-//
-//			// set custom comparator (if any)
-//			if(comps[j] != null) {
-//				// set custom comparator
-//				this.fieldTypes[oldLen + j].setCustomComparator(comps[j]);
-//			}
-//		}
-//
-//		return serdePos;
-//	}
 
 	public String[] registerKeyFields(Fields keyFields) {
 
@@ -123,7 +97,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 		for(int j=0; j<keyPos.length; j++) {
 			// update min length
-			updateMinLength(keyPos[j] + 1);
+			extendFieldInfoArrays(keyPos[j] + 1);
 
 			// set serde position
 			serdePos[j] = Integer.toString(keyPos[j]);
@@ -142,19 +116,18 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		return this.fields;
 	}
 
-	private void updateMinLength(int newMinLength) {
-		if(newMinLength > this.minLength) {
+	private void extendFieldInfoArrays(int newLength) {
+		int curLength = this.fieldNames.length;
+
+		if(newLength > curLength) {
 
 			// update known field names & field types
-			this.fieldNames = Arrays.copyOf(this.fieldNames, newMinLength);
-			this.fieldTypes = Arrays.copyOf(this.fieldTypes, newMinLength);
-			for(int i=minLength; i<newMinLength; i++) {
+			this.fieldNames = Arrays.copyOf(this.fieldNames, newLength);
+			this.fieldTypes = Arrays.copyOf(this.fieldTypes, newLength);
+			for(int i=curLength; i<newLength; i++) {
 				fieldNames[i] = Integer.toString(i);
 				fieldTypes[i] = new FieldTypeInfo();
 			}
-
-			// update maxIdx
-			this.minLength = newMinLength;
 		}
 	}
 
@@ -170,12 +143,17 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	@Override
 	public int getArity() {
-		return this.minLength;
+		if(this.length > 0) {
+			return this.length;
+		}
+		else {
+			return 1;
+		}
 	}
 
 	@Override
 	public int getTotalFields() {
-		return this.minLength;
+		return this.getArity();
 	}
 
 	@Override
@@ -225,7 +203,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 	public void getFlatFields(String fieldExpression, int offset, List<FlatFieldDescriptor> list) {
 
 		if(fieldExpression.equals("*")) {
-			for(int i=0; i<this.minLength; i++) {
+			for(int i=0; i<this.length; i++) {
 				list.add(new FlatFieldDescriptor(offset+i, getTypeAt(i)));
 			}
 		}
@@ -237,7 +215,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	@Override
 	public TypeSerializer<Tuple> createSerializer(ExecutionConfig config) {
-		return new TupleSerializer(new FieldTypeInfo().createSerializer(config), this.minLength);
+		return new TupleSerializer(new FieldTypeInfo().createSerializer(config), this.length);
 	}
 
 	@Override
@@ -274,7 +252,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		}
 
 		if(finalFieldComparators.length != 0 && finalLogicalKeyFields.length != 0 && serializers.length != 0 && finalFieldComparators.length == finalLogicalKeyFields.length) {
-			return new TupleComparator(finalLogicalKeyFields, finalFieldComparators, serializers);
+			return new TupleComparator(finalLogicalKeyFields, finalFieldComparators, serializers, this.length);
 		} else {
 			throw new IllegalArgumentException("Tuple comparator creation has a bug");
 		}

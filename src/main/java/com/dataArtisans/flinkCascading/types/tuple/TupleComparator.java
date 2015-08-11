@@ -34,6 +34,7 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	private static final long serialVersionUID = 1L;
 	private static final int[] HASH_SALT = new int[]{73, 79, 97, 113, 131, 197, 199, 311, 337, 373, 719, 733, 919, 971, 991, 1193, 1931, 3119, 3779, 7793, 7937, 9311, 9377, 11939, 19391, 19937, '酏', '飏', 71993, 91193, 93719, 93911};
 
+	private final int tupleLength;
 	private int[] keyPositions;
 	private TypeComparator[] comparators;
 	private TypeSerializer[] serializers;
@@ -42,18 +43,19 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	private Object[] fields2;
 
 
-	public TupleComparator(int[] keyPositions, TypeComparator<?>[] comparators, TypeSerializer<?>[] serializers) {
+	public TupleComparator(int[] keyPositions, TypeComparator<?>[] comparators, TypeSerializer<?>[] serializers, int tupleLength) {
 
 		this.keyPositions = keyPositions;
 		this.comparators = comparators;
 		this.serializers = serializers;
+		this.tupleLength = tupleLength;
 
 		fields1 = new Object[serializers.length];
 		fields2 = new Object[serializers.length];
 	}
 
 	private TupleComparator(TupleComparator toClone) {
-		this(toClone.keyPositions, toClone.comparators, toClone.serializers);
+		this(toClone.keyPositions, toClone.comparators, toClone.serializers, toClone.tupleLength);
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -107,8 +109,8 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 
 	public int compareSerialized(DataInputView firstSource, DataInputView secondSource) throws IOException {
 
-		int arity1 = firstSource.readInt();
-		int arity2 = secondSource.readInt();
+		int arity1 = this.tupleLength < 0 ? firstSource.readInt() : this.tupleLength;
+		int arity2 = this.tupleLength < 0 ? secondSource.readInt() : this.tupleLength;
 
 		// TODO more efficient via bit masks
 		boolean[] nullFields1 = new boolean[arity1];
