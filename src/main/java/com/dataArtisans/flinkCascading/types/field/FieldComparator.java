@@ -29,12 +29,13 @@ import java.io.IOException;
 public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> {
 
 	private static final long serialVersionUID = 1L;
-	private final boolean ascending;
-	private final Class<T> type;
-	private TypeSerializer<T> serializer;
+
+	protected final boolean ascending;
+	protected final Class<T> type;
+	protected TypeSerializer<T> serializer;
+
 	private transient T ref;
 	private transient T tmpRef;
-
 
 	public FieldComparator(boolean ascending, TypeSerializer<T> serializer, Class<T> type) {
 		this.ascending = ascending;

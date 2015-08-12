@@ -20,6 +20,7 @@ package com.dataArtisans.flinkCascading.types.field;
 
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.AtomicType;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
@@ -41,9 +42,28 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 
 	}
 
-	public FieldTypeInfo(TypeInformation<Comparable> fieldTypeInfo) {
-		if(fieldTypeInfo.isBasicType())
-		this.fieldTypeInfo = fieldTypeInfo;
+	public FieldTypeInfo(Class fieldType) {
+		this.fieldTypeInfo = BasicTypeInfo.getInfoFor(fieldType);
+	}
+
+	public void setFieldType(Class fieldType) {
+
+		TypeInformation newFieldTypeInfo = BasicTypeInfo.getInfoFor(fieldType);
+		if(this.fieldComparator != null) {
+			// do not set type info, if we have to use a custom comparator
+			return;
+		}
+		else {
+			if(this.fieldTypeInfo != null && newFieldTypeInfo != null) {
+				// check if field types are compatible
+				if(!this.fieldTypeInfo.equals(newFieldTypeInfo)) {
+					throw new RuntimeException("Cannot overwrite a field type by a new field types");
+				}
+			}
+			else if(this.fieldTypeInfo == null) {
+				this.fieldTypeInfo = newFieldTypeInfo;
+			}
+		}
 	}
 
 	public void setCustomComparator(Comparator<Comparable> comparator) {

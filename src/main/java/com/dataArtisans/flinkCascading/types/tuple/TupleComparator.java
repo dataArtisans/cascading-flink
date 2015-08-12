@@ -39,6 +39,11 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	private TypeComparator[] comparators;
 	private TypeSerializer[] serializers;
 
+	protected int[] normalizedKeyLengths;
+	protected int numLeadingNormalizableKeys;
+	protected int normalizableKeyPrefixLen;
+	protected boolean invertNormKey;
+
 	private Object[] fields1;
 	private Object[] fields2;
 
@@ -52,6 +57,47 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 
 		fields1 = new Object[serializers.length];
 		fields2 = new Object[serializers.length];
+
+		// set up auxiliary fields for normalized key support
+		this.normalizedKeyLengths = new int[keyPositions.length];
+		int nKeys = 0;
+		int nKeyLen = 0;
+		boolean inverted = false;
+
+		for (int i = 0; i < this.keyPositions.length; i++) {
+			TypeComparator<?> k = this.comparators[i];
+
+			// as long as the leading keys support normalized keys, we can build up the composite key
+			if (k.supportsNormalizedKey()) {
+				if (i == 0) {
+					// the first comparator decides whether we need to invert the key direction
+					inverted = k.invertNormalizedKey();
+				}
+				else if (k.invertNormalizedKey() != inverted) {
+					// if a successor does not agree on the inversion direction, it cannot be part of the normalized key
+					break;
+				}
+
+				nKeys++;
+				final int len = k.getNormalizeKeyLen();
+				if (len < 0) {
+					throw new RuntimeException("Comparator " + k.getClass().getName() + " specifies an invalid length for the normalized key: " + len);
+				}
+				this.normalizedKeyLengths[i] = len;
+				nKeyLen += len;
+
+				if (nKeyLen < 0) {
+					// overflow, which means we are out of budget for normalized key space anyways
+					nKeyLen = Integer.MAX_VALUE;
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+		this.numLeadingNormalizableKeys = nKeys;
+		this.normalizableKeyPrefixLen = nKeyLen;
+		this.invertNormKey = inverted;
 	}
 
 	private TupleComparator(TupleComparator toClone) {
@@ -162,43 +208,38 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 
 	@Override
 	public boolean supportsNormalizedKey() {
-		return false;
+		return this.numLeadingNormalizableKeys > 0;
 	}
 
 	@Override
-	public boolean supportsSerializationWithKeyNormalization() {
-		return false;
+	public boolean invertNormalizedKey() {
+		return this.invertNormKey;
 	}
 
 	@Override
 	public int getNormalizeKeyLen() {
-		return -1;
+		return this.normalizableKeyPrefixLen;
 	}
 
 	@Override
-	public boolean isNormalizedKeyPrefixOnly(int i) {
-		return false;
+	public boolean isNormalizedKeyPrefixOnly(int keyBytes) {
+		return this.numLeadingNormalizableKeys < this.keyPositions.length ||
+				this.normalizableKeyPrefixLen == Integer.MAX_VALUE ||
+				this.normalizableKeyPrefixLen > keyBytes;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public void putNormalizedKey(Tuple value, MemorySegment target, int offset, int numBytes) {
-		throw new UnsupportedOperationException("Normalized keys not suppported for Cascading tuples");
-	}
+		int i = 0;
 
-	@Override
-	public void writeWithKeyNormalization(Tuple objects, DataOutputView dataOutputView) throws IOException {
-		throw new UnsupportedOperationException("Normalized keys not suppported for Cascading tuples");
-	}
-
-	@Override
-	public Tuple readWithKeyDenormalization(Tuple objects, DataInputView dataInputView) throws IOException {
-		throw new UnsupportedOperationException("Normalized keys not suppported for Cascading tuples");
-	}
-
-	@Override
-	public boolean invertNormalizedKey() {
-		return false;
+		for (; i < this.numLeadingNormalizableKeys && numBytes > 0; i++) {
+			int len = this.normalizedKeyLengths[i];
+			len = numBytes >= len ? len : numBytes;
+			this.comparators[i].putNormalizedKey(value.getObject(this.keyPositions[i]), target, offset, len);
+			numBytes -= len;
+			offset += len;
+		}
 	}
 
 	@Override
@@ -224,6 +265,21 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 
 	public TypeComparator<Tuple> duplicate() {
 		return new TupleComparator(this);
+	}
+
+	@Override
+	public boolean supportsSerializationWithKeyNormalization() {
+		return false;
+	}
+
+	@Override
+	public void writeWithKeyNormalization(Tuple objects, DataOutputView dataOutputView) throws IOException {
+		throw new UnsupportedOperationException("Normalized keys not suppported for Cascading tuples");
+	}
+
+	@Override
+	public Tuple readWithKeyDenormalization(Tuple objects, DataInputView dataInputView) throws IOException {
+		throw new UnsupportedOperationException("Normalized keys not suppported for Cascading tuples");
 	}
 
 }

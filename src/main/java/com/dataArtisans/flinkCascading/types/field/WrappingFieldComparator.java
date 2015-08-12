@@ -26,24 +26,18 @@ import org.apache.flink.core.memory.MemorySegment;
 
 import java.io.IOException;
 
-public class WrappingFieldComparator<T extends Comparable<T>> extends TypeComparator<T> {
+public class WrappingFieldComparator<T extends Comparable<T>> extends FieldComparator<T> {
 
 	private static final long serialVersionUID = 1L;
 
+	private static final byte NULL_FLAG =     (byte)0x00;
+	private static final byte NOT_NULL_FLAG = (byte)0xFF;
+
 	private final TypeComparator wrappedComparator;
 
-	private final boolean ascending;
-	private final Class<T> type;
-	private TypeSerializer<T> serializer;
-	private transient T ref;
-	private transient T tmpRef;
-
 	public WrappingFieldComparator(TypeComparator<T> wrappedComparator, boolean ascending, TypeSerializer<T> serializer, Class<T> type) {
+		super(ascending, serializer, type);
 		this.wrappedComparator = wrappedComparator;
-
-		this.ascending = ascending;
-		this.serializer = serializer;
-		this.type = type;
 	}
 
 	public WrappingFieldComparator(WrappingFieldComparator toClone) {
@@ -52,117 +46,52 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 	}
 
 	@Override
-	public int hash(T t) {
-		if(t == null) {
-			return 1;
-		}
-		else {
-			return t.hashCode();
-		}
-	}
-
-	@Override
-	public void setReference(T t) {
-		if(t == null) {
-			this.ref = null;
-		}
-		else {
-			this.ref = (T)this.serializer.copy(t);
-		}
-	}
-
-	@Override
-	public boolean equalToReference(T t) {
-		if(t != null && ref != null) {
-			return t.equals(this.ref);
-		}
-		else if(t == null && ref == null) {
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-
-	@Override
-	public int compareToReference(TypeComparator<T> typeComparator) {
-		WrappingFieldComparator other = (WrappingFieldComparator)typeComparator;
-		int cmp;
-
-		if(this.ref != null && other.ref != null) {
-			cmp = other.ref.compareTo(this.ref);
-
-		}
-		else if(this.ref == null && other.ref == null) {
-			cmp = 0;
-		}
-		else if(this.ref == null && other.ref != null) {
-			cmp = -1;
-		}
-		else {
-			cmp = 1;
-		}
-		return this.ascending?cmp:-cmp;
-	}
-
-	@Override
-	public int compare(T t1, T t2) {
-		int cmp;
-
-		if(t1 != null && t2 != null) {
-			cmp = t1.compareTo(t2);
-		}
-		else if(t1 == null && t2 == null) {
-			cmp = 0;
-		}
-		else if(t1 == null && t2 != null) {
-			cmp = -1;
-		}
-		else {
-			cmp = 1;
-		}
-		return this.ascending?cmp:-cmp;
-	}
-
-	@Override
-	public int compareSerialized(DataInputView firstSource, DataInputView secondSource) throws IOException {
-		if(this.ref == null) {
-			this.ref = this.serializer.createInstance();
-		}
-
-		if(this.tmpRef == null) {
-			this.tmpRef = this.serializer.createInstance();
-		}
-
-		this.ref = this.serializer.deserialize(this.ref, firstSource);
-		this.tmpRef = this.serializer.deserialize(this.tmpRef, secondSource);
-		int cmp = this.ref.compareTo(this.tmpRef);
-		return this.ascending?cmp:-cmp;
-	}
-
-	@Override
 	public boolean supportsNormalizedKey() {
-		return false;
+		return this.wrappedComparator.supportsNormalizedKey();
+	}
+
+	@Override
+	public boolean invertNormalizedKey() {
+		return this.wrappedComparator.invertNormalizedKey();
+	}
+
+	@Override
+	public int getNormalizeKeyLen() {
+		int normalizeKeyLen = this.wrappedComparator.getNormalizeKeyLen();
+		if(normalizeKeyLen != Integer.MAX_VALUE) {
+			return normalizeKeyLen + 1;
+		}
+		else {
+			return normalizeKeyLen;
+		}
+	}
+
+	@Override
+	public boolean isNormalizedKeyPrefixOnly(int numBytes) {
+		return this.wrappedComparator.isNormalizedKeyPrefixOnly(numBytes + 1);
+	}
+
+	@Override
+	public void putNormalizedKey(T val, MemorySegment target, int offset, int numBytes) {
+		if(val != null) {
+			target.put(offset, NOT_NULL_FLAG);
+			this.wrappedComparator.putNormalizedKey(val, target, offset + 1, numBytes - 1);
+		}
+		else {
+			for(int i=0; i < numBytes; i++) {
+				target.put(offset, NULL_FLAG);
+			}
+		}
+	}
+
+	@Override
+	public TypeComparator<T> duplicate() {
+		return new WrappingFieldComparator<T>(this);
 	}
 
 	@Override
 	public boolean supportsSerializationWithKeyNormalization() {
 		return false;
-	}
-
-	@Override
-	public int getNormalizeKeyLen() {
-		return -1;
-	}
-
-	@Override
-	public boolean isNormalizedKeyPrefixOnly(int i) {
-		return false;
-	}
-
-	@Override
-	public void putNormalizedKey(T t, MemorySegment memorySegment, int i, int i1) {
-		throw new UnsupportedOperationException("Normalized keys not supported for Cascading fields.");
 	}
 
 	@Override
@@ -173,27 +102,6 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 	@Override
 	public T readWithKeyDenormalization(T t, DataInputView dataInputView) throws IOException {
 		throw new UnsupportedOperationException("Normalized keys not supported for Cascading fields.");
-	}
-
-	@Override
-	public boolean invertNormalizedKey() {
-		return false;
-	}
-
-	@Override
-	public TypeComparator<T> duplicate() {
-		return new WrappingFieldComparator<T>(this);
-	}
-
-	@Override
-	public int extractKeys(Object record, Object[] target, int idx) {
-		target[idx] = record;
-		return 1;
-	}
-
-	@Override
-	public TypeComparator[] getFlatComparators() {
-		return new TypeComparator[] {this};
 	}
 
 }

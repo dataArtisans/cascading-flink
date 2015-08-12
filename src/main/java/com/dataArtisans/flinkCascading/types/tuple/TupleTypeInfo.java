@@ -18,19 +18,15 @@
 
 package com.dataArtisans.flinkCascading.types.tuple;
 
-import cascading.flow.FlowException;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.types.field.FieldTypeInfo;
 import org.apache.flink.api.common.ExecutionConfig;
-import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.api.java.typeutils.TypeExtractor;
 
-import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -94,7 +90,8 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 		String[] serdePos = new String[keyPos.length];
 
-		Comparator[] comps = keyFields.getComparators();
+		Comparator[] keyComps = keyFields.getComparators();
+		Class[] keyTypes = keyFields.getTypesClasses();
 
 		for(int j=0; j<keyPos.length; j++) {
 			// update min length
@@ -103,11 +100,14 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			// set serde position
 			serdePos[j] = Integer.toString(keyPos[j]);
 
-			// set custom comparator (if any)
-			if(comps != null && comps.length > j && comps[j] != null) {
+			if(keyTypes != null && keyTypes.length > j && keyTypes[j] != null) {
+				// set key type
+				this.fieldTypes[keyPos[j]].setFieldType(keyTypes[j]);
+			}
 
-				// set custom comparator
-				this.fieldTypes[keyPos[j]].setCustomComparator(comps[j]);
+			if(keyComps != null && keyComps.length > j && keyComps[j] != null) {
+				// set custom key comparator
+				this.fieldTypes[keyPos[j]].setCustomComparator(keyComps[j]);
 			}
 		}
 
@@ -279,33 +279,19 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			throw new ArrayIndexOutOfBoundsException("Fields position out of bounds");
 		}
 
+		FieldTypeInfo fieldTypeInfo;
 		if(typeClasses != null && typeClasses[pos] != null) {
-			if(fieldComparators != null && fieldComparators[pos] != null) {
-				// we know the type of the field, but need to use a custom comparator
-				FieldTypeInfo fieldInfo = new FieldTypeInfo();
-				fieldInfo.setCustomComparator(fieldComparators[pos]);
-				return fieldInfo;
-			}
-			else {
-				// try to use a special field type
-				TypeInformation fieldTypeInfo = BasicTypeInfo.getInfoFor(typeClasses[pos]);
-				if(fieldTypeInfo != null) {
-					// use field field
-					return new FieldTypeInfo(fieldTypeInfo);
-				}
-				else {
-					// use generic type for complex types
-					return new FieldTypeInfo();
-				}
-			}
+			fieldTypeInfo = new FieldTypeInfo(typeClasses[pos]);
 		}
 		else {
-			// we do not know the type of the field. Use a generic field type
-			FieldTypeInfo fieldInfo = new FieldTypeInfo();
-			if(fieldComparators != null && fieldComparators[pos] != null) {
-				fieldInfo.setCustomComparator(fieldComparators[pos]);
-			}
-			return fieldInfo;
+			fieldTypeInfo = new FieldTypeInfo();
 		}
+
+		// set custom field comparator if any
+		if(fieldComparators != null && fieldComparators[pos] != null) {
+			fieldTypeInfo.setCustomComparator(fieldComparators[pos]);
+		}
+
+		return fieldTypeInfo;
 	}
 }
