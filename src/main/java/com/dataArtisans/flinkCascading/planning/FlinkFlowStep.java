@@ -618,7 +618,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		int[] keyPos = inputFields[0].getPos(keyFields[0]);
 
-		TupleTypeInfo keysTypeInfo = new TupleTypeInfo((keyFields[0]));
+		TupleTypeInfo keysTypeInfo = new TupleTypeInfo(inputFields[0].select(keyFields[0]));
 		keysTypeInfo.registerKeyFields(keyFields[0]);
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
@@ -658,7 +658,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		int[] keyPos = inputFields[0].getPos(keyFields[0]);
 
-		TupleTypeInfo keysTypeInfo = new TupleTypeInfo((keyFields[0]));
+		TupleTypeInfo keysTypeInfo = new TupleTypeInfo(inputFields[0].select(keyFields[0]));
 		keysTypeInfo.registerKeyFields(keyFields[0]);
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
@@ -711,7 +711,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			TypeInformation<Tuple3<Tuple, Integer, Tuple>> keyedType =
 					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Integer, Tuple>>(
-							new TupleTypeInfo(keyFields[i]),
+							new TupleTypeInfo(inputFields[i].select(keyFields[i])),
 							BasicTypeInfo.INT_TYPE_INFO,
 							new TupleTypeInfo(inputFields[i])
 			);
@@ -812,13 +812,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private DataSet<Tuple2<Tuple, Tuple[]>> prepareHashJoinInput(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
-		HashJoin hashJoin = (HashJoin)getCommonSuccessor(node.getSourceElements(), node);
+		HashJoin hashJoin = (HashJoin) getCommonSuccessor(node.getSourceElements(), node);
 		List<Scope> inScopes = getInputScopes(node, hashJoin);
 
 		Joiner joiner = hashJoin.getJoiner();
 
 		int numJoinInputs = hashJoin.isSelfJoin() ? hashJoin.getNumSelfJoins() + 1 : inputs.size();
-		Fields firstInputKeyFields = null;
+		Fields[] keyFields = new Fields[numJoinInputs];
 		String[][] flinkKeys = new String[numJoinInputs][];
 		List<DataSet<Tuple>> joinInputs;
 
@@ -831,11 +831,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				Scope inScope = inScopes.get(i);
 
 				// get join key fields
-				Fields keyFields = hashJoin.getKeySelectors().get(inScope.getName());
-				flinkKeys[i] = registerKeyFields(inputs.get(i), keyFields);
-				if (i == 0) {
-					firstInputKeyFields = keyFields;
-				}
+				keyFields[i] = hashJoin.getKeySelectors().get(inScope.getName());
+				flinkKeys[i] = registerKeyFields(inputs.get(i), keyFields[i]);
 			}
 
 			joinInputs = inputs;
@@ -845,11 +842,11 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			Scope inScope = inScopes.get(0);
 			// get join key fields
-			Fields keyFields = hashJoin.getKeySelectors().get(inScope.getName());
-			flinkKeys[0] = registerKeyFields(inputs.get(0), keyFields);
-			firstInputKeyFields = keyFields;
+			keyFields[0] = hashJoin.getKeySelectors().get(inScope.getName());
+			flinkKeys[0] = registerKeyFields(inputs.get(0), keyFields[0]);
 
 			for (int i = 1; i < numJoinInputs; i++) {
+				keyFields[i] = keyFields[0];
 				flinkKeys[i] = Arrays.copyOf(flinkKeys[0], flinkKeys[0].length);
 			}
 
@@ -861,9 +858,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 
 		if(joiner instanceof InnerJoin) {
-			if(!firstInputKeyFields.isNone()) {
+			if(!keyFields[0].isNone()) {
 				// inner join with keys
-				return prepareInnerHashJoinInput(joinInputs, firstInputKeyFields, flinkKeys, dop);
+				return prepareInnerHashJoinInput(joinInputs, keyFields, flinkKeys, dop);
 			}
 			else {
 				// Cartesian product
@@ -876,15 +873,15 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerHashJoinInput(List<DataSet<Tuple>> inputs, Fields firstInputKeyFields, String[][] flinkKeys, int dop) {
+	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerHashJoinInput(List<DataSet<Tuple>> inputs, Fields[] keyFields, String[][] flinkKeys, int dop) {
 
 		int numJoinInputs = inputs.size();
 
 		Fields inputFields = ((TupleTypeInfo)inputs.get(0).getType()).getFields();
-		int[] keyPos = inputFields.getPos(firstInputKeyFields);
+		int[] keyPos = inputFields.getPos(keyFields[0]);
 
-		TupleTypeInfo keysTypeInfo = new TupleTypeInfo((firstInputKeyFields));
-		keysTypeInfo.registerKeyFields(firstInputKeyFields);
+		TupleTypeInfo keysTypeInfo = new TupleTypeInfo(inputFields.select(keyFields[0]));
+		keysTypeInfo.registerKeyFields(keyFields[0]);
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(

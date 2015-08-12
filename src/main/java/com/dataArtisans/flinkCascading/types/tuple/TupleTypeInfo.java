@@ -23,11 +23,14 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.types.field.FieldTypeInfo;
 import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
 
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -57,13 +60,11 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			this.fieldTypes = new FieldTypeInfo[length];
 
 			Comparator[] comps = fields.getComparators();
+			Class[] typeClasses = fields.getTypesClasses();
 
 			for(int i=0; i<length; i++) {
 				this.fieldNames[i] = Integer.toString(i);
-				this.fieldTypes[i] = new FieldTypeInfo();
-				if(comps != null && comps.length > i && comps[i] != null) {
-					this.fieldTypes[i].setCustomComparator(comps[i]);
-				}
+				this.fieldTypes[i] = getFieldTypeInfo(i, typeClasses, comps);
 			}
 		}
 		else {
@@ -104,6 +105,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 			// set custom comparator (if any)
 			if(comps != null && comps.length > j && comps[j] != null) {
+
 				// set custom comparator
 				this.fieldTypes[keyPos[j]].setCustomComparator(comps[j]);
 			}
@@ -266,6 +268,44 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		}
 		else {
 			return false;
+		}
+	}
+
+	private FieldTypeInfo getFieldTypeInfo(int pos, Class[] typeClasses, Comparator[] fieldComparators) {
+		if(typeClasses != null && pos >= typeClasses.length) {
+			throw new ArrayIndexOutOfBoundsException("Fields position out of bounds");
+		}
+		if(fieldComparators != null && pos >= fieldComparators.length) {
+			throw new ArrayIndexOutOfBoundsException("Fields position out of bounds");
+		}
+
+		if(typeClasses != null && typeClasses[pos] != null) {
+			if(fieldComparators != null && fieldComparators[pos] != null) {
+				// we know the type of the field, but need to use a custom comparator
+				FieldTypeInfo fieldInfo = new FieldTypeInfo();
+				fieldInfo.setCustomComparator(fieldComparators[pos]);
+				return fieldInfo;
+			}
+			else {
+				// try to use a special field type
+				TypeInformation fieldTypeInfo = BasicTypeInfo.getInfoFor(typeClasses[pos]);
+				if(fieldTypeInfo != null) {
+					// use field field
+					return new FieldTypeInfo(fieldTypeInfo);
+				}
+				else {
+					// use generic type for complex types
+					return new FieldTypeInfo();
+				}
+			}
+		}
+		else {
+			// we do not know the type of the field. Use a generic field type
+			FieldTypeInfo fieldInfo = new FieldTypeInfo();
+			if(fieldComparators != null && fieldComparators[pos] != null) {
+				fieldInfo.setCustomComparator(fieldComparators[pos]);
+			}
+			return fieldInfo;
 		}
 	}
 }

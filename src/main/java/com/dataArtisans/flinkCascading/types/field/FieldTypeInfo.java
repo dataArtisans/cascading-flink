@@ -35,7 +35,19 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 
 	private Comparator<Comparable> fieldComparator = null;
 
+	private TypeInformation<Comparable> fieldTypeInfo;
+
+	public FieldTypeInfo() {
+
+	}
+
+	public FieldTypeInfo(TypeInformation<Comparable> fieldTypeInfo) {
+		if(fieldTypeInfo.isBasicType())
+		this.fieldTypeInfo = fieldTypeInfo;
+	}
+
 	public void setCustomComparator(Comparator<Comparable> comparator) {
+		this.fieldTypeInfo = null;
 		this.fieldComparator = comparator;
 	}
 
@@ -61,7 +73,12 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 
 	@Override
 	public Class getTypeClass() {
-		return Comparable.class;
+		if(fieldTypeInfo != null) {
+			return this.fieldTypeInfo.getTypeClass();
+		}
+		else {
+			return Comparable.class;
+		}
 	}
 
 	@Override
@@ -71,7 +88,12 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 
 	@Override
 	public TypeSerializer<Comparable> createSerializer(ExecutionConfig config) {
-		return new KryoSerializer(Comparable.class, config);
+		if(fieldTypeInfo != null) {
+			return this.fieldTypeInfo.createSerializer(config);
+		}
+		else {
+			return new KryoSerializer(Comparable.class, config);
+		}
 	}
 
 	@Override
@@ -79,11 +101,16 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 
 		TypeSerializer<Comparable> serializer = this.createSerializer(config);
 
-		if(this.fieldComparator == null) {
-			return new FieldComparator(sortOrderAscending, serializer, Comparable.class);
+		if(this.fieldTypeInfo != null) {
+			TypeComparator<Comparable> fieldComparator = ((AtomicType)fieldTypeInfo).createComparator(sortOrderAscending, config);
+			return new WrappingFieldComparator(fieldComparator, sortOrderAscending, serializer, Comparable.class);
 		}
 		else {
-			return new CustomFieldComparator(sortOrderAscending, this.fieldComparator, this.createSerializer(config));
+			if (this.fieldComparator == null) {
+				return new FieldComparator(sortOrderAscending, serializer, Comparable.class);
+			} else {
+				return new CustomFieldComparator(sortOrderAscending, this.fieldComparator, this.createSerializer(config));
+			}
 		}
 	}
 
