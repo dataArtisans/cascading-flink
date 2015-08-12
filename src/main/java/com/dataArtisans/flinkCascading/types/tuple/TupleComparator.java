@@ -115,12 +115,9 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 		// TODO more efficient via bit masks
 		boolean[] nullFields1 = new boolean[arity1];
 		boolean[] nullFields2 = new boolean[arity2];
-		for(int i = 0; i <arity1; i++) {
-			nullFields1[i] = firstSource.readBoolean();
-		}
-		for(int i=0; i <arity2; i++) {
-			nullFields2[i] = secondSource.readBoolean();
-		}
+
+		TupleSerializer.readNullMask(nullFields1, arity1, firstSource);
+		TupleSerializer.readNullMask(nullFields2, arity2, secondSource);
 
 		for (int i=0; i < serializers.length; i++) {
 			if(!nullFields1[i]) {

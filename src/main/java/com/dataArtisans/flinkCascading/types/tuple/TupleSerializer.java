@@ -45,7 +45,6 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 
 	@Override
 	public TupleSerializer duplicate() {
-//		return new TupleSerializer(this.fieldSer.duplicate(), serPos);
 		return new TupleSerializer(this.fieldSer.duplicate(), length);
 	}
 
@@ -92,20 +91,19 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public void serialize(Tuple value, DataOutputView target) throws IOException {
 
-		// write length only if length is unknown
 		if(this.length < 0) {
+			// write length only if length is unknown
 			target.writeInt(value.size());
 		}
 		else {
+			// verify correct length of tuple
 			if(value.size() != length) {
 				throw new FlowException("Size of tuple "+value+" is not correspond to specified size ("+length+").");
 			}
 		}
 
-		// write null markers TODO: use bit mask instead of boolean array
-		for (int i = 0; i < value.size(); i++) {
-			target.writeBoolean(value.getObject(i) == null);
-		}
+		// write null mask
+		TupleSerializer.writeNullMask(value, target);
 
 		for (int i = 0; i < value.size(); i++) {
 			Object o = value.getObject(i);
@@ -121,15 +119,15 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 		// read length only if unknown
 		int arity = this.length < 0 ? source.readInt() : this.length;
 
+		// initialize or resize null fields if necessary
 		if(this.nullFields == null || this.nullFields.length < arity) {
 			this.nullFields = new boolean[arity];
 		}
 
-		// TODO: read bit mask instead of boolean array
-		for (int i = 0; i < arity; i++) {
-			this.nullFields[i] = source.readBoolean();
-		}
+		// read null mask
+		TupleSerializer.readNullMask(this.nullFields, arity, source);
 
+		// read non-null fields
 		Tuple tuple = Tuple.size(arity);
 		for (int i = 0; i < arity; i++) {
 			Object field;
@@ -151,17 +149,17 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 		// read length only if unknown
 		int arity = this.length < 0 ? source.readInt() : this.length;
 
+		// initialize or resize null fields if necessary
 		if(this.nullFields == null || this.nullFields.length < arity) {
 			this.nullFields = new boolean[arity];
 		}
+		// resize Tuple if necessary
 		if(reuse.size() != arity) {
 			reuse = Tuple.size(arity);
 		}
 
-		// TODO: read bit mask instead of boolean array
-		for (int i = 0; i < arity; i++) {
-			this.nullFields[i] = source.readBoolean();
-		}
+		// read null mask
+		TupleSerializer.readNullMask(nullFields, arity, source);
 
 		for (int i = 0; i < arity; i++) {
 			Object field;
@@ -183,19 +181,20 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 		// read length only if unknown
 		int arity = this.length < 0 ? source.readInt() : this.length;
 
-		if(this.nullFields == null || this.nullFields.length < arity) {
-			this.nullFields = new boolean[arity];
-		}
-
+		// write length if necessary
 		if(this.length < 0) {
 			target.writeInt(arity);
 		}
 
-		for (int i = 0; i < arity; i++) {
-			this.nullFields[i] = source.readBoolean();
-			target.writeBoolean(this.nullFields[i]);
+		// initialize or resize nullFields if necessary
+		if(this.nullFields == null || this.nullFields.length < arity) {
+			this.nullFields = new boolean[arity];
 		}
 
+		// read and copy null mask
+		TupleSerializer.readAndCopyNullMask(nullFields, arity, source, target);
+
+		// copy non-null fields
 		for (int i = 0; i < arity; i++) {
 			if(!this.nullFields[i]) {
 				fieldSer.copy(source, target);
@@ -206,6 +205,60 @@ public class TupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public boolean equals(Object o) {
 		return (o instanceof TupleSerializer);
+	}
+
+	public static void writeNullMask(
+			Tuple t, DataOutputView target) throws IOException{
+
+		final int length = t.size();
+		int b;
+		int bytePos;
+
+		for(int fieldPos = 0; fieldPos < length; ) {
+			b = 0x00;
+			// set bits in byte
+			for(bytePos = 0; bytePos < 8 && fieldPos < length; bytePos++, fieldPos++) {
+				b = b << 1;
+				// set bit if field is null
+				if(t.getObject(fieldPos) == null) {
+					b |= 0x01;
+				}
+			}
+			// shift bits if last byte is not completely filled
+			for(; bytePos < 8; bytePos++) {
+				b = b << 1;
+			}
+			// write byte
+			target.writeByte(b);
+		}
+	}
+
+	public static void readNullMask(
+			boolean[] mask, int length, DataInputView source) throws IOException {
+
+		for(int fieldPos = 0; fieldPos < length; ) {
+			// read byte
+			int b = source.readUnsignedByte();
+			for(int bytePos = 0; bytePos < 8 && fieldPos < length; bytePos++, fieldPos++) {
+				mask[fieldPos] = (b & 0x80) > 0;
+				b = b << 1;
+			}
+		}
+	}
+
+	public static void readAndCopyNullMask(
+			boolean[] mask, int length, DataInputView source, DataOutputView target) throws IOException {
+
+		for(int fieldPos = 0; fieldPos < length; ) {
+			// read byte
+			int b = source.readUnsignedByte();
+			// copy byte
+			target.writeByte(b);
+			for(int bytePos = 0; bytePos < 8 && fieldPos < length; bytePos++, fieldPos++) {
+				mask[fieldPos] = (b & 0x80) > 0;
+				b = b << 1;
+			}
+		}
 	}
 
 }
