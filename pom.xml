@@ -306,7 +306,7 @@ under the License.
 						<exclude>**/*.prefs</exclude>
 						<exclude>**/*.properties</exclude>
 						<exclude>**/*.log</exclude>
-						<exclude>**/*.txt</exclude>
+                                                <exclude>*.txt/**</exclude>
 						<!-- Administrative files in the main trunk. -->
 						<exclude>**/README.md</exclude>
 						<exclude>CHANGELOG</exclude>
