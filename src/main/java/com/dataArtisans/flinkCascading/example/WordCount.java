@@ -32,7 +32,6 @@ import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import com.dataArtisans.flinkCascading.FlinkConnector;
 
-import java.util.Properties;
 
 public class WordCount {
 	public static void main(String[] args) {
