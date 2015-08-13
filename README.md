@@ -79,12 +79,12 @@ Then submit the jar to a Flink cluster by using the command-line utility:
 
     cd flink-dist
     cd bin
-    ./flink run -c <entry_class> <path_to_jar>
+    ./flink run -c <entry_class> <path_to_jar> <jar_arguments>
  
  This will use the cluster's default parallelism. You may explictly specify the parallelism by 
  setting the `-p` flag.
  
-    ./flink run -p 20 -c <entry_class> <path_to_jar>
+    ./flink run -p 20 -c <entry_class> <path_to_jar> <jar_arguments>
     
 This will set the default parallelism for operators to 20 which means Flink tries to run 20 parallel
 instances of each operation.
@@ -93,7 +93,7 @@ instances of each operation.
 
 If you want to run your Flink cluster on YARN, you can do that as follows:
 
-    ./flink run -m yarn-cluster -yn 10 -p 20 -c <entry_class> <path_to_jar>
+    ./flink run -m yarn-cluster -yn 10 -p 20 -c <entry_class> <path_to_jar> <jar_arguments>
 
 This will create a Flink cluster for your job consisting of 10 task managers (workers) with a default 
 parallelism of 20.
