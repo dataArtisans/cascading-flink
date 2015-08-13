@@ -52,6 +52,11 @@ public class FlinkFlowStepStats extends FlowStepStats {
 	}
 
 	@Override
+	public long getLastSuccessfulCounterFetchTime() {
+		return 0;
+	}
+
+	@Override
 	public Collection<String> getCounterGroups() {
 		return null;
 	}
