@@ -1,4 +1,4 @@
-# Cascading-Flink - Cascading on top of Apache Flink
+# Cascading on top of Apache Flink
 
 Cascading-Flink enables you to use Apache Flink as an execution engine for your Cascading
 applications.
