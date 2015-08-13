@@ -35,7 +35,7 @@ import cascading.tap.hadoop.Hfs;
 import cascading.tap.hadoop.PartitionTap;
 import cascading.tap.partition.Partition;
 import cascading.tuple.Fields;
-import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
+import com.dataArtisans.flinkCascading.runtime.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.FlinkConnector;
 import com.dataArtisans.flinkCascading.util.FlinkConfigDefScheme;
 import data.InputData;

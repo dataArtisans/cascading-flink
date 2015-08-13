@@ -158,7 +158,6 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 		int arity1 = this.tupleLength < 0 ? firstSource.readInt() : this.tupleLength;
 		int arity2 = this.tupleLength < 0 ? secondSource.readInt() : this.tupleLength;
 
-		// TODO more efficient via bit masks
 		boolean[] nullFields1 = new boolean[arity1];
 		boolean[] nullFields2 = new boolean[arity2];
 
