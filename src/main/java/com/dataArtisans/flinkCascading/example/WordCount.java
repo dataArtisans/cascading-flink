@@ -36,6 +36,10 @@ import com.dataArtisans.flinkCascading.FlinkConnector;
 public class WordCount {
 	public static void main(String[] args) {
 
+		if (args.length < 2) {
+			throw new IllegalArgumentException("Please specify input and ouput paths as arguments.");
+		}
+
 		Fields token = new Fields( "token" );
 		Fields text = new Fields( "text" );
 		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "\\s+" );
