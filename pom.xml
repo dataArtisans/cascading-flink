@@ -64,6 +64,13 @@ under the License.
 			<id>conjars.org</id>
 			<url>http://conjars.org/repo</url>
 		</repository>
+
+		<repository>
+			<id>flink-snapshot-repo</id>
+			<url>https://repository.apache.org/content/repositories/snapshots/</url>
+			<releases><enabled>false</enabled></releases>
+			<snapshots><enabled>true</enabled></snapshots>
+		</repository>
 	</repositories>
 
 	<dependencies>
@@ -87,13 +94,13 @@ under the License.
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-core</artifactId>
-			<version>3.1.0-wip-dev</version>
+			<version>3.1.0-wip-6</version>
 		</dependency>
 
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-hadoop2-io</artifactId>
-			<version>3.1.0-wip-dev</version>
+			<version>3.1.0-wip-6</version>
 		</dependency>
 
 		<!-- CASCADING TESTS -->
@@ -101,7 +108,7 @@ under the License.
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-core</artifactId>
-			<version>3.1.0-wip-dev</version>
+			<version>3.1.0-wip-6</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
@@ -109,7 +116,7 @@ under the License.
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-platform</artifactId>
-			<version>3.1.0-wip-dev</version>
+			<version>3.1.0-wip-6</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
@@ -117,7 +124,7 @@ under the License.
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-hadoop</artifactId>
-			<version>3.1.0-wip-dev</version>
+			<version>3.1.0-wip-6</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
