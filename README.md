@@ -1,26 +1,40 @@
-# Cascading on top of Apache Flink
+# Cascading Connector for Apache Flink
 
-Cascading-Flink enables you to use Apache Flink as an execution engine for your Cascading
-applications.
+[Cascading](http://www.cascading.org/projects/cascading) is a popular framework to develop, maintain, and execute large-scale and robust data analysis applications. Originally, Cascading flows have been executed on [Apache Hadoop](http://hadoop.apache.org). The most recent [3.0 release](http://www.cascading.org/2015/06/08/cascading-3-0-release) of Cascading added support for [Apache Tez](http://tez.apache.org) as a runtime backend.
 
+[Apache Flink](http://flink.apache.org) is a platform for scalable stream and batch processing. Flink's execution engine features low-latency pipelined and scalable batched data transfers and high-performance, in-memory operators for sorting and joining that gracefully go out-of-core in case of scarce memory resources. Flink can execute programs on a local machine, in a dedicated cluster, or on Hadoop YARN setups.
+
+The **Cascading Connector for Apache Flink** enables you to execute Cascading flows on Apache Flink. Using this connector, your Cascading flows will benefit from Flink's runtime features such as its pipelined data shuffles and its efficient and robust in-memory operators.
+
+## Features & Limitations ##
+
+The Cascading Connector for Apache Flink supports most Cascading and Flink features. 
+
+- Most Cascading operators are directly executed on Flink's memory-safe operators. This significantly reduces the need for cumbersome parameter tuning such as spill thresholds and the risk for `OutOfMemoryErrors`.
+- Flink's runtime leverages field type information of Cascading programs. Apache Flink uses specialized serializers and comparators to efficiently operate on binary data. Cascading flows that specify the type of key fields benefit from significant performance improvements.
+
+However, there are also a few limitations, which we are still working on, namely:
+
+- No support for counters. We expect to resolve this limitation very soon.
+- Only InnerJoins for HashJoin pipes. The remaining join types will be available once Flink supports hash-based outer joins.
 
 ## Install ##
 
-To retrieve the latest version of Cascading-Flink, run the following command
+To retrieve the latest version of the Cascading Connector for Apache Flink, run the following command
 
     git clone https://github.com/dataArtisans/cascading-flink.git
 
-Then switch to the newly created directory and run Maven to build Cascading-Flink:
+Then switch to the newly created directory and run Maven to build the Cascading Connector for Apache Flink:
 
     cd cascading-flink
     mvn clean install -DskipTests
 
-Cascading-Flink is now installed in your local maven repository.
+The Cascading Connector for Apache Flink is now installed in your local maven repository.
 
 ## WordCount Example
 
 Next, let's run the classic WordCount example. Before running it in our ETL pipeline on the cluster,
-we want to run it locally first. Cascading-Flink contains a built-in local execution mode to test
+we want to run it locally first. The Cascading Connector for Apache Flink contains a built-in local execution mode to test
 your applications before deploying them.
 
 Here is the main method of our WordCount example:
@@ -67,7 +81,7 @@ Then let's run the included WordCount locally on your machine:
 
     mvn exec:exec -Dinput=kinglear.txt -Doutput=wordcounts.txt
 
-Congratulations! You have run your first Flink-Cascading application on top of Apache Flink.
+Congratulations! You have run your first Cascading application on top of Apache Flink.
 
 ## Cluster Execution
 
@@ -81,7 +95,7 @@ Then submit the jar to a Flink cluster by using the command-line utility:
     cd bin
     ./flink run -c <entry_class> <path_to_jar> <jar_arguments>
  
- This will use the cluster's default parallelism. You may explictly specify the parallelism by 
+ This will use the cluster's default parallelism. You may explicitly specify the parallelism by 
  setting the `-p` flag.
  
     ./flink run -p 20 -c <entry_class> <path_to_jar> <jar_arguments>
@@ -107,9 +121,3 @@ Now let's run the included WordCount example on the cluster.
 Or on a YARN cluster:
 
     ./flink run  -m yarn-cluster -yn 10 -c com.dataArtisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
-
-
-## More
-
-For more information, please visit the [Apache Flink website](http://flink.apache.org) or send a
-mail to the [mailinglists](http://flink.apache.org/community.html#mailing-lists).
