@@ -31,14 +31,14 @@ import cascading.tuple.Tuple;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryOutStage;
 import com.dataArtisans.flinkCascading.exec.genericDucts.GroupByOutGate;
-import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
+import com.dataArtisans.flinkCascading.exec.util.CollectorOutput;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import org.apache.flink.util.Collector;
 
 public class CoGroupReduceStreamGraph extends NodeStreamGraph {
 
 	private CoGroupInGate sourceStage;
-	private FlinkCollectorOutput sinkStage;
+	private CollectorOutput sinkStage;
 
 	public CoGroupReduceStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, CoGroup coGroup) {
 

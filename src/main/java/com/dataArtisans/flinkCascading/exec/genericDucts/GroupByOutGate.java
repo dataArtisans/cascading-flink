@@ -26,10 +26,10 @@ import cascading.flow.stream.graph.StreamGraph;
 import cascading.pipe.Splice;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
+import com.dataArtisans.flinkCascading.exec.util.CollectorOutput;
 import org.apache.flink.util.Collector;
 
-public class GroupByOutGate extends GroupingSpliceGate implements FlinkCollectorOutput {
+public class GroupByOutGate extends GroupingSpliceGate implements CollectorOutput {
 
 	private Collector<Tuple> tupleCollector;
 

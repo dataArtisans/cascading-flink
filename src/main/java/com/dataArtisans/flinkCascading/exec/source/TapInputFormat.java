@@ -61,15 +61,15 @@ import java.util.Set;
 import static cascading.util.LogUtil.logCounters;
 import static cascading.util.LogUtil.logMemory;
 
-public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
+public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final Logger LOG = LoggerFactory.getLogger(CascadingInputFormat.class);
+	private static final Logger LOG = LoggerFactory.getLogger(TapInputFormat.class);
 
 	private FlowNode node;
 
-	private transient FlinkSourceStreamGraph streamGraph;
+	private transient SourceStreamGraph streamGraph;
 	private transient TapSourceStage sourceStage;
 	private transient SingleOutBoundaryStage sinkStage;
 
@@ -79,7 +79,7 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 	private transient org.apache.hadoop.mapred.InputFormat<? extends WritableComparable, ? extends Writable> mapredInputFormat;
 	private transient JobConf jobConf;
 
-	public CascadingInputFormat(FlowNode node) {
+	public TapInputFormat(FlowNode node) {
 
 		super();
 		this.node = node;
@@ -138,7 +138,7 @@ public class CascadingInputFormat implements InputFormat<Tuple, HadoopInputSplit
 			}
 			Tap source = (Tap)sourceElement;
 
-			streamGraph = new FlinkSourceStreamGraph( flowProcess, node, source );
+			streamGraph = new SourceStreamGraph( flowProcess, node, source );
 
 			sourceStage = this.streamGraph.getSourceStage();
 			sinkStage = this.streamGraph.getSinkStage();

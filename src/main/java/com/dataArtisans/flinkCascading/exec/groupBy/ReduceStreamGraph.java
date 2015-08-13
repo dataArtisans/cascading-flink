@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.reducer;
+package com.dataArtisans.flinkCascading.exec.groupBy;
 
 import cascading.flow.FlowNode;
 import cascading.flow.FlowProcess;
@@ -31,16 +31,16 @@ import cascading.tuple.Tuple;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryOutStage;
 import com.dataArtisans.flinkCascading.exec.genericDucts.GroupByOutGate;
-import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
+import com.dataArtisans.flinkCascading.exec.util.CollectorOutput;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import org.apache.flink.util.Collector;
 
-public class FlinkReduceStreamGraph extends NodeStreamGraph {
+public class ReduceStreamGraph extends NodeStreamGraph {
 
 	private GroupByInGate sourceStage;
-	private FlinkCollectorOutput sinkStage;
+	private CollectorOutput sinkStage;
 
-	public FlinkReduceStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, GroupBy groupBy) {
+	public ReduceStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, GroupBy groupBy) {
 
 		super(flowProcess, node);
 

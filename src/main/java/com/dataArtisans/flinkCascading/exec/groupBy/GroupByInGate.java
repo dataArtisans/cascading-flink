@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.reducer;
+package com.dataArtisans.flinkCascading.exec.groupBy;
 
 import cascading.flow.FlowProcess;
 import cascading.flow.stream.duct.Duct;
@@ -30,14 +30,13 @@ import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import cascading.tuple.util.TupleBuilder;
 import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
-import com.dataArtisans.flinkCascading.exec.reducer.FlinkGroupByClosure;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 
-	private FlinkGroupByClosure closure;
+	private GroupByClosure closure;
 
 	private final boolean isBufferJoin;
 
@@ -69,7 +68,7 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 		}
 
 		if( role != IORole.sink ) {
-			closure = new FlinkGroupByClosure(flowProcess, keyFields, valuesFields); // TODO what to do for CoGroupGates
+			closure = new GroupByClosure(flowProcess, keyFields, valuesFields); // TODO what to do for CoGroupGates
 		}
 
 		if( grouping != null && splice.getJoinDeclaredFields() != null && splice.getJoinDeclaredFields().isNone() ) {

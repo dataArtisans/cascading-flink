@@ -30,7 +30,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import java.util.Arrays;
 import java.util.Iterator;
 
-public class FlinkJoinClosure extends JoinerClosure {
+public class JoinClosure extends JoinerClosure {
 
 	private Tuple2<Tuple, Tuple[]> tupleJoinList;
 	private SingleTupleIterator[] iterators;
@@ -40,7 +40,7 @@ public class FlinkJoinClosure extends JoinerClosure {
 	private final Tuple[] keyTuples;
 	private final TupleBuilder joinedKeysTupleBuilder;
 
-	public FlinkJoinClosure(FlowProcess flowProcess, Fields[] joinFields, Fields[] valueFields) {
+	public JoinClosure(FlowProcess flowProcess, Fields[] joinFields, Fields[] valueFields) {
 		super(flowProcess, joinFields, valueFields);
 		this.emptyKeyTuple = Tuple.size( joinFields[0].size() );
 		this.keyTuples = new Tuple[joinFields.length];

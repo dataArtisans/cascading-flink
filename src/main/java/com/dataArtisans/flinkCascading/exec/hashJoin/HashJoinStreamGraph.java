@@ -29,14 +29,14 @@ import cascading.pipe.GroupBy;
 import cascading.pipe.HashJoin;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.exec.genericDucts.BoundaryOutStage;
-import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
+import com.dataArtisans.flinkCascading.exec.util.CollectorOutput;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import org.apache.flink.util.Collector;
 
 public class HashJoinStreamGraph extends NodeStreamGraph {
 
 	private JoinBoundaryInStage sourceStage;
-	private FlinkCollectorOutput sinkStage;
+	private CollectorOutput sinkStage;
 
 	public HashJoinStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary source) {
 

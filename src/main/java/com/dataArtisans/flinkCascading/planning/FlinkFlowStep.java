@@ -55,10 +55,10 @@ import com.dataArtisans.flinkCascading.exec.hashJoin.TupleAppendCrosser;
 import com.dataArtisans.flinkCascading.exec.hashJoin.TupleAppendJoiner;
 import com.dataArtisans.flinkCascading.exec.hashJoin.HashJoinMapper;
 import com.dataArtisans.flinkCascading.exec.mapper.Mapper;
-import com.dataArtisans.flinkCascading.exec.sink.CascadingOutputFormat;
-import com.dataArtisans.flinkCascading.exec.source.CascadingInputFormat;
+import com.dataArtisans.flinkCascading.exec.sink.TapOutputFormat;
+import com.dataArtisans.flinkCascading.exec.source.TapInputFormat;
 import com.dataArtisans.flinkCascading.exec.util.IdMapper;
-import com.dataArtisans.flinkCascading.exec.reducer.Reducer;
+import com.dataArtisans.flinkCascading.exec.groupBy.GroupByReducer;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 import com.dataArtisans.flinkCascading.types.tuple.TupleTypeInfo;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
@@ -361,7 +361,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		MultiInputFormat.addInputFormat(sourceConfig, tapConfig);
 
 		DataSet<Tuple> src = env
-				.createInput(new CascadingInputFormat(node), new TupleTypeInfo(tap.getSourceFields()))
+				.createInput(new TapInputFormat(node), new TupleTypeInfo(tap.getSourceFields()))
 				.name(tap.getIdentifier())
 				.setParallelism(dop)
 				.withParameters(FlinkConfigConverter.toFlinkConfig(new Configuration(sourceConfig)));
@@ -379,7 +379,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		int parallelism = ((Operator)input).getParallelism();
 
 		input
-				.output(new CascadingOutputFormat(node))
+				.output(new TapOutputFormat(node))
 				.name(tap.getIdentifier())
 				.setParallelism(parallelism)
 				.withParameters(FlinkConfigConverter.toFlinkConfig(sinkConfig));
@@ -490,7 +490,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			return result
 					.groupBy(groupKeys)
-					.reduceGroup(new Reducer(node))
+					.reduceGroup(new GroupByReducer(node))
 					.returns(new TupleTypeInfo(outFields))
 					.withParameters(this.getFlinkNodeConfig(node))
 					.setParallelism(dop)
@@ -506,7 +506,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			// group all data
 			return result
-					.reduceGroup(new Reducer(node))
+					.reduceGroup(new GroupByReducer(node))
 					.returns(new TupleTypeInfo(outFields))
 					.withParameters(this.getFlinkNodeConfig(node))
 					.setParallelism(dop)

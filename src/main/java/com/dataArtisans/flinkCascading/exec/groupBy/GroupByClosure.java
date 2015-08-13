@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.reducer;
+package com.dataArtisans.flinkCascading.exec.groupBy;
 
 import cascading.flow.FlowProcess;
 import cascading.pipe.joiner.JoinerClosure;
@@ -25,11 +25,11 @@ import cascading.tuple.Tuple;
 
 import java.util.Iterator;
 
-public class FlinkGroupByClosure extends JoinerClosure {
+public class GroupByClosure extends JoinerClosure {
 
 	protected Iterator values;
 
-	public FlinkGroupByClosure(FlowProcess flowProcess, Fields[] groupingFields, Fields[] valueFields) {
+	public GroupByClosure(FlowProcess flowProcess, Fields[] groupingFields, Fields[] valueFields) {
 		super(flowProcess, groupingFields, valueFields);
 	}
 

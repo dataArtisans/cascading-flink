@@ -30,11 +30,11 @@ import cascading.pipe.GroupBy;
 import cascading.pipe.HashJoin;
 import com.dataArtisans.flinkCascading.exec.util.FlinkFlowProcess;
 
-public class FlinkSinkStreamGraph extends NodeStreamGraph {
+public class SinkStreamGraph extends NodeStreamGraph {
 
 	private SinkBoundaryInStage sourceStage;
 
-	public FlinkSinkStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary source) {
+	public SinkStreamGraph(FlinkFlowProcess flowProcess, FlowNode node, Boundary source) {
 
 		super(flowProcess, node);
 

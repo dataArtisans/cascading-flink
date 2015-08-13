@@ -29,7 +29,7 @@ import cascading.pipe.joiner.Joiner;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-import com.dataArtisans.flinkCascading.exec.hashJoin.FlinkJoinClosure;
+import com.dataArtisans.flinkCascading.exec.hashJoin.JoinClosure;
 import org.apache.flink.api.java.tuple.Tuple2;
 
 import java.util.Iterator;
@@ -37,7 +37,7 @@ import java.util.NoSuchElementException;
 
 public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 
-	private FlinkJoinClosure closure;
+	private JoinClosure closure;
 	private JoinResultIterator resultIterator;
 
 	public CoGroupInGate(FlowProcess flowProcess, CoGroup splice, IORole ioRole) {
@@ -82,7 +82,7 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 				valuesFields = super.valuesFields;
 			}
 
-			closure = new FlinkJoinClosure(flowProcess, keyFields, valuesFields);
+			closure = new JoinClosure(flowProcess, keyFields, valuesFields);
 		}
 
 		if( grouping != null && splice.getJoinDeclaredFields() != null && splice.getJoinDeclaredFields().isNone() ) {
@@ -131,12 +131,12 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 
 		private Iterator<Tuple2<Tuple, Tuple[]>> input;
 
-		private FlinkJoinClosure closure;
+		private JoinClosure closure;
 		private Joiner joiner;
 
 		private Iterator<Tuple> joinedTuples;
 
-		public JoinResultIterator(FlinkJoinClosure closure, Joiner joiner) {
+		public JoinResultIterator(JoinClosure closure, Joiner joiner) {
 			this.closure = closure;
 			this.joiner = joiner;
 		}

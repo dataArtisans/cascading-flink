@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.exec.reducer;
+package com.dataArtisans.flinkCascading.exec.groupBy;
 
 import cascading.CascadingException;
 import cascading.flow.FlowElement;
@@ -45,13 +45,13 @@ import static cascading.util.LogUtil.logMemory;
  * Corresponds to FlowReducer
  *
  */
-public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
+public class GroupByReducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(Reducer.class);
+	private static final Logger LOG = LoggerFactory.getLogger(GroupByReducer.class);
 
 	private FlowNode flowNode;
 
-	private FlinkReduceStreamGraph streamGraph;
+	private ReduceStreamGraph streamGraph;
 
 	private GroupByInGate groupSource;
 
@@ -59,9 +59,9 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 
 	private boolean calledPrepare;
 
-	public Reducer() {}
+	public GroupByReducer() {}
 
-	public Reducer(FlowNode flowNode) {
+	public GroupByReducer(FlowNode flowNode) {
 		this.flowNode = flowNode;
 	}
 
@@ -86,7 +86,7 @@ public class Reducer extends RichGroupReduceFunction<Tuple, Tuple> {
 			}
 			GroupBy source = (GroupBy)sourceElement;
 
-			streamGraph = new FlinkReduceStreamGraph( currentProcess, flowNode, source );
+			streamGraph = new ReduceStreamGraph( currentProcess, flowNode, source );
 
 			groupSource = this.streamGraph.getGroupSource();
 

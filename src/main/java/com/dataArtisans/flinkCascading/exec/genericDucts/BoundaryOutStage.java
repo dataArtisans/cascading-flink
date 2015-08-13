@@ -25,10 +25,10 @@ import cascading.flow.stream.element.ElementStage;
 import cascading.flow.stream.graph.StreamGraph;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-import com.dataArtisans.flinkCascading.exec.util.FlinkCollectorOutput;
+import com.dataArtisans.flinkCascading.exec.util.CollectorOutput;
 import org.apache.flink.util.Collector;
 
-public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements FlinkCollectorOutput {
+public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements CollectorOutput {
 
 	private Collector<Tuple> tupleCollector;
 

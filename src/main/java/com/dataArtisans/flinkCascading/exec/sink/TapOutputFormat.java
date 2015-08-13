@@ -44,22 +44,22 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Set;
 
-public class CascadingOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
+public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final Logger LOG = LoggerFactory.getLogger(CascadingOutputFormat.class);
+	private static final Logger LOG = LoggerFactory.getLogger(TapOutputFormat.class);
 
 	private FlowNode node;
 
 	private transient org.apache.hadoop.conf.Configuration config;
 	private transient FlinkFlowProcess flowProcess;
-	private transient FlinkSinkStreamGraph streamGraph;
+	private transient SinkStreamGraph streamGraph;
 	private transient SinkBoundaryInStage sourceStage;
 
 	private transient long processBeginTime;
 
-	public CascadingOutputFormat(FlowNode node) {
+	public TapOutputFormat(FlowNode node) {
 		super();
 
 		this.node = node;
@@ -100,7 +100,7 @@ public class CascadingOutputFormat implements OutputFormat<Tuple>, FinalizeOnMas
 			}
 			Boundary source = (Boundary)sourceElement;
 
-			streamGraph = new FlinkSinkStreamGraph( flowProcess, node, source );
+			streamGraph = new SinkStreamGraph( flowProcess, node, source );
 
 			sourceStage = this.streamGraph.getSourceStage();
 

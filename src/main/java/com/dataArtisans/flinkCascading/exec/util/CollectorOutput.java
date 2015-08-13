@@ -21,7 +21,7 @@ package com.dataArtisans.flinkCascading.exec.util;
 import cascading.tuple.Tuple;
 import org.apache.flink.util.Collector;
 
-public interface FlinkCollectorOutput {
+public interface CollectorOutput {
 
 	public void setTupleCollector(Collector<Tuple> tupleCollector);
 

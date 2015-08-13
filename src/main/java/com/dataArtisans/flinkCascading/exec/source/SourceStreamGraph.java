@@ -29,12 +29,12 @@ import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
 import cascading.tap.Tap;
 
-public class FlinkSourceStreamGraph extends NodeStreamGraph {
+public class SourceStreamGraph extends NodeStreamGraph {
 
 	private TapSourceStage sourceStage;
 	private SingleOutBoundaryStage sinkStage;
 
-	public FlinkSourceStreamGraph(FlowProcess flowProcess, FlowNode node, Tap tap) {
+	public SourceStreamGraph(FlowProcess flowProcess, FlowNode node, Tap tap) {
 		super(flowProcess, node);
 
 		sourceStage = translateHead(tap, flowProcess);

@@ -32,7 +32,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 
 public class HashJoinGate extends SpliceGate<Tuple2<Tuple, Tuple[]>, TupleEntry> {
 
-	private FlinkJoinClosure closure;
+	private JoinClosure closure;
 	private Joiner joiner;
 
 	private TupleEntryChainIterator entryIterator;
@@ -72,7 +72,7 @@ public class HashJoinGate extends SpliceGate<Tuple2<Tuple, Tuple[]>, TupleEntry>
 			}
 		}
 
-		this.closure = new FlinkJoinClosure(this.flowProcess, keyFields, valueFields);
+		this.closure = new JoinClosure(this.flowProcess, keyFields, valueFields);
 		this.joiner = this.splice.getJoiner();
 		this.entryIterator = new TupleEntryChainIterator(outgoingScope.getOutValuesFields());
 
