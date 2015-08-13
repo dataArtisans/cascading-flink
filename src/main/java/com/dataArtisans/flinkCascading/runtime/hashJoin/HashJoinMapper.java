@@ -60,8 +60,7 @@ public class HashJoinMapper extends RichMapPartitionFunction<Tuple2<Tuple, Tuple
 
 		try {
 
-			String taskId = "hashjoin-" + flowNode.getID();
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), flowNode.getID());
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			// pick one (arbitrary) source

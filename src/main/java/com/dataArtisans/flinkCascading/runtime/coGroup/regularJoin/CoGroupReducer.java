@@ -67,8 +67,7 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple2<Tuple, Tuple[
 
 		try {
 
-			String taskId = "coGroup-" + flowNode.getID();
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), flowNode.getID());
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {

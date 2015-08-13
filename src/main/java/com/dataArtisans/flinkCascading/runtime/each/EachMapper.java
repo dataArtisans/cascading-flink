@@ -60,8 +60,7 @@ public class EachMapper extends RichMapPartitionFunction<Tuple, Tuple> {
 
 		try {
 
-			String taskId = "map-" + flowNode.getID();
-			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), taskId);
+			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), flowNode.getID());
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {

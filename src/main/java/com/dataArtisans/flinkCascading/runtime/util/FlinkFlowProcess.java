@@ -26,6 +26,7 @@ import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
+import org.apache.flink.api.common.accumulators.LongCounter;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.hadoop.conf.Configuration;
@@ -117,32 +118,28 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public void increment(Enum e, long l) {
-//		throw new UnsupportedOperationException("Enum counters not supported."); // TODO
+		increment(e.getDeclaringClass().getCanonicalName(), e.toString(), l);
 	}
 
 	@Override
 	public void increment(String group, String counter, long l) {
-		if(this.runtimeContext == null) {
-			throw new RuntimeException("RuntimeContext has not been set.");
-		}
-		else {
-			this.runtimeContext.getLongCounter(group+"."+counter).add(l);
+		if(this.runtimeContext != null) {
+			getOrInitCounter(group + "." + counter).add(l);
 		}
 	}
 
 	@Override
-	public long getCounterValue(Enum anEnum) {
-//		throw new UnsupportedOperationException("Enum counters not supported."); // TODO
-		return -1l;
+	public long getCounterValue(Enum e) {
+		return getCounterValue(e.getDeclaringClass().getCanonicalName(), e.toString());
 	}
 
 	@Override
 	public long getCounterValue(String group, String counter) {
-		if(this.runtimeContext == null) {
-			throw new RuntimeException("RuntimeContext has not been set.");
+		if(this.runtimeContext != null) {
+			return getOrInitCounter(group + "." + counter).getLocalValue();
 		}
 		else {
-			return this.runtimeContext.getLongCounter(group+"."+counter).getLocalValue();
+			return 0l;
 		}
 	}
 
@@ -232,6 +229,18 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 			mergedConf.set(key, map.get(key));
 		}
 		return mergedConf;
+	}
+
+	private LongCounter getOrInitCounter(String counterName) {
+
+		counterName = this.taskId + ":" + counterName;
+
+		LongCounter lc = this.runtimeContext.getLongCounter(counterName);
+		if(lc == null) {
+			lc = new LongCounter();
+			this.runtimeContext.addAccumulator(counterName, lc);
+		}
+		return lc;
 	}
 
 }

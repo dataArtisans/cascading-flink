@@ -50,7 +50,7 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 	private static final Logger LOG = LoggerFactory.getLogger(TapOutputFormat.class);
 
-	private FlowNode node;
+	private FlowNode flowNode;
 
 	private transient org.apache.hadoop.conf.Configuration config;
 	private transient FlinkFlowProcess flowProcess;
@@ -61,8 +61,7 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 	public TapOutputFormat(FlowNode node) {
 		super();
-
-		this.node = node;
+		this.flowNode = node;
 	}
 
 	@Override
@@ -79,8 +78,7 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 		FakeRuntimeContext rc = new FakeRuntimeContext(); // TODO replace fake runtime context
 		rc.setTaskNum(taskNumber);
 
-		String taskId = "datasink-" + node.getID();
-		BigInteger numId = new BigInteger(node.getID(), 16);
+		BigInteger numId = new BigInteger(flowNode.getID(), 16);
 		String hadoopTaskId = String.format( "attempt_%012d_0000_%s_%06d_0", numId.longValue(), "m", taskNumber );
 
 		this.config.setInt("mapred.task.partition", taskNumber);
@@ -88,9 +86,9 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 		try {
 
-			flowProcess = new FlinkFlowProcess(this.config, rc, taskId);
+			flowProcess = new FlinkFlowProcess(this.config, rc, flowNode.getID());
 
-			Set<FlowElement> sources = node.getSourceElements();
+			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {
 				throw new RuntimeException("FlowNode for TapOutputFormat may only have a single source");
 			}
@@ -100,7 +98,7 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 			}
 			Boundary source = (Boundary)sourceElement;
 
-			streamGraph = new SinkStreamGraph( flowProcess, node, source );
+			streamGraph = new SinkStreamGraph( flowProcess, flowNode, source );
 			sourceStage = this.streamGraph.getSourceStage();
 
 			for( Duct head : streamGraph.getHeads() ) {
@@ -163,7 +161,7 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 	public void finalizeGlobal(int parallelism) throws IOException {
 
 		org.apache.hadoop.conf.Configuration config = HadoopUtil.copyConfiguration(this.config);
-		Tap tap = this.node.getSinkTaps().iterator().next();
+		Tap tap = this.flowNode.getSinkTaps().iterator().next();
 
 		config.setBoolean(HadoopUtil.CASCADING_FLOW_EXECUTING, false);
 		HadoopUtil.setOutputPath(config, new Path(tap.getIdentifier()));

@@ -67,7 +67,7 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(TapInputFormat.class);
 
-	private FlowNode node;
+	private FlowNode flowNode;
 
 	private transient SourceStreamGraph streamGraph;
 	private transient TapSourceStage sourceStage;
@@ -79,13 +79,14 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	private transient org.apache.hadoop.mapred.InputFormat<? extends WritableComparable, ? extends Writable> mapredInputFormat;
 	private transient JobConf jobConf;
 
-	public TapInputFormat(FlowNode node) {
+	public TapInputFormat(FlowNode flowNode) {
 
 		super();
-		this.node = node;
+		this.flowNode = flowNode;
 
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void configure(Configuration config) {
 
@@ -113,16 +114,14 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 		FakeRuntimeContext rc = new FakeRuntimeContext();
 		rc.setTaskNum(split.getSplitNumber());
 
-		String taskId = "datasource-" + node.getID();
-
-		this.flowProcess = new FlinkFlowProcess(this.jobConf, rc, taskId);
+		this.flowProcess = new FlinkFlowProcess(this.jobConf, rc, flowNode.getID());
 
 		processBeginTime = System.currentTimeMillis();
 		flowProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
 
 		try {
 
-			Set<FlowElement> sources = node.getSourceElements();
+			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {
 				throw new RuntimeException("FlowNode for TapInputFormat may only have a single source");
 			}
@@ -132,7 +131,7 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 			}
 			Tap source = (Tap)sourceElement;
 
-			streamGraph = new SourceStreamGraph( flowProcess, node, source );
+			streamGraph = new SourceStreamGraph( flowProcess, flowNode, source );
 
 			sourceStage = this.streamGraph.getSourceStage();
 			sinkStage = this.streamGraph.getSinkStage();
@@ -181,12 +180,7 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	public boolean reachedEnd() throws IOException {
 
 		try {
-			if(sinkStage.hasNextTuple()) {
-				return false;
-			}
-			else {
-				return !this.sourceStage.readNextRecord();
-			}
+			return !sinkStage.hasNextTuple() && !this.sourceStage.readNextRecord();
 		}
 		catch( OutOfMemoryError error ) {
 			throw error;
@@ -225,7 +219,7 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 			flowProcess.increment(SliceCounters.Process_End_Time, processEndTime);
 			flowProcess.increment( SliceCounters.Process_Duration, processEndTime - this.processBeginTime );
 
-			String message = "flow node id: " + node.getID();
+			String message = "flow node id: " + flowNode.getID();
 			logMemory( LOG, message + ", mem on close" );
 			logCounters( LOG, message + ", counter:", flowProcess );
 		}
