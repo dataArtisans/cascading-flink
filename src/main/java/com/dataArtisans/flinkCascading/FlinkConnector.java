@@ -140,8 +140,6 @@ public class FlinkConnector extends FlowConnector {
 
 			// remove duplicate boundaries
 			addRule( new DoubleBoundaryRemovalTransformer() );
-			// remove boundaries in front of GroupBys
-//			addRule( new BoundaryBeforeGroupByRemovalTransformer() ); // TODO: add again (check with FieldedPipesPlatformTest.testSplitOut!) probably check for linear connection
 
 			// PreResolve
 			addRule( new RemoveNoOpPipeTransformer() );

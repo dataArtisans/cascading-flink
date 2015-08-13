@@ -97,7 +97,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		this.classPath = classPath;
 	}
 
-	// Configures the MapReduce program for this step
+	/**
+	 * Configures the Flink program for this step
+	 */
 	public Configuration createInitializedConfig( FlowProcess<Configuration> flowProcess, Configuration parentConfig ) {
 
 		Configuration config = parentConfig == null ? new JobConf() : HadoopUtil.copyJobConf( parentConfig );
@@ -108,30 +110,15 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return config;
 	}
 
-	protected FlowStepJob<Configuration> createFlowStepJob( ClientState clientState, FlowProcess<Configuration> flowProcess, Configuration initializedStepConfig )
-	{
-		try {
-
-			this.buildFlinkProgram(flowProcess);
-
-			return new FlinkFlowStepJob(clientState, this, initializedStepConfig, classPath);
-		}
-		catch(NoClassDefFoundError error) {
-			PlatformInfo platformInfo = HadoopUtil.getPlatformInfo();
-
-//			String message = "unable to load platform specific class, please verify Hadoop cluster version: '%s', matches the Hadoop platform build dependency and associated FlowConnector, cascading-hadoop or cascading-hadoop2-mr1";
-			String message = "Error"; // TODO
-
-			logError( String.format( message, platformInfo.toString() ), error );
-
-			throw error;
-		}
+	protected FlowStepJob<Configuration> createFlowStepJob( ClientState clientState, FlowProcess<Configuration> flowProcess, Configuration initializedStepConfig ) {
+		this.buildFlinkProgram(flowProcess);
+		return new FlinkFlowStepJob(clientState, this, initializedStepConfig, classPath);
 	}
 
 	/**
 	 * Method clean removes any temporary files used by this FlowStep instance. It will log any IOExceptions thrown.
 	 *
-	 * @param config of type JobConf
+	 * @param config of type Configuration
 	 */
 	public void clean( Configuration config ) {
 
@@ -192,7 +179,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		numReducers = (numReducers > 0) ? numReducers : env.getParallelism();
 
 		FlowNodeGraph flowNodeGraph = getFlowNodeGraph();
-		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator(); // TODO: topologicalIterator is non-deterministically broken!!!
+		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator();
 
 		Map<FlowElement, DataSet<?>> flinkMemo = new HashMap<FlowElement, DataSet<?>>();
 

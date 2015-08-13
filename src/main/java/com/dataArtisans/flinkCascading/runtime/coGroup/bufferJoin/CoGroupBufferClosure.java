@@ -365,7 +365,6 @@ public class CoGroupBufferClosure extends JoinerClosure {
 
 		public Collection<Tuple> create(FlowProcess<? extends Configuration> flowProcess) {
 
-			// TODO: Replace by a FlinkSplillableTupleList ?
 			return new HadoopSpillableTupleList(this.spillThreshold, this.tupleSerialization, this.codec);
 		}
 	}

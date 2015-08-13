@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.dataArtisans.flinkCascading.util;
+package com.dataArtisans.flinkCascading.platform.util;
 
 import cascading.flow.FlowProcess;
 import cascading.flow.FlowProcessWrapper;
@@ -38,25 +38,12 @@ public class FlinkConfigDefScheme extends TextLine {
 	}
 
 	@Override
-	public void sourceConfInit( FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf )
-	{
-
-		// TODO: Not sure why this check is necessary. Ask Chris!
-		// we should not see any config def values here
-//		if( flowProcess.getProperty( "default" ) != null )
-//			throw new RuntimeException( "default should be null" );
-
+	public void sourceConfInit( FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf ) {
 		super.sourceConfInit( flowProcess, tap, conf );
 	}
 
 	@Override
-	public void sinkConfInit( FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf )
-	{
-		// TODO: Not sure why this check is necessary. Ask Chris!
-		// we should not see any config def values here
-//		if( flowProcess.getProperty( "default" ) != null )
-//			throw new RuntimeException( "default should be null" );
-
+	public void sinkConfInit( FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf ) {
 		super.sinkConfInit( flowProcess, tap, conf );
 	}
 
