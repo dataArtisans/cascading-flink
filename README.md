@@ -53,7 +53,11 @@ public static void main(String[] args) {
 }
 ```
 
-That's really all the code you need to run a WordCount. Now let's see how it performs.
+That's really all the code you need to run a WordCount.
+
+## Local execution
+
+Now let's see how our WordCount performs.
 
 To execute the example, let's first get some sample data:
 

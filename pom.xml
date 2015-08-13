@@ -441,8 +441,8 @@ under the License.
 						<argument>-classpath</argument>
 						<classpath />
 						<argument>${clazz}</argument>
-						<argument>--input=${input}</argument>
-						<argument>--output=${output}</argument>
+						<argument>${input}</argument>
+						<argument>${output}</argument>
 					</arguments>
 				</configuration>
 			</plugin>
