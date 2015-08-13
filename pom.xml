@@ -52,6 +52,11 @@ under the License.
 		<slf4j.version>1.7.7</slf4j.version>
 		<guava.version>17.0</guava.version>
 		<kryoserialization.version>0.3.2</kryoserialization.version>
+
+		<!-- Default parameters for mvn exec:exec -->
+		<clazz>com.dataArtisans.flinkCascading.example.WordCount</clazz>
+		<input>kinglear.txt</input>
+		<output>wordcounts.txt</output>
 	</properties>
 
 	<repositories>
@@ -424,6 +429,22 @@ under the License.
 						</goals>
 					</execution>
 				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.2.1</version>
+				<configuration>
+					<executable>java</executable>
+					<arguments>
+						<argument>-classpath</argument>
+						<classpath />
+						<argument>${clazz}</argument>
+						<argument>--input=${input}</argument>
+						<argument>--output=${output}</argument>
+					</arguments>
+				</configuration>
 			</plugin>
 
 		</plugins>
