@@ -31,11 +31,10 @@ import cascading.flow.stream.element.ElementDuct;
 import cascading.tap.Tap;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.runtime.util.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.runtime.util.FakeRuntimeContext;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.io.FileInputFormat.FileBaseStatistics;
-import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.io.LocatableInputSplitAssigner;
+import org.apache.flink.api.common.io.RichInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.hadoop.mapred.wrapper.HadoopDummyReporter;
 import org.apache.flink.api.java.hadoop.mapred.wrapper.HadoopInputSplit;
@@ -61,7 +60,7 @@ import java.util.Set;
 import static cascading.util.LogUtil.logCounters;
 import static cascading.util.LogUtil.logMemory;
 
-public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
+public class TapInputFormat extends RichInputFormat<Tuple, HadoopInputSplit> {
 
 	private static final long serialVersionUID = 1L;
 
@@ -109,12 +108,7 @@ public class TapInputFormat implements InputFormat<Tuple, HadoopInputSplit> {
 	public void open(HadoopInputSplit split) throws IOException {
 
 		this.jobConf = split.getJobConf();
-
-		// TODO get proper runtime context from DataSource
-		FakeRuntimeContext rc = new FakeRuntimeContext();
-		rc.setTaskNum(split.getSplitNumber());
-
-		this.flowProcess = new FlinkFlowProcess(this.jobConf, rc, flowNode.getID());
+		this.flowProcess = new FlinkFlowProcess(this.jobConf, this.getRuntimeContext(), flowNode.getID());
 
 		processBeginTime = System.currentTimeMillis();
 		flowProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );

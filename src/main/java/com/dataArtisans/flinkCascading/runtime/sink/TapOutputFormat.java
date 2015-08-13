@@ -31,10 +31,9 @@ import cascading.tap.Tap;
 import cascading.tap.hadoop.util.Hadoop18TapUtil;
 import cascading.tuple.Tuple;
 import com.dataArtisans.flinkCascading.runtime.util.FlinkFlowProcess;
-import com.dataArtisans.flinkCascading.runtime.util.FakeRuntimeContext;
 import com.dataArtisans.flinkCascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.io.FinalizeOnMaster;
-import org.apache.flink.api.common.io.OutputFormat;
+import org.apache.flink.api.common.io.RichOutputFormat;
 import org.apache.flink.configuration.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -44,7 +43,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Set;
 
-public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
+public class TapOutputFormat extends RichOutputFormat<Tuple> implements FinalizeOnMaster {
 
 	private static final long serialVersionUID = 1L;
 
@@ -75,9 +74,6 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 		this.processBeginTime = System.currentTimeMillis();
 
-		FakeRuntimeContext rc = new FakeRuntimeContext(); // TODO replace fake runtime context
-		rc.setTaskNum(taskNumber);
-
 		BigInteger numId = new BigInteger(flowNode.getID(), 16);
 		String hadoopTaskId = String.format( "attempt_%012d_0000_%s_%06d_0", numId.longValue(), "m", taskNumber );
 
@@ -86,7 +82,7 @@ public class TapOutputFormat implements OutputFormat<Tuple>, FinalizeOnMaster {
 
 		try {
 
-			flowProcess = new FlinkFlowProcess(this.config, rc, flowNode.getID());
+			flowProcess = new FlinkFlowProcess(this.config, this.getRuntimeContext(), flowNode.getID());
 
 			Set<FlowElement> sources = flowNode.getSourceElements();
 			if(sources.size() != 1) {
