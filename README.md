@@ -98,6 +98,17 @@ If you want to run your Flink cluster on YARN, you can do that as follows:
 This will create a Flink cluster for your job consisting of 10 task managers (workers) with a default 
 parallelism of 20.
 
+### WordCount on the Cluster
+
+Now let's run the included WordCount example on the cluster.
+
+    ./flink run -c com.dataArtisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
+
+Or on a YARN cluster:
+
+    ./flink run  -m yarn-cluster -yn 10 -c com.dataArtisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
+
+
 ## More
 
 For more information, please visit the [Apache Flink website](http://flink.apache.org) or send a
