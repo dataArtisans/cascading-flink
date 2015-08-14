@@ -20,6 +20,7 @@ package com.dataArtisans.flinkCascading.planner;
 
 import cascading.flow.BaseFlow;
 import cascading.flow.FlowDef;
+import cascading.flow.FlowException;
 import cascading.flow.FlowProcess;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
@@ -29,6 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import riffle.process.ProcessConfiguration;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -75,7 +77,14 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 
 	@Override
 	protected void internalStart() {
-		// setup stuff: delete output files if overwrite, etc.
+		try {
+			deleteSinksIfReplace();
+			deleteTrapsIfReplace();
+			deleteCheckpointsIfReplace();
+		}
+		catch( IOException exception ) {
+			throw new FlowException( "unable to delete sinks", exception );
+		}
 	}
 
 	@Override
