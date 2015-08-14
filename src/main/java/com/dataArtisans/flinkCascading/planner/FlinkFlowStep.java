@@ -103,6 +103,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	public Configuration createInitializedConfig( FlowProcess<Configuration> flowProcess, Configuration parentConfig ) {
 
 		Configuration config = parentConfig == null ? new JobConf() : HadoopUtil.copyJobConf( parentConfig );
+		config.set( "cascading.flow.step.num", Integer.toString( getOrdinal() ) );
 		HadoopUtil.setIsInflow(config);
 
 		this.setConfig(config);
@@ -1073,6 +1074,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		ConfigurationSetter configSetter = new ConfigurationSetter(nodeConfig);
 		this.initConfFromNodeConfigDef(node.getElementGraph(), configSetter);
 		this.initConfFromStepConfigDef(configSetter);
+		nodeConfig.set("cascading.flow.node.num", Integer.toString(node.getOrdinal()));
 
 		return nodeConfig;
 	}

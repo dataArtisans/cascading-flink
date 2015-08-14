@@ -170,10 +170,13 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 			JobConf jobConf = new JobConf(this.getConfigCopy());
 
-			String partname = String.format("-%s-%05d-", this.taskId, this.getCurrentSliceNum());
-			jobConf.set( "cascading.tapcollector.partname", "%s%spart" + partname + "%05d" );
+			int stepNum = jobConf.getInt( "cascading.flow.step.num", 0 );
+			int nodeNum = jobConf.getInt( "cascading.flow.node.num", 0 );
 
-			return trap.openForWrite( new FlinkFlowProcess( jobConf ), null );
+			String partname = String.format( "-%05d-%05d-%05d", stepNum, nodeNum, this.getCurrentSliceNum() );
+			jobConf.set( "cascading.tapcollector.partname", "%s%spart" + partname );
+
+			return trap.openForWrite( new FlinkFlowProcess( jobConf ), null);
 		}
 		else {
 			throw new UnsupportedOperationException("Only Hfs taps are supported as traps");
