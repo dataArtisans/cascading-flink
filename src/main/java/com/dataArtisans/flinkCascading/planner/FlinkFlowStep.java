@@ -49,6 +49,8 @@ import com.dataArtisans.flinkCascading.runtime.coGroup.bufferJoin.CoGroupBufferR
 import com.dataArtisans.flinkCascading.runtime.coGroup.bufferJoin.BufferJoinKeyExtractor;
 import com.dataArtisans.flinkCascading.runtime.coGroup.regularJoin.CoGroupReducer;
 import com.dataArtisans.flinkCascading.runtime.coGroup.regularJoin.TupleAppendCoGrouper;
+import com.dataArtisans.flinkCascading.runtime.hashJoin.BinaryHashJoinJoiner;
+import com.dataArtisans.flinkCascading.runtime.hashJoin.NaryHashJoinJoiner;
 import com.dataArtisans.flinkCascading.runtime.hashJoin.JoinPrepareMapper;
 import com.dataArtisans.flinkCascading.runtime.hashJoin.TupleAppendCrosser;
 import com.dataArtisans.flinkCascading.runtime.hashJoin.TupleAppendJoiner;
@@ -537,51 +539,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Fields[] inputFields = new Fields[numJoinInputs];
 		Fields[] keyFields = new Fields[numJoinInputs];
 		String[][] flinkKeys = new String[numJoinInputs][];
-		List<DataSet<Tuple>> joinInputs;
-
-		// collect key and value fields of inputs
-		if(!coGroup.isSelfJoin()) {
-			// regular join with different inputs
-
-			for (int i = 0; i < numJoinInputs; i++) {
-				// get input scope
-				Scope inScope = inScopes.get(i);
-
-				inputFields[i] = ((TupleTypeInfo)inputs.get(i).getType()).getFields();
-				// get join key fields
-				keyFields[i] = coGroup.getKeySelectors().get(inScope.getName());
-				flinkKeys[i] = registerKeyFields(inputs.get(i), keyFields[i]);
-			}
-
-			joinInputs = inputs;
-		}
-		else {
-			// self join
-
-			Scope inScope = inScopes.get(0);
-
-			inputFields[0] = ((TupleTypeInfo)inputs.get(0).getType()).getFields();
-			// get join key fields
-			keyFields[0] = coGroup.getKeySelectors().get(inScope.getName());
-			flinkKeys[0] = registerKeyFields(inputs.get(0), keyFields[0]);
-
-			for (int i = 1; i < numJoinInputs; i++) {
-				inputFields[i] = inputFields[0];
-				keyFields[i] = keyFields[0];
-				flinkKeys[i] = Arrays.copyOf(flinkKeys[0], flinkKeys[0].length);
-			}
-
-			// duplicate self join input to treat it like a regular join
-			joinInputs = new ArrayList<DataSet<Tuple>>(numJoinInputs);
-			for(int i=0; i<numJoinInputs; i++) {
-				joinInputs.add(inputs.get(0));
-			}
-		}
+		List<DataSet<Tuple>> joinInputs = computeSpliceInputsFieldsKeys(coGroup, node, inputs, inputFields, keyFields, flinkKeys);
 
 		if(joiner instanceof InnerJoin) {
 			if(!keyFields[0].isNone()) {
-				// inner join with keys
-//				return prepareInnerCoGroupInput(joinInputs, firstInputKeyFields, flinkKeys, dop); // tests expect buffer being called for empty groups :-/
 				return prepareFullOuterCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
 			}
 			else {
@@ -595,46 +556,6 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		else {
 			return prepareFullOuterCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
 		}
-
-	}
-
-	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerCoGroupInput(List<DataSet<Tuple>> inputs,
-						Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
-
-		int numJoinInputs = inputs.size();
-
-		int[] keyPos = inputFields[0].getPos(keyFields[0]);
-
-		TupleTypeInfo keysTypeInfo = new TupleTypeInfo(inputFields[0].select(keyFields[0]));
-		keysTypeInfo.registerKeyFields(keyFields[0]);
-
-		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
-						keysTypeInfo,
-						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
-				);
-
-		// prepare tuple list for join
-		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-				.mapPartition(new JoinPrepareMapper(numJoinInputs, keyPos))
-				.returns(tupleJoinListsTypeInfo);
-
-
-		for(int i=0; i<flinkKeys[0].length; i++) {
-			flinkKeys[0][i] = "f0."+i;
-		}
-
-		// inner join inputs
-		for (int i = 1; i < numJoinInputs; i++) {
-			tupleJoinLists = tupleJoinLists.join(inputs.get(i), JoinOperatorBase.JoinHint.REPARTITION_SORT_MERGE)
-					.where(flinkKeys[0]).equalTo(flinkKeys[i])
-					.with(new TupleAppendJoiner(i))
-					.returns(tupleJoinListsTypeInfo)
-					.withForwardedFieldsFirst(flinkKeys[0])
-					.setParallelism(dop);
-		}
-
-		return tupleJoinLists;
 
 	}
 
@@ -679,6 +600,34 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		return tupleJoinLists;
 
+	}
+
+	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerCrossInput(List<DataSet<Tuple>> inputs, int dop) {
+
+		int numJoinInputs = inputs.size();
+
+		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
+				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+						new TupleTypeInfo(Fields.UNKNOWN),
+						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
+				);
+
+		int mapDop = ((Operator)inputs.get(0)).getParallelism();
+
+		// prepare tuple list for join
+		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
+				.mapPartition(new JoinPrepareMapper(numJoinInputs, null))
+				.returns(tupleJoinListsTypeInfo)
+				.setParallelism(mapDop);
+
+		for (int i = 1; i < inputs.size(); i++) {
+			tupleJoinLists = tupleJoinLists.crossWithTiny(inputs.get(i))
+					.with(new TupleAppendCrosser(i))
+					.returns(tupleJoinListsTypeInfo)
+					.setParallelism(dop);
+		}
+
+		return tupleJoinLists;
 	}
 
 	private DataSet<Tuple3<Tuple, Integer, Tuple>> prepareBufferCoGroupInput(List<DataSet<Tuple>> inputs,
@@ -800,116 +749,121 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						.name("coGroup-" + node.getID());
 			}
 		}
-
 	}
 
-	private DataSet<Tuple2<Tuple, Tuple[]>> prepareHashJoinInput(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
+	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		HashJoin hashJoin = (HashJoin) getCommonSuccessor(node.getSourceElements(), node);
-		List<Scope> inScopes = getInputScopes(node, hashJoin);
-
 		Joiner joiner = hashJoin.getJoiner();
 
 		int numJoinInputs = hashJoin.isSelfJoin() ? hashJoin.getNumSelfJoins() + 1 : inputs.size();
+
+		Fields[] inputFields = new Fields[numJoinInputs];
 		Fields[] keyFields = new Fields[numJoinInputs];
 		String[][] flinkKeys = new String[numJoinInputs][];
-		List<DataSet<Tuple>> joinInputs;
 
-		// collect key and value fields of inputs
-		if(!hashJoin.isSelfJoin()) {
-			// regular join with different inputs
-
-			for (int i = 0; i < numJoinInputs; i++) {
-				// get input scope
-				Scope inScope = inScopes.get(i);
-
-				// get join key fields
-				keyFields[i] = hashJoin.getKeySelectors().get(inScope.getName());
-				flinkKeys[i] = registerKeyFields(inputs.get(i), keyFields[i]);
-			}
-
-			joinInputs = inputs;
-		}
-		else {
-			// self join
-
-			Scope inScope = inScopes.get(0);
-			// get join key fields
-			keyFields[0] = hashJoin.getKeySelectors().get(inScope.getName());
-			flinkKeys[0] = registerKeyFields(inputs.get(0), keyFields[0]);
-
-			for (int i = 1; i < numJoinInputs; i++) {
-				keyFields[i] = keyFields[0];
-				flinkKeys[i] = Arrays.copyOf(flinkKeys[0], flinkKeys[0].length);
-			}
-
-			// duplicate self join input to treat it like a regular join
-			joinInputs = new ArrayList<DataSet<Tuple>>(numJoinInputs);
-			for(int i=0; i<numJoinInputs; i++) {
-				joinInputs.add(inputs.get(0));
-			}
-		}
+		List<DataSet<Tuple>> joinInputs = computeSpliceInputsFieldsKeys(hashJoin, node, inputs, inputFields, keyFields, flinkKeys);
 
 		if(joiner instanceof InnerJoin) {
 			if(!keyFields[0].isNone()) {
 				// inner join with keys
-				return prepareInnerHashJoinInput(joinInputs, keyFields, flinkKeys, dop);
+				return translateInnerHashJoin(node, joinInputs, keyFields, flinkKeys, dop);
 			}
 			else {
 				// Cartesian product
-				return prepareInnerCrossInput(joinInputs, dop);
+				return translateInnerCrossProduct(node, joinInputs, dop);
 			}
 		}
 		else {
 			throw new FlowException("HashJoin does only support InnerJoin.");
 		}
-
 	}
 
-	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerHashJoinInput(List<DataSet<Tuple>> inputs, Fields[] keyFields, String[][] flinkKeys, int dop) {
+	private DataSet<Tuple> translateInnerHashJoin(FlowNode node, List<DataSet<Tuple>> inputs, Fields[] keyFields, String[][] flinkKeys, int dop) {
 
 		int numJoinInputs = inputs.size();
 
-		Fields inputFields = ((TupleTypeInfo)inputs.get(0).getType()).getFields();
+		// get out fields of node
+		Scope outScope = getOutScope(node);
+		Fields outFields;
+		if (outScope.isEvery()) {
+			outFields = outScope.getOutGroupingFields();
+		} else {
+			outFields = outScope.getOutValuesFields();
+		}
+
+		Fields inputFields = ((TupleTypeInfo) inputs.get(0).getType()).getFields();
 		int[] keyPos = inputFields.getPos(keyFields[0]);
 
-		TupleTypeInfo keysTypeInfo = new TupleTypeInfo(inputFields.select(keyFields[0]));
-		keysTypeInfo.registerKeyFields(keyFields[0]);
+		if(numJoinInputs == 2) {
+			// binary join
 
-		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
-						keysTypeInfo,
-						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
-				);
+			return inputs.get(0).join(inputs.get(1), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
+					.where(flinkKeys[0]).equalTo(flinkKeys[1])
+					.with(new BinaryHashJoinJoiner(node, keyPos))
+					.withParameters(this.getFlinkNodeConfig(node))
+					.setParallelism(dop)
+					.returns(new TupleTypeInfo(outFields))
+					.name("hashjoin-" + node.getID());
 
-		int mapDop = ((Operator)inputs.get(0)).getParallelism();
-
-		// prepare tuple list for join
-		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-				.mapPartition(new JoinPrepareMapper(numJoinInputs, keyPos))
-				.returns(tupleJoinListsTypeInfo)
-				.setParallelism(mapDop);
-
-		for(int i=0; i<flinkKeys[0].length; i++) {
-			flinkKeys[0][i] = "f0."+i;
 		}
+		else {
+			// nary join
 
-		// regular inner join
-		for (int i = 1; i < inputs.size(); i++) {
-			tupleJoinLists = tupleJoinLists.join(inputs.get(i), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
-					.where(flinkKeys[0]).equalTo(flinkKeys[i])
-					.with(new TupleAppendJoiner(i))
+			TupleTypeInfo keysTypeInfo = new TupleTypeInfo(inputFields.select(keyFields[0]));
+			keysTypeInfo.registerKeyFields(keyFields[0]);
+
+			TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+							keysTypeInfo,
+							ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
+					);
+
+			int mapDop = ((Operator) inputs.get(0)).getParallelism();
+
+			// prepare tuple list for join
+			DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
+					.mapPartition(new JoinPrepareMapper(numJoinInputs-1, keyPos))
 					.returns(tupleJoinListsTypeInfo)
-					.withForwardedFieldsFirst(flinkKeys[0])
-					.setParallelism(dop);
-		}
+					.setParallelism(mapDop);
 
-		return tupleJoinLists;
+			for (int i = 0; i < flinkKeys[0].length; i++) {
+				flinkKeys[0][i] = "f0." + i;
+			}
+
+			// join all inputs except last
+			for (int i = 1; i < inputs.size()-1; i++) {
+				tupleJoinLists = tupleJoinLists.join(inputs.get(i), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
+						.where(flinkKeys[0]).equalTo(flinkKeys[i])
+						.with(new TupleAppendJoiner(i))
+						.returns(tupleJoinListsTypeInfo)
+						.withForwardedFieldsFirst(flinkKeys[0])
+						.setParallelism(dop);
+			}
+
+			// join last input
+			return tupleJoinLists.join(inputs.get(numJoinInputs-1), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
+					.where(flinkKeys[0]).equalTo(flinkKeys[numJoinInputs-1])
+					.with(new NaryHashJoinJoiner(node, numJoinInputs))
+					.withParameters(this.getFlinkNodeConfig(node))
+					.setParallelism(dop)
+					.returns(new TupleTypeInfo(outFields))
+					.name("hashjoin-" + node.getID());
+		}
 	}
 
-	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerCrossInput(List<DataSet<Tuple>> inputs, int dop) {
+	private DataSet<Tuple> translateInnerCrossProduct(FlowNode node, List<DataSet<Tuple>> inputs, int dop) {
 
 		int numJoinInputs = inputs.size();
+
+		// get out fields of node
+		Scope outScope = getOutScope(node);
+		Fields outFields;
+		if (outScope.isEvery()) {
+			outFields = outScope.getOutGroupingFields();
+		} else {
+			outFields = outScope.getOutValuesFields();
+		}
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
@@ -932,33 +886,60 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.setParallelism(dop);
 		}
 
-		return tupleJoinLists;
-	}
-
-
-	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
-
-		DataSet<Tuple2<Tuple, Tuple[]>> input = prepareHashJoinInput(inputs, node, dop);
-
-		// get out fields of node
-		Scope outScope = getOutScope(node);
-		Fields outFields;
-		if(outScope.isEvery()) {
-			outFields = outScope.getOutGroupingFields();
-		}
-		else {
-			outFields = outScope.getOutValuesFields();
-		}
-
-		DataSet<Tuple> joinResult = input
+		return tupleJoinLists
 				.mapPartition(new HashJoinMapper(node))
 				.withParameters(this.getFlinkNodeConfig(node))
 				.setParallelism(dop)
 				.returns(new TupleTypeInfo(outFields))
 				.name("hashjoin-" + node.getID());
 
-		return joinResult;
+	}
 
+	private List<DataSet<Tuple>> computeSpliceInputsFieldsKeys(Splice splice, FlowNode node, List<DataSet<Tuple>> inputs, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys) {
+
+		int numJoinInputs = splice.isSelfJoin() ? splice.getNumSelfJoins() + 1 : inputs.size();
+		List<Scope> inScopes = getInputScopes(node, splice);
+		List<DataSet<Tuple>> inputs2;
+
+		// collect key and value fields of inputs
+		if(!splice.isSelfJoin()) {
+			// regular join with different inputs
+
+			for (int i = 0; i < numJoinInputs; i++) {
+				// get input scope
+				Scope inScope = inScopes.get(i);
+
+				// get join key fields
+				inputFields[i] = ((TupleTypeInfo)inputs.get(i).getType()).getFields();
+				keyFields[i] = splice.getKeySelectors().get(inScope.getName());
+				flinkKeys[i] = registerKeyFields(inputs.get(i), keyFields[i]);
+			}
+
+			inputs2 = inputs;
+		}
+		else {
+			// self join
+
+			Scope inScope = inScopes.get(0);
+			// get join key fields
+			inputFields[0] = ((TupleTypeInfo)inputs.get(0).getType()).getFields();
+			keyFields[0] = splice.getKeySelectors().get(inScope.getName());
+			flinkKeys[0] = registerKeyFields(inputs.get(0), keyFields[0]);
+
+			for (int i = 1; i < numJoinInputs; i++) {
+				inputFields[i] = inputFields[0];
+				keyFields[i] = keyFields[0];
+				flinkKeys[i] = Arrays.copyOf(flinkKeys[0], flinkKeys[0].length);
+			}
+
+			// duplicate self join input to treat it like a regular join
+			inputs2 = new ArrayList<DataSet<Tuple>>(numJoinInputs);
+			for(int i=0; i<numJoinInputs; i++) {
+				inputs2.add(inputs.get(0));
+			}
+		}
+
+		return inputs2;
 	}
 
 	private List<Scope> getInputScopes(FlowNode node, Splice splice) {

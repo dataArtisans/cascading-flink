@@ -18,19 +18,23 @@
 
 package com.dataArtisans.flinkCascading.runtime.hashJoin;
 
+import cascading.CascadingException;
 import cascading.flow.FlowElement;
 import cascading.flow.FlowProcess;
 import cascading.flow.SliceCounters;
 import cascading.flow.StepCounters;
 import cascading.flow.stream.duct.Duct;
+import cascading.flow.stream.duct.DuctException;
 import cascading.flow.stream.element.ElementStage;
 import cascading.flow.stream.element.InputSource;
 import cascading.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 
-public class JoinBoundaryInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[]>> implements InputSource {
+import java.util.Iterator;
 
-	public JoinBoundaryInStage(FlowProcess flowProcess, FlowElement flowElement) {
+public class JoinBoundaryMapperInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[]>> implements InputSource {
+
+	public JoinBoundaryMapperInStage(FlowProcess flowProcess, FlowElement flowElement) {
 		super(flowProcess, flowElement);
 	}
 
@@ -39,31 +43,42 @@ public class JoinBoundaryInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[
 		throw new UnsupportedOperationException( "use run() instead" );
 	}
 
-	@Override
-	public void complete(Duct next) {
-		next.complete(this);
-	}
-
-	@Override
-	public void start(Duct previous) {
-		next.start(this);
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run(Object input) throws Throwable {
 
-		Tuple2<Tuple, Tuple[]> joinInputTuples;
+		Iterator<Tuple2<Tuple, Tuple[]>> joinInputIterator;
 		try {
-			joinInputTuples = (Tuple2<Tuple, Tuple[]>)input;
+			joinInputIterator = (Iterator<Tuple2<Tuple, Tuple[]>>)input;
 		}
 		catch(ClassCastException cce) {
-			throw new RuntimeException("JoinBoundaryInStage expects Tuple2<Tuple, Tuple[]>", cce);
+			throw new RuntimeException("JoinBoundaryInStage requires Iterator<Tuple2<Tuple, Tuple[]>", cce);
 		}
 
-		flowProcess.increment( StepCounters.Tuples_Read, 1 );
-		flowProcess.increment( SliceCounters.Tuples_Read, 1 );
+		next.start(this);
 
-		next.receive(this, joinInputTuples);
+		while (joinInputIterator.hasNext()) {
+
+			Tuple2<Tuple, Tuple[]> joinListTuple;
+
+			try {
+				joinListTuple = joinInputIterator.next();
+				flowProcess.increment( StepCounters.Tuples_Read, 1 );
+				flowProcess.increment( SliceCounters.Tuples_Read, 1 );
+			}
+			catch( CascadingException exception ) {
+				handleException( exception, null );
+				continue;
+			}
+			catch( Throwable throwable ) {
+				handleException( new DuctException( "internal error", throwable ), null );
+				continue;
+			}
+
+			next.receive( this, joinListTuple );
+
+		}
+
+		next.complete(this);
 	}
 }

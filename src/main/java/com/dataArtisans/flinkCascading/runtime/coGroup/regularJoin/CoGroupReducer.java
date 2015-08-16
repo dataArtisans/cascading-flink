@@ -111,10 +111,10 @@ public class CoGroupReducer extends RichGroupReduceFunction<Tuple2<Tuple, Tuple[
 			this.calledPrepare = true;
 
 			this.groupSource.start(this.groupSource);
-		}
 
-		this.processBeginTime = System.currentTimeMillis();
-		currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
+			this.processBeginTime = System.currentTimeMillis();
+			currentProcess.increment( SliceCounters.Process_Begin_Time, processBeginTime );
+		}
 
 		try {
 			this.groupSource.run(input.iterator());
