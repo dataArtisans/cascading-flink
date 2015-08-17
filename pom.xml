@@ -368,7 +368,7 @@ limitations under the License.
 						  the property is null when we have just the variable-->
 						<forkNumber>${surefire.forkNumber}</forkNumber>
 					</systemPropertyVariables>
-					<argLine>-Xmx800m -Dlog4j.configuration=log4j-test.properties -XX:-UseGCOverheadLimit</argLine>
+					<argLine>-Xmx800m  -XX:-UseGCOverheadLimit</argLine>
 				</configuration>
 			</plugin>
 
@@ -382,7 +382,7 @@ limitations under the License.
 					<systemPropertyVariables>
 						<forkNumber>0${surefire.forkNumber}</forkNumber>
 					</systemPropertyVariables>
-					<argLine>-Xmx800m -Dlog4j.configuration=log4j-test.properties -XX:-UseGCOverheadLimit</argLine>
+					<argLine>-Xmx800m  -XX:-UseGCOverheadLimit</argLine>
 				</configuration>
 			</plugin>
 
