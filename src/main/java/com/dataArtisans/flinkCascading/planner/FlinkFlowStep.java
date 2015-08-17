@@ -240,7 +240,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				}
 
 				// prepare groupBy input
-				DataSet<Tuple> groupByInput = prepareGroupByInput(groupByInputs, node, numReducers);
+				DataSet<Tuple> groupByInput = prepareGroupByInput(groupByInputs, node);
 
 				flinkMemo.put(groupBy, groupByInput);
 			}
@@ -325,7 +325,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					allOfType(sources, Boundary.class)) {
 
 				DataSet<Tuple> input = (DataSet<Tuple>)flinkMemo.get(getSingle(sources));
-				DataSet<Tuple> mapped = translateMap(input, node, numMappers);
+				DataSet<Tuple> mapped = translateMap(input, node);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, mapped);
 				}
@@ -363,20 +363,21 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Configuration sinkConfig = this.getNodeConfig(node);
 		tap.sinkConfInit(flowProcess, sinkConfig);
 
-		int parallelism = ((Operator)input).getParallelism();
+		int dop = ((Operator)input).getParallelism();
 
 		input
 				.output(new TapOutputFormat(node))
 				.name(tap.getIdentifier())
-				.setParallelism(parallelism)
+				.setParallelism(dop)
 				.withParameters(FlinkConfigConverter.toFlinkConfig(sinkConfig));
 
 	}
 
 
-	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node, int dop) {
+	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node) {
 
 		Scope outScope = getOutScope(node);
+		int dop = ((Operator)input).getParallelism();
 
 		return input
 				.mapPartition(new EachMapper(node))
@@ -387,7 +388,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	}
 
-	private DataSet<Tuple> prepareGroupByInput(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
+	private DataSet<Tuple> prepareGroupByInput(List<DataSet<Tuple>> inputs, FlowNode node) {
 
 		DataSet<Tuple> merged = null;
 
@@ -401,8 +402,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 			else {
 				merged = merged
-						.union(input)
-						.setParallelism(dop);
+						.union(input);
 			}
 		}
 
@@ -654,10 +654,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
 				);
 
+		int mapDop = ((Operator)inputs.get(0)).getParallelism();
+
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 				.mapPartition(new JoinPrepareMapper(numJoinInputs, 0, keyPos))
-				.returns(tupleJoinListsTypeInfo);
+				.returns(tupleJoinListsTypeInfo)
+				.setParallelism(mapDop);
 
 
 		for(int i=0; i<flinkKeys[0].length; i++) {
@@ -703,10 +706,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 							new TupleTypeInfo(inputFields[i])
 			);
 
+			int inputDop = ((Operator)input).getParallelism();
+
 			// add mapper
 			DataSet<Tuple3<Tuple, Integer, Tuple>> keyedInput = input
 					.map(new BufferJoinKeyExtractor(i, keyPos))
-					.returns(keyedType);
+					.returns(keyedType)
+					.setParallelism(inputDop);
 
 			// add to groupByInput
 			if(coGroupInput == null) {
@@ -876,10 +882,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
 				);
 
+		int mapDop = ((Operator)inputs.get(0)).getParallelism();
+
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 				.mapPartition(new JoinPrepareMapper(numJoinInputs, keyPos))
-				.returns(tupleJoinListsTypeInfo);
+				.returns(tupleJoinListsTypeInfo)
+				.setParallelism(mapDop);
 
 		for(int i=0; i<flinkKeys[0].length; i++) {
 			flinkKeys[0][i] = "f0."+i;
@@ -908,10 +917,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
 				);
 
+		int mapDop = ((Operator)inputs.get(0)).getParallelism();
+
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 				.mapPartition(new JoinPrepareMapper(numJoinInputs, null))
-				.returns(tupleJoinListsTypeInfo);
+				.returns(tupleJoinListsTypeInfo)
+				.setParallelism(mapDop);
 
 		for (int i = 1; i < inputs.size(); i++) {
 			tupleJoinLists = tupleJoinLists.crossWithTiny(inputs.get(i))
