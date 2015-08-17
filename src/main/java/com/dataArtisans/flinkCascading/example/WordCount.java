@@ -38,7 +38,7 @@ public class WordCount {
 			throw new IllegalArgumentException("Please specify input and ouput paths as arguments.");
 		}
 
-		Fields token = new Fields( "token" );
+		Fields token = new Fields( "token", String.class );
 		Fields text = new Fields( "text" );
 		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "\\s+" );
 		// only returns "token"
