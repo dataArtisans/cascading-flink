@@ -590,7 +590,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		for (int i = 1; i < inputs.size(); i++) {
 			tupleJoinLists = tupleJoinLists.coGroup(inputs.get(i))
 					.where(flinkKeys[0]).equalTo(flinkKeys[i])
-					.with(new TupleAppendCoGrouper(i, numJoinInputs, keyPos))
+					.with(new TupleAppendCoGrouper(i, numJoinInputs, inputFields[i], keyFields[i]))
 					.returns(tupleJoinListsTypeInfo)
 					.withForwardedFieldsFirst(flinkKeys[0])
 					.setParallelism(dop);

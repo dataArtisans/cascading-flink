@@ -23,15 +23,12 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.Tuples;
 import cascading.tuple.collect.Spillable;
-import cascading.tuple.collect.SpillableTupleList;
 import cascading.tuple.collect.TupleCollectionFactory;
-import cascading.tuple.hadoop.TupleSerialization;
-import cascading.tuple.hadoop.collect.HadoopSpillableTupleList;
 import cascading.tuple.util.TupleViews;
+import com.dataArtisans.flinkCascading.runtime.spilling.SpillListener;
+import com.dataArtisans.flinkCascading.runtime.spilling.SpillingTupleCollectionFactory;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.GzipCodec;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -54,7 +51,6 @@ public class CoGroupBufferClosure extends JoinerClosure {
 	protected Tuple grouping;
 	private Tuple joinedTuple = new Tuple(); // is discarded
 
-
 	private final TupleCollectionFactory<Configuration> tupleCollectionFactory;
 
 	public CoGroupBufferClosure(FlowProcess flowProcess, int numSelfJoins, Fields[] joinFields, Fields[] valueFields) {
@@ -64,7 +60,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 		this.emptyTuple = Tuple.size( joinFields[0].size() );
 		FactoryLoader loader = FactoryLoader.getInstance();
 
-		this.tupleCollectionFactory = loader.loadFactoryFrom( flowProcess, TUPLE_COLLECTION_FACTORY, FlinkTupleCollectionFactory.class );
+		this.tupleCollectionFactory = loader.loadFactoryFrom( flowProcess, TUPLE_COLLECTION_FACTORY, SpillingTupleCollectionFactory.class );
 
 		initLists();
 	}
@@ -131,7 +127,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 		Collection<Tuple> collection = tupleCollectionFactory.create( flowProcess );
 
 		if( collection instanceof Spillable) {
-			((Spillable) collection).setSpillListener(new SpillListener(flowProcess, joinField));
+			((Spillable) collection).setSpillListener(new SpillListener(flowProcess, joinField, this.getClass()));
 		}
 
 		return collection;
@@ -295,76 +291,8 @@ public class CoGroupBufferClosure extends JoinerClosure {
 		};
 	}
 
-
-	public enum Spill
-	{
-		Num_Spills_Written, Num_Spills_Read, Num_Tuples_Spilled, Duration_Millis_Written
-	}
-
 	static interface TupleBuilder {
 		Tuple makeResult(Tuple[] tuples);
-	}
-
-	private class SpillListener implements Spillable.SpillListener {
-		private final FlowProcess flowProcess;
-		private final Fields joinField;
-
-		public SpillListener( FlowProcess flowProcess, Fields joinField ) {
-			this.flowProcess = flowProcess;
-			this.joinField = joinField;
-		}
-
-		@Override
-		public void notifyWriteSpillBegin( Spillable spillable, int spillSize, String spillReason ) {
-			int numFiles = spillable.spillCount();
-
-			if( numFiles % 10 == 0 ) {
-//				LOG.info( "spilling group: {}, on grouping: {}, num times: {}, with reason: {}",
-//						new Object[]{joinField.printVerbose(), spillable.getGrouping().print(), numFiles + 1, spillReason} );
-
-				Runtime runtime = Runtime.getRuntime();
-				long freeMem = runtime.freeMemory() / 1024 / 1024;
-				long maxMem = runtime.maxMemory() / 1024 / 1024;
-				long totalMem = runtime.totalMemory() / 1024 / 1024;
-
-//				LOG.info( "mem on spill (mb), free: " + freeMem + ", total: " + totalMem + ", max: " + maxMem );
-			}
-
-//			LOG.info( "spilling {} tuples in list to file number {}", spillSize, numFiles + 1 );
-
-			flowProcess.increment( Spill.Num_Spills_Written, 1 );
-			flowProcess.increment( Spill.Num_Tuples_Spilled, spillSize );
-		}
-
-		@Override
-		public void notifyWriteSpillEnd( SpillableTupleList spillableTupleList, long duration ) {
-			flowProcess.increment( Spill.Duration_Millis_Written, duration );
-		}
-
-		@Override
-		public void notifyReadSpillBegin( Spillable spillable ) {
-			flowProcess.increment( Spill.Num_Spills_Read, 1 );
-		}
-	}
-
-	public static class FlinkTupleCollectionFactory implements TupleCollectionFactory<Configuration> {
-		private int spillThreshold;
-		private CompressionCodec codec;
-		private TupleSerialization tupleSerialization;
-
-		public FlinkTupleCollectionFactory() {
-		}
-
-		public void initialize(FlowProcess<? extends Configuration> flowProcess) {
-			this.spillThreshold = SpillableTupleList.getThreshold(flowProcess, 10000);
-			this.codec = new GzipCodec();
-			this.tupleSerialization = new TupleSerialization(flowProcess);
-		}
-
-		public Collection<Tuple> create(FlowProcess<? extends Configuration> flowProcess) {
-
-			return new HadoopSpillableTupleList(this.spillThreshold, this.tupleSerialization, this.codec);
-		}
 	}
 
 	private static class FlinkUnwrappingIterator<F1, F2> implements Iterator<Tuple> {
