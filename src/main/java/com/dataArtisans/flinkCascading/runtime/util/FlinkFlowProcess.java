@@ -174,6 +174,10 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 			String partname = String.format( "-%05d-%05d-%05d", stepNum, nodeNum, this.getCurrentSliceNum() );
 			jobConf.set( "cascading.tapcollector.partname", "%s%spart" + partname );
 
+			String value = String.format( "attempt_%012d_0000_m_%06d_0", (int) Math.rint( System.currentTimeMillis() ), this.getCurrentSliceNum() );
+			jobConf.set( "mapred.task.id", value );
+			jobConf.set( "mapreduce.task.id", value );
+
 			return trap.openForWrite( new FlinkFlowProcess( jobConf ), null);
 		}
 		else {
