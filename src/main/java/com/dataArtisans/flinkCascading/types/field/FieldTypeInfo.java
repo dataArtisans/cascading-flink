@@ -117,14 +117,13 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 	@Override
 	public TypeComparator<Comparable> createComparator(boolean sortOrderAscending, ExecutionConfig config) {
 
-		TypeSerializer<Comparable> serializer = this.createSerializer(config);
-
 		if(this.fieldTypeInfo != null) {
 			TypeComparator<Comparable> fieldComparator = ((AtomicType)fieldTypeInfo).createComparator(sortOrderAscending, config);
-			return new WrappingFieldComparator(fieldComparator, sortOrderAscending, serializer, Comparable.class);
+			return new WrappingFieldComparator(fieldComparator, Comparable.class);
 		}
 		else {
 			if (this.fieldComparator == null) {
+				TypeSerializer<Comparable> serializer = this.createSerializer(config);
 				return new FieldComparator(sortOrderAscending, serializer, Comparable.class);
 			} else {
 				return new CustomFieldComparator(sortOrderAscending, this.fieldComparator, this.createSerializer(config));

@@ -28,12 +28,11 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 
 	private static final long serialVersionUID = 1L;
 
-	protected final boolean ascending;
-	protected final Class<T> type;
-	protected TypeSerializer<T> serializer;
+	private final boolean ascending;
+	private final Class<T> type;
+	private TypeSerializer<T> serializer;
 
 	private transient T ref;
-	private transient T tmpRef;
 
 	public FieldComparator(boolean ascending, TypeSerializer<T> serializer, Class<T> type) {
 		this.ascending = ascending;
@@ -42,7 +41,7 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 	}
 
 	public FieldComparator(FieldComparator toClone) {
-		this(toClone.ascending, toClone.serializer, toClone.type);
+		this(toClone.ascending, toClone.serializer.duplicate(), toClone.type);
 	}
 
 	@Override
@@ -61,7 +60,7 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 			this.ref = null;
 		}
 		else {
-			this.ref = (T)this.serializer.copy(t);
+			this.ref = this.serializer.copy(t); // TODO: check if copy necessary
 		}
 	}
 
@@ -80,7 +79,7 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 
 	@Override
 	public int compareToReference(TypeComparator<T> typeComparator) {
-		FieldComparator other = (FieldComparator)typeComparator;
+		FieldComparator<T> other = (FieldComparator<T>)typeComparator;
 		int cmp;
 
 		if(this.ref != null && other.ref != null) {
@@ -120,17 +119,10 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 
 	@Override
 	public int compareSerialized(DataInputView firstSource, DataInputView secondSource) throws IOException {
-		if(this.ref == null) {
-			this.ref = this.serializer.createInstance();
-		}
 
-		if(this.tmpRef == null) {
-			this.tmpRef = this.serializer.createInstance();
-		}
-
-		this.ref = this.serializer.deserialize(this.ref, firstSource);
-		this.tmpRef = this.serializer.deserialize(this.tmpRef, secondSource);
-		int cmp = this.ref.compareTo(this.tmpRef);
+		T t1 = this.serializer.deserialize(firstSource);
+		T t2 = this.serializer.deserialize(secondSource);
+		int cmp = t1.compareTo(t2);
 		return this.ascending?cmp:-cmp;
 	}
 

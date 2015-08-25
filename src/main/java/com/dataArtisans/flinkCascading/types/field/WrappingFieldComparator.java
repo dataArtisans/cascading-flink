@@ -17,30 +17,100 @@
 package com.dataArtisans.flinkCascading.types.field;
 
 import org.apache.flink.api.common.typeutils.TypeComparator;
-import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.MemorySegment;
 
 import java.io.IOException;
 
-public class WrappingFieldComparator<T extends Comparable<T>> extends FieldComparator<T> {
+public class WrappingFieldComparator<T extends Comparable<T>> extends TypeComparator<T> {
 
 	private static final long serialVersionUID = 1L;
 
 	private static final byte NULL_FLAG =     (byte)0x00;
 	private static final byte NOT_NULL_FLAG = (byte)0xFF;
 
+	private final Class<T> type;
 	private final TypeComparator wrappedComparator;
 
-	public WrappingFieldComparator(TypeComparator<T> wrappedComparator, boolean ascending, TypeSerializer<T> serializer, Class<T> type) {
-		super(ascending, serializer, type);
+	private transient boolean refNull = true;
+
+	public WrappingFieldComparator(TypeComparator<T> wrappedComparator, Class<T> type) {
+		this.type = type;
 		this.wrappedComparator = wrappedComparator;
 	}
 
 	public WrappingFieldComparator(WrappingFieldComparator toClone) {
-		this(toClone.wrappedComparator.duplicate(),
-				toClone.ascending, toClone.serializer, toClone.type);
+		this(toClone.wrappedComparator.duplicate(), toClone.type);
+	}
+
+	@Override
+	public int hash(T t) {
+		return (t == null) ? 1 : this.wrappedComparator.hash(t);
+	}
+
+	@Override
+	public void setReference(T t) {
+		if(t == null) {
+			this.refNull = true;
+		}
+		else {
+			this.wrappedComparator.setReference(t);
+			this.refNull = false;
+		}
+	}
+
+	@Override
+	public boolean equalToReference(T t) {
+		if(t != null && !this.refNull) {
+			return this.wrappedComparator.equalToReference(t);
+		}
+		else if(t == null && this.refNull) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
+	@Override
+	public int compareToReference(TypeComparator<T> typeComparator) {
+		WrappingFieldComparator other = (WrappingFieldComparator)typeComparator;
+
+		if(!this.refNull && !other.refNull) {
+			return other.wrappedComparator.compareToReference(this.wrappedComparator);
+
+		}
+		else if(this.refNull && other.refNull) {
+			return 0;
+		}
+		else if(this.refNull && !other.refNull) {
+			return -1;
+		}
+		else {
+			return 1;
+		}
+	}
+
+	@Override
+	public int compare(T t1, T t2) {
+		if(t1 != null && t2 != null) {
+			return this.wrappedComparator.compare(t1, t2);
+		}
+		else if(t1 == null && t2 == null) {
+			return 0;
+		}
+		else if(t1 == null && t2 != null) {
+			return -1;
+		}
+		else {
+			return 1;
+		}
+	}
+
+	@Override
+	public int compareSerialized(DataInputView firstSource, DataInputView secondSource) throws IOException {
+		return this.wrappedComparator.compareSerialized(firstSource, secondSource);
 	}
 
 	@Override
@@ -85,6 +155,17 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends FieldCompa
 	@Override
 	public TypeComparator<T> duplicate() {
 		return new WrappingFieldComparator<T>(this);
+	}
+
+	@Override
+	public int extractKeys(Object record, Object[] target, int idx) {
+		target[idx] = record;
+		return 1;
+	}
+
+	@Override
+	public TypeComparator[] getFlatComparators() {
+		return new TypeComparator[] {this};
 	}
 
 	@Override

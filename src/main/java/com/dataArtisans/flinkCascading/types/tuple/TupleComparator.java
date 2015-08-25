@@ -99,7 +99,7 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	}
 
 	private TupleComparator(TupleComparator toClone) {
-		this(toClone.keyPositions, toClone.comparators, toClone.serializers, toClone.tupleLength);
+		this(toClone.keyPositions, cloneComparators(toClone.comparators), cloneSerializers(toClone.serializers), toClone.tupleLength);
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -277,6 +277,24 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	@Override
 	public Tuple readWithKeyDenormalization(Tuple objects, DataInputView dataInputView) throws IOException {
 		throw new UnsupportedOperationException("Normalized keys not suppported for Cascading tuples");
+	}
+
+	private static TypeComparator[] cloneComparators(TypeComparator[] comps) {
+
+		TypeComparator[] clonedComps = new TypeComparator[comps.length];
+		for(int i = 0; i < comps.length; i++) {
+			clonedComps[i] = comps[i].duplicate();
+		}
+		return clonedComps;
+	}
+
+	private static TypeSerializer[] cloneSerializers(TypeSerializer[] serializers) {
+
+		TypeSerializer[] clonedSerializers = new TypeSerializer[serializers.length];
+		for(int i = 0; i < serializers.length; i++) {
+			clonedSerializers[i] = serializers[i].duplicate();
+		}
+		return clonedSerializers;
 	}
 
 }
