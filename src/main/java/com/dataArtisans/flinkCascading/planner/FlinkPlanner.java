@@ -27,10 +27,14 @@ import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.tap.Tap;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.client.CliFrontend;
+import org.apache.flink.configuration.ConfigConstants;
+import org.apache.flink.configuration.GlobalConfiguration;
 import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -42,13 +46,26 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	private Configuration defaultConfig;
 
-	private ExecutionEnvironment env;
 	private List<String> classPath;
 
-	public FlinkPlanner(ExecutionEnvironment env, List<String> classPath) {
+	private ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+
+	public FlinkPlanner(List<String> classPath) {
 		super();
-		this.env = env;
 		this.classPath = classPath;
+
+		if (env.getParallelism() <= 0) {
+			// load the default parallelism from config
+			GlobalConfiguration.loadConfiguration(new File(CliFrontend.getConfigurationDirectoryFromEnv()).getAbsolutePath());
+			org.apache.flink.configuration.Configuration configuration = GlobalConfiguration.getConfiguration();
+			int parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY_OLD, -1);
+			parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY, parallelism);
+			if (parallelism <= 0) {
+				throw new RuntimeException("Please set the default parallelism via the -p command-line flag");
+			} else {
+				env.setParallelism(parallelism);
+			}
+		}
 	}
 
 	@Override
