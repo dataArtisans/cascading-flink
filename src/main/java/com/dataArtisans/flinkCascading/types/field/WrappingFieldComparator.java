@@ -31,17 +31,19 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 	private static final byte NOT_NULL_FLAG = (byte)0xFF;
 
 	private final Class<T> type;
-	private final TypeComparator wrappedComparator;
+	private final TypeComparator<T> wrappedComparator;
+	private final boolean ascending;
 
 	private transient boolean refNull = true;
 
-	public WrappingFieldComparator(TypeComparator<T> wrappedComparator, Class<T> type) {
+	public WrappingFieldComparator(TypeComparator<T> wrappedComparator, boolean ascending,  Class<T> type) {
 		this.type = type;
+		this.ascending = ascending;
 		this.wrappedComparator = wrappedComparator;
 	}
 
-	public WrappingFieldComparator(WrappingFieldComparator toClone) {
-		this(toClone.wrappedComparator.duplicate(), toClone.type);
+	public WrappingFieldComparator(WrappingFieldComparator<T> toClone) {
+		this(toClone.wrappedComparator.duplicate(), toClone.ascending, toClone.type);
 	}
 
 	@Override
@@ -75,20 +77,19 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 
 	@Override
 	public int compareToReference(TypeComparator<T> typeComparator) {
-		WrappingFieldComparator other = (WrappingFieldComparator)typeComparator;
+		WrappingFieldComparator<T> other = (WrappingFieldComparator<T>)typeComparator;
 
 		if(!this.refNull && !other.refNull) {
-			return other.wrappedComparator.compareToReference(this.wrappedComparator);
-
+			return this.wrappedComparator.compareToReference(other.wrappedComparator);
 		}
 		else if(this.refNull && other.refNull) {
 			return 0;
 		}
 		else if(this.refNull && !other.refNull) {
-			return -1;
+			return ascending ? -1 : 1;
 		}
 		else {
-			return 1;
+			return ascending ? 1 : -1;
 		}
 	}
 
@@ -101,10 +102,10 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 			return 0;
 		}
 		else if(t1 == null && t2 != null) {
-			return -1;
+			return ascending ? -1 : 1;
 		}
 		else {
-			return 1;
+			return ascending ? 1 : -1;
 		}
 	}
 

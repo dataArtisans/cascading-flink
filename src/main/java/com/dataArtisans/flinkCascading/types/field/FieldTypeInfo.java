@@ -27,7 +27,7 @@ import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
 import java.util.Comparator;
 
 /**
- * Cascading field type info. Uses a generic (Kryo) serializer.
+ * Cascading field type info.
  *
  */
 public class FieldTypeInfo extends TypeInformation<Comparable> implements AtomicType {
@@ -119,11 +119,11 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 
 		if(this.fieldTypeInfo != null) {
 			TypeComparator<Comparable> fieldComparator = ((AtomicType)fieldTypeInfo).createComparator(sortOrderAscending, config);
-			return new WrappingFieldComparator(fieldComparator, Comparable.class);
+			return new WrappingFieldComparator(fieldComparator, sortOrderAscending, Comparable.class);
 		}
 		else {
+			TypeSerializer<Comparable> serializer = this.createSerializer(config);
 			if (this.fieldComparator == null) {
-				TypeSerializer<Comparable> serializer = this.createSerializer(config);
 				return new FieldComparator(sortOrderAscending, serializer, Comparable.class);
 			} else {
 				return new CustomFieldComparator(sortOrderAscending, this.fieldComparator, this.createSerializer(config));

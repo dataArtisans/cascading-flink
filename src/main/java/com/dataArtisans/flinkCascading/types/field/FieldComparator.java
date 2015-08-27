@@ -46,22 +46,12 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 
 	@Override
 	public int hash(T t) {
-		if(t == null) {
-			return 1;
-		}
-		else {
-			return t.hashCode();
-		}
+		return (t == null) ? 1 : t.hashCode();
 	}
 
 	@Override
 	public void setReference(T t) {
-		if(t == null) {
-			this.ref = null;
-		}
-		else {
-			this.ref = t; // this.serializer.copy(t); // TODO: check if copy necessary
-		}
+		this.ref = t;
 	}
 
 	@Override
