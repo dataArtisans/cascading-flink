@@ -539,7 +539,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		String[][] flinkKeys = new String[numJoinInputs][];
 		List<DataSet<Tuple>> joinInputs = computeSpliceInputsFieldsKeys(coGroup, node, inputs, inputFields, keyFields, flinkKeys);
 
-		if(joiner.getClass().equals(BufferJoin.class)) {
+		if(joiner.getClass().equals(InnerJoin.class)) {
+			if(!keyFields[0].isNone()) {
+				return prepareFullOuterCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
+			}
+			else {
+				// Cartesian product
+				return prepareInnerCrossInput(joinInputs, dop);
+			}
+		}
+		else if(joiner.getClass().equals(BufferJoin.class)) {
 			return prepareBufferCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
 		}
 		else {
