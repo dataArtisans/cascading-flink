@@ -60,7 +60,7 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 			this.ref = null;
 		}
 		else {
-			this.ref = this.serializer.copy(t); // TODO: check if copy necessary
+			this.ref = t; // this.serializer.copy(t); // TODO: check if copy necessary
 		}
 	}
 

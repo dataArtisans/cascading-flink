@@ -79,7 +79,7 @@ public class CustomFieldComparator extends TypeComparator<Comparable> {
 			this.ref = null;
 		}
 		else {
-			this.ref = this.serializer.copy(toCompare);
+			this.ref = toCompare;
 		}
 	}
 
