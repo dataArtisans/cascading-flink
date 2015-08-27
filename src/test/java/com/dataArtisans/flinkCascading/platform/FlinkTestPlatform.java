@@ -136,7 +136,7 @@ public class FlinkTestPlatform extends TestPlatform {
 	@Override
 	public Tap getTextFile(Fields sourceFields, Fields sinkFields, String filename, SinkMode mode) {
 		if( sourceFields == null ) {
-			return new Hfs(new TextLine(), filename, mode);
+ 			return new Hfs(new TextLine(), filename, mode);
 		}
 
 		return new Hfs( new TextLine( sourceFields, sinkFields ), filename, mode );

@@ -24,6 +24,7 @@ import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
+import com.dataArtisans.flinkCascading.runtime.stats.EnumStringConverter;
 import org.apache.flink.api.common.accumulators.LongCounter;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.util.InstantiationUtil;
@@ -116,25 +117,26 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public void increment(Enum e, long l) {
-		increment(e.getDeclaringClass().getCanonicalName(), e.toString(), l);
+		increment(EnumStringConverter.enumToGroup(e), EnumStringConverter.enumToKey(e), l);
 	}
 
 	@Override
 	public void increment(String group, String counter, long l) {
 		if(this.runtimeContext != null) {
-			getOrInitCounter(group + "." + counter).add(l);
+			LongCounter flinkCounter = getOrInitCounter(EnumStringConverter.mergeGroupCounter(group, counter));
+			flinkCounter.add(l);
 		}
 	}
 
 	@Override
 	public long getCounterValue(Enum e) {
-		return getCounterValue(e.getDeclaringClass().getCanonicalName(), e.toString());
+		return getCounterValue(EnumStringConverter.enumToGroup(e), EnumStringConverter.enumToKey(e));
 	}
 
 	@Override
 	public long getCounterValue(String group, String counter) {
 		if(this.runtimeContext != null) {
-			return getOrInitCounter(group + "." + counter).getLocalValue();
+			return getOrInitCounter(EnumStringConverter.mergeGroupCounter(group, counter)).getLocalValue();
 		}
 		else {
 			return 0l;
@@ -238,10 +240,8 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	private LongCounter getOrInitCounter(String counterName) {
 
-		counterName = this.taskId + ":" + counterName;
-
 		LongCounter lc = this.runtimeContext.getLongCounter(counterName);
-		if(lc == null) {
+		if (lc == null) {
 			lc = new LongCounter();
 			this.runtimeContext.addAccumulator(counterName, lc);
 		}

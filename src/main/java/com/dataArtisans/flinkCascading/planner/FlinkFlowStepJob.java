@@ -17,11 +17,11 @@
 package com.dataArtisans.flinkCascading.planner;
 
 import akka.actor.ActorSystem;
-import cascading.flow.FlowException;
 import cascading.flow.planner.FlowStepJob;
 import cascading.management.state.ClientState;
 import cascading.stats.FlowNodeStats;
 import cascading.stats.FlowStepStats;
+import com.dataArtisans.flinkCascading.runtime.stats.AccumulatorCache;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.Plan;
@@ -70,11 +70,15 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	private final ExecutionEnvironment env;
 
-	private static FlinkMiniCluster localCluster;
+	private AccumulatorCache accumulatorCache;
+
+	private FlinkMiniCluster localCluster;
 
 	private Future<Object> jobSubmission;
 
 	private ExecutorService executorService;
+
+	private static final int accumulatorUpdateIntervalSecs = 10;
 
 	private static final FiniteDuration DEFAULT_TIMEOUT = new FiniteDuration(60, TimeUnit.SECONDS);
 
@@ -99,7 +103,8 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	@Override
 	protected FlowStepStats createStepStats(ClientState clientState) {
-		return new FlinkFlowStepStats(this.flowStep, clientState);
+		this.accumulatorCache = new AccumulatorCache(accumulatorUpdateIntervalSecs, DEFAULT_TIMEOUT);
+		return new FlinkFlowStepStats(this.flowStep, clientState, accumulatorCache);
 	}
 
 	protected void internalBlockOnStop() throws IOException {
@@ -138,6 +143,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		}
 
 		jobID = jobGraph.getJobID();
+		accumulatorCache.setJobID(jobID);
 
 		Callable<Object> callable;
 
@@ -148,7 +154,9 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			final ActorSystem actorSystem = JobClient.startJobClientActorSystem(new org.apache.flink.configuration.Configuration());
 
 			startLocalCluster();
+
 			final ActorGateway jobManager = localCluster.getJobManagerGateway();
+			accumulatorCache.setLocalJobManager(jobManager);
 
 			JobClient.uploadJarFiles(jobGraph, jobManager, DEFAULT_TIMEOUT);
 
@@ -171,6 +179,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			}
 
 			final Client client = ((ContextEnvironment) env).getClient();
+			accumulatorCache.setClient(client);
 
 			callable = new Callable<Object>() {
 				@Override
@@ -187,66 +196,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	}
 
 	@Override
-	protected void updateNodeStatus( FlowNodeStats flowNodeStats )
-	{
-
-		// TODO
-
-		/*
-		try
-		{
-			if( runningJob == null )
-				return;
-
-			float progress;
-
-			boolean isMapper = flowNodeStats.getOrdinal() == 0;
-
-			if( isMapper )
-				progress = runningJob.mapProgress();
-			else
-				progress = runningJob.reduceProgress();
-
-			if( progress == 0.0F ) // not yet running, is only started
-				return;
-
-			if( progress != 1.0F )
-			{
-				flowNodeStats.markRunning();
-				return;
-			}
-
-			if( !flowNodeStats.isRunning() )
-				flowNodeStats.markRunning();
-
-			if( isMapper && runningJob.reduceProgress() > 0.0F )
-			{
-				flowNodeStats.markSuccessful();
-				return;
-			}
-
-			int jobState = runningJob.getJobState();
-
-			if( JobStatus.SUCCEEDED == jobState )
-				flowNodeStats.markSuccessful();
-			else if( JobStatus.FAILED == jobState )
-				flowNodeStats.markFailed( null ); // todo: find failure
-		}
-		catch( IOException exception )
-		{
-			flowStep.logError( "failed setting node status", throwable );
-		}
-		*/
-	}
-
-	@Override
-	public boolean isSuccessful() {
+	protected void updateNodeStatus( FlowNodeStats flowNodeStats ) {
 		try {
-			return super.isSuccessful();
-		}
-		catch( NullPointerException exception) {
-			// TODO
-			throw new FlowException( "Hadoop is not keeping a large enough job history, please increase the \'mapred.jobtracker.completeuserjobs.maximum\' property", exception );
+			if (internalNonBlockingIsComplete() && internalNonBlockingIsSuccessful()) {
+				flowNodeStats.markSuccessful();
+			} else if(internalIsStartedRunning()) {
+				flowNodeStats.isRunning();
+			} else {
+				flowNodeStats.markFailed(jobException);
+			}
+		} catch (IOException e) {
+			flowStep.logError("Failed to update node status.");
 		}
 	}
 
@@ -266,6 +226,15 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		if (isDone) {
 			stopCluster();
 		}
+//		try {
+//			System.out.println("result : "+ ((SerializedJobExecutionResult)jobSubmission.get()).toJobExecutionResult(ClassLoader.getSystemClassLoader()).getAllAccumulatorResults());
+//		} catch (InterruptedException e) {
+//			e.printStackTrace();
+//		} catch (ExecutionException e) {
+//			e.printStackTrace();
+//		} catch (ClassNotFoundException e) {
+//			e.printStackTrace();
+//		}
 		return isDone;
 	}
 
@@ -327,13 +296,13 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		if (localCluster == null) {
 			org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
 			configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism() * 2);
-//			configuration.setInteger(ConfigConstants.TASK_MANAGER_MEMORY_SIZE_KEY, 128);
 			localCluster = new LocalFlinkMiniCluster(configuration);
 		}
 	}
 
 	private void stopCluster() {
 		if (localCluster != null) {
+			accumulatorCache.update(true);
 			localCluster.shutdown();
 			localCluster = null;
 		}

@@ -66,6 +66,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 				env.setParallelism(parallelism);
 			}
 		}
+
 	}
 
 	@Override

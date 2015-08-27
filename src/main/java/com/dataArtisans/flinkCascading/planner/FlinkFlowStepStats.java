@@ -19,19 +19,27 @@ package com.dataArtisans.flinkCascading.planner;
 import cascading.flow.FlowStep;
 import cascading.management.state.ClientState;
 import cascading.stats.FlowStepStats;
+import com.dataArtisans.flinkCascading.runtime.stats.AccumulatorCache;
+import com.dataArtisans.flinkCascading.runtime.stats.EnumStringConverter;
+import com.google.common.base.Preconditions;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class FlinkFlowStepStats extends FlowStepStats {
 
+	private AccumulatorCache accumulatorCache;
 
-	protected FlinkFlowStepStats(FlowStep flowStep, ClientState clientState) {
+	protected FlinkFlowStepStats(FlowStep flowStep, ClientState clientState, AccumulatorCache accumulatorCache) {
 		super(flowStep, clientState);
+		this.accumulatorCache = Preconditions.checkNotNull(accumulatorCache);
 	}
 
 	@Override
 	public void recordChildStats() {
-
+		// TODO
 	}
 
 	@Override
@@ -46,31 +54,58 @@ public class FlinkFlowStepStats extends FlowStepStats {
 
 	@Override
 	public void captureDetail(Type depth) {
-
+		// TODO
 	}
 
 	@Override
 	public long getLastSuccessfulCounterFetchTime() {
-		return 0;
+		return accumulatorCache.getLastUpdateTime();
 	}
 
 	@Override
 	public Collection<String> getCounterGroups() {
-		return null;
+		accumulatorCache.update();
+		Map<String, Object> currentAccumulators = accumulatorCache.getCurrentAccumulators();
+		Set<String> result = new HashSet<String>();
+
+		for (String key : currentAccumulators.keySet()) {
+			result.add(EnumStringConverter.groupCounterToGroup(key));
+		}
+		return result;
 	}
 
 	@Override
 	public Collection<String> getCountersFor(String group) {
-		return null;
+		accumulatorCache.update();
+		Map<String, Object> currentAccumulators = accumulatorCache.getCurrentAccumulators();
+		Set<String> result = new HashSet<String>();
+
+		for (String key : currentAccumulators.keySet()) {
+			if (EnumStringConverter.accInGroup(group, key)) {
+				result.add(key);
+			}
+		}
+		return result;
 	}
 
 	@Override
 	public long getCounterValue(Enum counter) {
-		return 0;
+		return getCounterValue(EnumStringConverter.enumToGroup(counter), EnumStringConverter.enumToKey(counter));
 	}
 
 	@Override
 	public long getCounterValue(String group, String counter) {
+		accumulatorCache.update();
+		Map<String, Object> currentAccumulators = accumulatorCache.getCurrentAccumulators();
+
+		for (String key : currentAccumulators.keySet()) {
+			if (EnumStringConverter.accMatchesGroupCounter(key, group, counter)) {
+				Object o = currentAccumulators.get(key);
+				return (Long) o;
+			}
+		}
+		// Cascading returns 0 in case of empty accumulators
 		return 0;
 	}
+
 }
