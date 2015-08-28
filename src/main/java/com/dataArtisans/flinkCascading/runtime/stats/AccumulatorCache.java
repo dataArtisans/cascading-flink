@@ -22,7 +22,7 @@ import org.apache.flink.client.program.Client;
 import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.messages.accumulators.AccumulatorResultsFound;
 import org.apache.flink.runtime.messages.accumulators.RequestAccumulatorResults;
-import org.apache.flink.runtime.util.SerializedValue;
+import org.apache.flink.util.SerializedValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.concurrent.Await;
@@ -36,18 +36,16 @@ public class AccumulatorCache {
 
 	private static final Logger LOG = LoggerFactory.getLogger(AccumulatorCache.class);
 
+	private JobID jobID;
 
 	private ActorGateway localJobManager;
-
-	private JobID jobID;
-	// TODO
 	private Client client;
 
 	private volatile Map<String, Object> currentAccumulators = Collections.emptyMap();
 
 	private FiniteDuration defaultTimeout;
 
-	private final int updateIntervalMillis;
+	private final long updateIntervalMillis;
 	private long lastUpdateTime;
 
 	public AccumulatorCache(int updateIntervalSecs, FiniteDuration defaultTimeout) {
@@ -84,26 +82,30 @@ public class AccumulatorCache {
 							((AccumulatorResultsFound) result).result();
 
 					updateAccumulatorMap(serializedAccumulators);
+					lastUpdateTime = currentTime;
 
 				} else {
-					LOG.warn("Failed to fetch accumulators for job {}", jobID);
+					LOG.warn("Failed to fetch accumulators for job {}.", jobID);
 				}
 
 			} catch (Exception e) {
-				LOG.error("Error occurred while fetching accumulators for {}", jobID, e);
+				LOG.error("Error occurred while fetching accumulators for {}.", jobID, e);
 			}
 
 
 		} else if (client != null) {
 
-			//TODO
-//			client.getAccumulators(jobID);
+			try {
+				currentAccumulators = client.getAccumulators(jobID);
+				lastUpdateTime = currentTime;
+			} catch (Exception e) {
+				LOG.error("Failed to fetch accumulators for job {}.", jobID);
+			}
 
 		} else {
 			throw new IllegalStateException("The accumulator cache has no valid target.");
 		}
 
-		lastUpdateTime = currentTime;
 	}
 
 	private void updateAccumulatorMap(Map<String, SerializedValue<Object>> serializedAccumulators) throws Exception {

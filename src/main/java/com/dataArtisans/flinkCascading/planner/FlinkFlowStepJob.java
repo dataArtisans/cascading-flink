@@ -57,6 +57,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class FlinkFlowStepJob extends FlowStepJob<Configuration>
@@ -72,13 +73,15 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	private AccumulatorCache accumulatorCache;
 
-	private FlinkMiniCluster localCluster;
-
 	private Future<Object> jobSubmission;
 
 	private ExecutorService executorService;
 
 	private static final int accumulatorUpdateIntervalSecs = 10;
+
+	private volatile static FlinkMiniCluster localCluster;
+	private volatile static int localClusterUsers;
+	private static final Object lock = new Object();
 
 	private static final FiniteDuration DEFAULT_TIMEOUT = new FiniteDuration(60, TimeUnit.SECONDS);
 
@@ -93,7 +96,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		if( flowStep.isDebugEnabled() ) {
 			flowStep.logDebug("using polling interval: " + pollingInterval);
 		}
-
 	}
 
 	@Override
@@ -224,6 +226,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 		boolean isDone = jobSubmission.isDone();
 		if (isDone) {
+			accumulatorCache.update(true);
 			stopCluster();
 		}
 //		try {
@@ -293,18 +296,25 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	}
 
 	private void startLocalCluster() {
-		if (localCluster == null) {
-			org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
-			configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism() * 2);
-			localCluster = new LocalFlinkMiniCluster(configuration);
+		synchronized (lock) {
+			if (localCluster == null) {
+				org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
+				configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism() * 2);
+				localCluster = new LocalFlinkMiniCluster(configuration);
+			}
+			localClusterUsers++;
 		}
 	}
 
 	private void stopCluster() {
-		if (localCluster != null) {
-			accumulatorCache.update(true);
-			localCluster.shutdown();
-			localCluster = null;
+		synchronized (lock) {
+			if (localCluster != null) {
+				if (--localClusterUsers <= 0) {
+					localCluster.shutdown();
+					localCluster = null;
+					localClusterUsers = 0;
+				}
+			}
 		}
 		if (executorService != null) {
 			executorService.shutdown();
