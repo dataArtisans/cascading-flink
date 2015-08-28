@@ -166,6 +166,11 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 				return values.next();
 			}
 		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
 	}
 
 }

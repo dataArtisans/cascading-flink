@@ -176,6 +176,11 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 				throw new NoSuchElementException("Iterator is empty.");
 			}
 		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
 	}
 
 

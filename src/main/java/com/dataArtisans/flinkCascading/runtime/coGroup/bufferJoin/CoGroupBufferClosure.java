@@ -318,6 +318,11 @@ public class CoGroupBufferClosure extends JoinerClosure {
 
 			return flinkIterator.next().f2;
 		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
 	}
 
 	private static class FalseCollection implements Collection<Tuple> {

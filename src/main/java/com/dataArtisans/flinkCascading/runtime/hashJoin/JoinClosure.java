@@ -128,5 +128,10 @@ public class JoinClosure extends JoinerClosure {
 			this.t = null;
 			return t;
 		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
 	}
 }
