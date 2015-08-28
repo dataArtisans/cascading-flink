@@ -229,15 +229,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			accumulatorCache.update(true);
 			stopCluster();
 		}
-//		try {
-//			System.out.println("result : "+ ((SerializedJobExecutionResult)jobSubmission.get()).toJobExecutionResult(ClassLoader.getSystemClassLoader()).getAllAccumulatorResults());
-//		} catch (InterruptedException e) {
-//			e.printStackTrace();
-//		} catch (ExecutionException e) {
-//			e.printStackTrace();
-//		} catch (ClassNotFoundException e) {
-//			e.printStackTrace();
-//		}
+
 		return isDone;
 	}
 
@@ -260,31 +252,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	}
 
 	protected void dumpDebugInfo() {
-
-		// TODO
-		/*
-		try
-		{
-			if( runningJob == null )
-				return;
-
-			int jobState = runningJob.getJobState(); // may throw an NPE internally
-
-			flowStep.logWarn( "hadoop job " + runningJob.getID() + " state at " + JobStatus.getJobRunState( jobState ) );
-			flowStep.logWarn( "failure info: " + runningJob.getFailureInfo() );
-
-			TaskCompletionEvent[] events = runningJob.getTaskCompletionEvents( 0 );
-			flowStep.logWarn( "task completion events identify failed tasks" );
-			flowStep.logWarn( "task completion events count: " + events.length );
-
-			for( TaskCompletionEvent event : events )
-				flowStep.logWarn( "event = " + event );
-		}
-		catch( Throwable throwable )
-		{
-			flowStep.logError( "failed reading task completion events", throwable );
-		}
-		*/
 	}
 
 	protected boolean internalIsStartedRunning() {
