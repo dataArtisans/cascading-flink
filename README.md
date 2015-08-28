@@ -116,8 +116,8 @@ parallelism of 20.
 
 Now let's run the included WordCount example on the cluster.
 
-    ./flink run -c com.dataArtisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
+    ./flink run -c com.dataartisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
 
 Or on a YARN cluster:
 
-    ./flink run  -m yarn-cluster -yn 10 -c com.dataArtisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
+    ./flink run  -m yarn-cluster -yn 10 -c com.dataartisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output

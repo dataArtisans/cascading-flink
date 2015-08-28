@@ -51,7 +51,7 @@ limitations under the License.
 		<kryoserialization.version>0.3.2</kryoserialization.version>
 
 		<!-- Default parameters for mvn exec:exec -->
-		<clazz>com.dataArtisans.flinkCascading.example.WordCount</clazz>
+		<clazz>com.dataartisans.flink.cascading.example.WordCount</clazz>
 		<input>kinglear.txt</input>
 		<output>wordcounts.txt</output>
 	</properties>
