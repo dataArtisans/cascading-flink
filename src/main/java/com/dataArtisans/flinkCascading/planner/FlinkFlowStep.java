@@ -102,6 +102,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	 */
 	public Configuration createInitializedConfig( FlowProcess<Configuration> flowProcess, Configuration parentConfig ) {
 
+		this.env.getConfig().registerKryoType(Tuple.class);
+
 		Configuration config = parentConfig == null ? new JobConf() : HadoopUtil.copyJobConf( parentConfig );
 		config.set( "cascading.flow.step.num", Integer.toString( getOrdinal() ) );
 		HadoopUtil.setIsInflow(config);
