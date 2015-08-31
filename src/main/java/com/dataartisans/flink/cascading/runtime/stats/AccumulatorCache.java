@@ -107,8 +107,6 @@ public class AccumulatorCache {
 				LOG.error("Failed to fetch accumulators for job {}.", jobID);
 			}
 
-		} else {
-			throw new IllegalStateException("The accumulator cache has no valid target.");
 		}
 
 	}

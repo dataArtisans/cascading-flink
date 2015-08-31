@@ -278,6 +278,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 					localCluster.shutdown();
 					localCluster = null;
 					localClusterUsers = 0;
+					accumulatorCache.setLocalJobManager(null);
 				}
 			}
 			if (executorService != null) {
