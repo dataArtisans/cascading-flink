@@ -75,6 +75,8 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -87,6 +89,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class FlinkFlowStep extends BaseFlowStep<Configuration> {
+
+	private static final Logger LOG = LoggerFactory.getLogger(FlinkFlowStep.class);
 
 	private ExecutionEnvironment env;
 	private List<String> classPath;
@@ -139,22 +143,22 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	private void printFlowStep() {
 		Iterator<FlowNode> iterator = getFlowNodeGraph().getTopologicalIterator();
 
-		System.out.println("Step Cnt: " + getFlowNodeGraph().vertexSet().size());
-		System.out.println("Edge Cnt: "+getFlowNodeGraph().edgeSet().size());
-		System.out.println("Src Set: "+getFlowNodeGraph().getSourceElements());
-		System.out.println("Snk Set: "+getFlowNodeGraph().getSinkElements());
-		System.out.println("##############");
+		LOG.info("Step Cnt: {} ", getFlowNodeGraph().vertexSet().size());
+		LOG.info("Edge Cnt: {} ", getFlowNodeGraph().edgeSet().size());
+		LOG.info("Src Set: {} ", getFlowNodeGraph().getSourceElements());
+		LOG.info("Snk Set: {} ", getFlowNodeGraph().getSinkElements());
+		LOG.info("##############");
 
 		while(iterator.hasNext()) {
 
 			FlowNode next = iterator.next();
 
-			System.out.println("Node cnt: "+next.getElementGraph().vertexSet().size());
-			System.out.println("Edge cnt: "+next.getElementGraph().edgeSet().size());
+			LOG.info("Node cnt: {} ", next.getElementGraph().vertexSet().size());
+			LOG.info("Edge cnt: {} ", next.getElementGraph().edgeSet().size());
 
-			System.out.println("Nodes: "+next.getElementGraph().vertexSet());
+			LOG.info("Nodes: {} ", next.getElementGraph().vertexSet());
 
-			System.out.println("-----------");
+			LOG.info("-----------");
 		}
 
 
