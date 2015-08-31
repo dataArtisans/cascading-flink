@@ -37,7 +37,6 @@ import org.apache.flink.optimizer.plan.OptimizedPlan;
 import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
 import org.apache.flink.runtime.client.JobClient;
 import org.apache.flink.runtime.client.JobExecutionException;
-import org.apache.flink.runtime.client.SerializedJobExecutionResult;
 import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.JobManagerMessages;
@@ -72,7 +71,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	private AccumulatorCache accumulatorCache;
 
-	private Future<Object> jobSubmission;
+	private Future<JobSubmissionResult> jobSubmission;
 
 	private ExecutorService executorService;
 
@@ -146,7 +145,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		jobID = jobGraph.getJobID();
 		accumulatorCache.setJobID(jobID);
 
-		Callable<Object> callable;
+		Callable<JobSubmissionResult> callable;
 
 		if (isLocalExecution()) {
 
@@ -161,10 +160,11 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 			JobClient.uploadJarFiles(jobGraph, jobManager, DEFAULT_TIMEOUT);
 
-			callable = new Callable<Object>() {
+			callable = new Callable<JobSubmissionResult>() {
 				@Override
-				public SerializedJobExecutionResult call() throws JobExecutionException {
-					return JobClient.submitJobAndWait(actorSystem, jobManager, jobGraph, DEFAULT_TIMEOUT, true);
+				public JobSubmissionResult call() throws JobExecutionException {
+					return JobClient.submitJobAndWait(actorSystem, jobManager, jobGraph,
+							DEFAULT_TIMEOUT, true, ClassLoader.getSystemClassLoader());
 				}
 			};
 
@@ -182,7 +182,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			final Client client = ((ContextEnvironment) env).getClient();
 			accumulatorCache.setClient(client);
 
-			callable = new Callable<Object>() {
+			callable = new Callable<JobSubmissionResult>() {
 				@Override
 				public JobSubmissionResult call() throws Exception {
 					return client.run(jobGraph, true);
