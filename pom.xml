@@ -345,7 +345,8 @@ limitations under the License.
 					<dependenciesToScan>
 						<dependency>cascading:cascading-platform</dependency>
 					</dependenciesToScan>
-                    <forkCount>1C</forkCount>
+					<!--<forkCount>1C</forkCount>-->
+					<reuseForks>false</reuseForks>
 					<argLine>-Xmx4G -Dlog4j.configuration=log4j-test.properties</argLine>
 				</configuration>
 			</plugin>

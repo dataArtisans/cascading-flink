@@ -276,6 +276,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			if (localCluster != null) {
 				if (--localClusterUsers <= 0) {
 					localCluster.shutdown();
+					localCluster.awaitTermination();
 					localCluster = null;
 					localClusterUsers = 0;
 					accumulatorCache.setLocalJobManager(null);
