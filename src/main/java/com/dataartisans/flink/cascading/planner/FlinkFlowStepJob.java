@@ -73,7 +73,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	private Future<JobSubmissionResult> jobSubmission;
 
-	private ExecutorService executorService;
+	private ExecutorService executorService = Executors.newFixedThreadPool(1);
 
 	private static final int accumulatorUpdateIntervalSecs = 10;
 
@@ -190,7 +190,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			};
 		}
 
-		executorService = Executors.newFixedThreadPool(1);
 		jobSubmission = executorService.submit(callable);
 
 		flowStep.logInfo("submitted Flink job: " + jobID);
@@ -281,9 +280,9 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 					localClusterUsers = 0;
 				}
 			}
-		}
-		if (executorService != null) {
-			executorService.shutdown();
+			if (executorService != null) {
+				executorService.shutdown();
+			}
 		}
 	}
 

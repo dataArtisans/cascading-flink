@@ -55,7 +55,7 @@ public class FlinkTestPlatform extends TestPlatform {
 			this.numGatherPartitions = 1;
 		}
 		Properties properties = System.getProperties();
-		properties.setProperty(InputData.TEST_DATA_PATH, ClassLoader.getSystemResource("data").getPath() + "/");
+		properties.setProperty(InputData.TEST_DATA_PATH, "./target/data/");
 	}
 
 	@Override
