@@ -18,6 +18,7 @@ package com.dataartisans.flink.cascading.runtime.stats;
 
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.accumulators.AccumulatorHelper;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.messages.accumulators.AccumulatorResultsFound;
@@ -29,7 +30,6 @@ import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
 public class AccumulatorCache {
@@ -81,9 +81,12 @@ public class AccumulatorCache {
 					Map<String, SerializedValue<Object>> serializedAccumulators =
 							((AccumulatorResultsFound) result).result();
 
-					updateAccumulatorMap(serializedAccumulators);
+					currentAccumulators = AccumulatorHelper.deserializeAccumulators(
+							serializedAccumulators, ClassLoader.getSystemClassLoader());
+
 					lastUpdateTime = currentTime;
 
+					LOG.debug("Updated accumulators: {}", currentAccumulators);
 				} else {
 					LOG.warn("Failed to fetch accumulators for job {}.", jobID);
 				}
@@ -98,6 +101,8 @@ public class AccumulatorCache {
 			try {
 				currentAccumulators = client.getAccumulators(jobID);
 				lastUpdateTime = currentTime;
+
+				LOG.debug("Updated accumulators: {}", currentAccumulators);
 			} catch (Exception e) {
 				LOG.error("Failed to fetch accumulators for job {}.", jobID);
 			}
@@ -106,32 +111,6 @@ public class AccumulatorCache {
 			throw new IllegalStateException("The accumulator cache has no valid target.");
 		}
 
-	}
-
-	private void updateAccumulatorMap(Map<String, SerializedValue<Object>> serializedAccumulators) throws Exception {
-
-		if (serializedAccumulators != null) {
-
-			Map<String, Object> newAccumulators;
-			if (serializedAccumulators.isEmpty()) {
-				newAccumulators = Collections.emptyMap();
-			} else {
-				newAccumulators = new HashMap<String, Object>(serializedAccumulators.size());
-			}
-
-			for (Map.Entry<String, SerializedValue<Object>> entry : serializedAccumulators.entrySet()) {
-
-				Object value = null;
-				if (entry.getValue() != null) {
-					value = entry.getValue().deserializeValue(ClassLoader.getSystemClassLoader());
-				}
-
-				newAccumulators.put(entry.getKey(), value);
-			}
-
-			currentAccumulators = newAccumulators;
-			LOG.debug("Updated accumulators: {}", newAccumulators);
-		}
 	}
 
 	public Map<String, Object> getCurrentAccumulators() {
