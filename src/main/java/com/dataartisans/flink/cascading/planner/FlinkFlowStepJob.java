@@ -110,7 +110,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	protected void internalBlockOnStop() throws IOException {
 		if (jobSubmission != null && !jobSubmission.isDone()) {
 			if (isLocalExecution()) {
-				final ActorGateway jobManager = localCluster.getJobManagerGateway();
+				final ActorGateway jobManager = localCluster.getLeaderGateway(DEFAULT_TIMEOUT);
 
 				scala.concurrent.Future<Object> response = jobManager.ask(new JobManagerMessages.CancelJob(jobID), DEFAULT_TIMEOUT);
 
@@ -155,7 +155,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 			startLocalCluster();
 
-			final ActorGateway jobManager = localCluster.getJobManagerGateway();
+			final ActorGateway jobManager = localCluster.getLeaderGateway(DEFAULT_TIMEOUT);
 			accumulatorCache.setLocalJobManager(jobManager);
 
 			JobClient.uploadJarFiles(jobGraph, jobManager, DEFAULT_TIMEOUT);
@@ -266,6 +266,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 				org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
 				configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism() * 2);
 				localCluster = new LocalFlinkMiniCluster(configuration);
+				localCluster.start();
 			}
 			localClusterUsers++;
 		}
