@@ -21,7 +21,6 @@ import cascading.management.state.ClientState;
 import cascading.stats.FlowStepStats;
 import com.dataartisans.flink.cascading.runtime.stats.EnumStringConverter;
 import com.dataartisans.flink.cascading.runtime.stats.AccumulatorCache;
-import com.google.common.base.Preconditions;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -34,7 +33,7 @@ public class FlinkFlowStepStats extends FlowStepStats {
 
 	protected FlinkFlowStepStats(FlowStep flowStep, ClientState clientState, AccumulatorCache accumulatorCache) {
 		super(flowStep, clientState);
-		this.accumulatorCache = Preconditions.checkNotNull(accumulatorCache);
+		this.accumulatorCache = accumulatorCache;
 	}
 
 	@Override
