@@ -15,7 +15,6 @@ The Cascading Connector for Apache Flink supports most Cascading and Flink featu
 
 However, there are also a few limitations, which we are still working on, namely:
 
-- No support for counters. We expect to resolve this limitation very soon.
 - Only InnerJoins for HashJoin pipes. The remaining join types will be available once Flink supports hash-based outer joins.
 
 ## Install ##
