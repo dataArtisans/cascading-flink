@@ -19,11 +19,13 @@ package com.dataartisans.flink.cascading.planner;
 import cascading.flow.FlowConnector;
 import cascading.flow.FlowDef;
 import cascading.flow.FlowStep;
+import cascading.flow.planner.BaseFlowStepFactory;
 import cascading.flow.planner.FlowPlanner;
 import cascading.flow.planner.PlannerInfo;
 import cascading.flow.planner.PlatformInfo;
 import cascading.flow.planner.graph.ElementGraph;
 import cascading.flow.planner.process.FlowNodeGraph;
+import cascading.flow.planner.process.FlowStepFactory;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.tap.Tap;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -103,6 +105,17 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 	@Override
 	protected FlinkFlow createFlow( FlowDef flowDef ) {
 		return new FlinkFlow(env, getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());
+	}
+
+	@Override
+	public FlowStepFactory<Configuration> getFlowStepFactory() {
+
+		return new BaseFlowStepFactory<Configuration>( getFlowNodeFactory() ) {
+			@Override
+			public FlowStep<Configuration> createFlowStep( ElementGraph stepElementGraph, FlowNodeGraph flowNodeGraph ) {
+				return new FlinkFlowStep(env, stepElementGraph, flowNodeGraph, classPath);
+			}
+		};
 	}
 
 	@Override

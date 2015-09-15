@@ -84,9 +84,10 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	private static final FiniteDuration DEFAULT_TIMEOUT = new FiniteDuration(60, TimeUnit.SECONDS);
 
 
-	public FlinkFlowStepJob( ClientState clientState, FlinkFlowStep flowStep, Configuration currentConf, List<String> classPath )
-	{
-		super( clientState, currentConf, flowStep, 1000, 1000 );
+	public FlinkFlowStepJob( ClientState clientState, FlinkFlowStep flowStep, Configuration currentConf, List<String> classPath ) {
+
+		super(clientState, currentConf, flowStep, 1000, 60000, 60000);
+
 		this.currentConf = currentConf;
 		this.env = ((FlinkFlowStep)this.flowStep).getExecutionEnvironment();
 		this.classPath = classPath;
