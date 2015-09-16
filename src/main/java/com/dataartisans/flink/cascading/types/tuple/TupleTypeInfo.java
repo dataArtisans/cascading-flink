@@ -215,12 +215,22 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 	public TypeSerializer<Tuple> createSerializer(ExecutionConfig config) {
 
 		if(this.length > 0) {
-			return new DefinedTupleSerializer(new FieldTypeInfo().createSerializer(config), this.length);
+			// create serializer for tuple with schema
+
+			TypeSerializer[] fieldSers;
+			fieldSers = new TypeSerializer[this.length];
+			for(String field : this.fieldTypes.keySet()) {
+				Integer fieldIdx = Integer.parseInt(field);
+				fieldSers[fieldIdx] = this.fieldTypes.get(field).createSerializer(config);
+			}
+			return new DefinedTupleSerializer(this.schema, fieldSers);
 		}
 		else {
-			return new UnknownTupleSerializer(new FieldTypeInfo().createSerializer(config));
-		}
+			// create serializer for tuple without schema
 
+			TypeSerializer defaultFieldSer = new FieldTypeInfo().createSerializer(config);
+			return new UnknownTupleSerializer(defaultFieldSer);
+		}
 	}
 
 	@Override
@@ -250,7 +260,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			// get field serializers up to max key
 			TypeSerializer[] serializers = new TypeSerializer[maxKey + 1];
 			for(int i = 0; i <= maxKey; ++i) {
-				serializers[i] = new FieldTypeInfo().createSerializer(config);
+				serializers[i] = this.fieldTypes.get(Integer.toString(i)).createSerializer(config);
 			}
 
 			return new DefinedTupleComparator(keyIdxs, keyComps, serializers, this.length);

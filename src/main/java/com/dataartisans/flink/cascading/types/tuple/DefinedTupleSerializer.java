@@ -16,24 +16,36 @@
 
 package com.dataartisans.flink.cascading.types.tuple;
 
+import cascading.flow.FlowException;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 
 	private static final long serialVersionUID = 1L;
 
-	private final boolean[] nullFields;
-	private final TypeSerializer fieldSer;
+	private final Fields fields;
+	private final TypeSerializer[] fieldSers;
 	private final int length;
+	private final boolean[] nullFields;
 
-	public DefinedTupleSerializer(TypeSerializer fieldSer, int length) {
-		this.fieldSer = fieldSer;
-		this.length = length;
+	public DefinedTupleSerializer(Fields fields, TypeSerializer[] fieldSers) {
+		if(!fields.isDefined()) {
+			throw new RuntimeException("DefinedTupleSerializer requires defined Fields schema");
+		}
+		if(fieldSers == null || fieldSers.length != fields.size()) {
+			throw new RuntimeException("Exactly one field serializer required for each tuple field.");
+		}
+
+		this.fields = fields;
+		this.fieldSers = fieldSers;
+		this.length = fields.size();
 		this.nullFields = new boolean[this.length];
 	}
 
@@ -44,7 +56,11 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 
 	@Override
 	public DefinedTupleSerializer duplicate() {
-		return new DefinedTupleSerializer(this.fieldSer.duplicate(), length);
+		TypeSerializer[] copies = new TypeSerializer[this.fieldSers.length];
+		for(int i=0; i<copies.length; i++) {
+			copies[i] = this.fieldSers[i].duplicate();
+		}
+		return new DefinedTupleSerializer(this.fields, copies);
 	}
 
 	@Override
@@ -60,8 +76,14 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	public Tuple copy(Tuple from) {
 		Tuple target = Tuple.size(from.size());
 		for (int i = 0; i < from.size(); i++) {
-			Object copy = fieldSer.copy(from.getObject(i));
-			target.set(i, copy);
+			try {
+				Object copy = fieldSers[i].copy(from.getObject(i));
+				target.set(i, copy);
+			}
+			catch(ClassCastException cce) {
+				throw new FlowException("Unexpected type of field \""+fields.get(i)+"\" encountered. " +
+										"Should have been "+fields.getType(i)+" but was "+from.getObject(i).getClass()+".", cce);
+			}
 		}
 		return target;
 	}
@@ -70,8 +92,14 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	public Tuple copy(Tuple from, Tuple reuse) {
 
 		for (int i = 0; i < from.size(); i++) {
-			Object copy = fieldSer.copy(from.getObject(i), reuse.getObject(i));
-			reuse.set(i, copy);
+			try {
+				Object copy = fieldSers[i].copy(from.getObject(i), reuse.getObject(i));
+				reuse.set(i, copy);
+			}
+			catch(ClassCastException cce) {
+				throw new FlowException("Unexpected type of field \""+fields.get(i)+"\" encountered. " +
+						"Should have been "+fields.getType(i)+" but was "+from.getObject(i).getClass()+".", cce);
+			}
 		}
 
 		return reuse;
@@ -91,7 +119,13 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 		for (int i = 0; i < value.size(); i++) {
 			Object o = value.getObject(i);
 			if(o != null) {
-				fieldSer.serialize(o, target);
+				try {
+					fieldSers[i].serialize(o, target);
+				}
+				catch(ClassCastException cce) {
+					throw new FlowException("Unexpected type of field \""+fields.get(i)+"\" encountered. " +
+											"Should have been "+fields.getType(i)+" but was "+o.getClass()+".", cce);
+				}
 			}
 		}
 	}
@@ -107,7 +141,7 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 		for (int i = 0; i < this.length; i++) {
 			Object field;
 			if(!this.nullFields[i]) {
-				field = fieldSer.deserialize(source);
+				field = fieldSers[i].deserialize(source);
 			}
 			else {
 				field = null;
@@ -127,7 +161,7 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 		for (int i = 0; i < this.length; i++) {
 			Object field;
 			if(!this.nullFields[i]) {
-				field = fieldSer.deserialize(source);
+				field = fieldSers[i].deserialize(source);
 			}
 			else {
 				field = null;
@@ -147,7 +181,7 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 		// copy non-null fields
 		for (int i = 0; i < this.length; i++) {
 			if(!this.nullFields[i]) {
-				fieldSer.copy(source, target);
+				fieldSers[i].copy(source, target);
 			}
 		}
 	}
@@ -158,8 +192,8 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 			DefinedTupleSerializer other = (DefinedTupleSerializer) obj;
 
 			return other.canEqual(this) &&
-					length == other.length &&
-					fieldSer.equals(other.fieldSer);
+					fields.equals(other.fields) &&
+					Arrays.equals(this.fieldSers, other.fieldSers);
 		}
 		else {
 			return false;
@@ -168,7 +202,7 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 
 	@Override
 	public int hashCode() {
-		return 31 * this.fieldSer.hashCode() + length;
+		return 31 * this.fields.hashCode() + Arrays.hashCode(this.fieldSers);
 	}
 
 	@Override
