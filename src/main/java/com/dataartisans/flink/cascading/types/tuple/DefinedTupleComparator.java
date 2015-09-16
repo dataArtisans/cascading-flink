@@ -27,34 +27,38 @@ import org.apache.flink.core.memory.MemorySegment;
 import java.io.IOException;
 import java.util.List;
 
-public class TupleComparator extends CompositeTypeComparator<Tuple> {
+public class DefinedTupleComparator extends CompositeTypeComparator<Tuple> {
 
 	private static final long serialVersionUID = 1L;
 	private static final int[] HASH_SALT = new int[]{73, 79, 97, 113, 131, 197, 199, 311, 337, 373, 719, 733, 919, 971, 991, 1193, 1931, 3119, 3779, 7793, 7937, 9311, 9377, 11939, 19391, 19937, '酏', '飏', 71993, 91193, 93719, 93911};
 
 	private final int tupleLength;
-	private int[] keyPositions;
-	private TypeComparator[] comparators;
-	private TypeSerializer[] serializers;
+	private final int[] keyPositions;
+	private final TypeComparator[] comparators;
+	private final TypeSerializer[] serializers;
 
-	protected int[] normalizedKeyLengths;
-	protected int numLeadingNormalizableKeys;
-	protected int normalizableKeyPrefixLen;
-	protected boolean invertNormKey;
+	private final int[] normalizedKeyLengths;
+	private final int numLeadingNormalizableKeys;
+	private final int normalizableKeyPrefixLen;
+	private final boolean invertNormKey;
 
-	private Object[] fields1;
-	private Object[] fields2;
+	private final Object[] fields1;
+	private final Object[] fields2;
 
+	private final boolean[] nullFields1;
+	private final boolean[] nullFields2;
 
-	public TupleComparator(int[] keyPositions, TypeComparator<?>[] comparators, TypeSerializer<?>[] serializers, int tupleLength) {
+	public DefinedTupleComparator(int[] keyPositions, TypeComparator<?>[] comparators, TypeSerializer<?>[] serializers, int tupleLength) {
 
 		this.keyPositions = keyPositions;
 		this.comparators = comparators;
 		this.serializers = serializers;
 		this.tupleLength = tupleLength;
 
-		fields1 = new Object[serializers.length];
-		fields2 = new Object[serializers.length];
+		this.fields1 = new Object[serializers.length];
+		this.fields2 = new Object[serializers.length];
+		this.nullFields1 = new boolean[this.tupleLength];
+		this.nullFields2 = new boolean[this.tupleLength];
 
 		// set up auxiliary fields for normalized key support
 		this.normalizedKeyLengths = new int[keyPositions.length];
@@ -98,7 +102,7 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 		this.invertNormKey = inverted;
 	}
 
-	private TupleComparator(TupleComparator toClone) {
+	private DefinedTupleComparator(DefinedTupleComparator toClone) {
 		this(toClone.keyPositions, cloneComparators(toClone.comparators), cloneSerializers(toClone.serializers), toClone.tupleLength);
 	}
 
@@ -140,7 +144,7 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	@Override
 	public int compareToReference(TypeComparator<Tuple> typeComparator) {
 
-		TupleComparator other = (TupleComparator)typeComparator;
+		DefinedTupleComparator other = (DefinedTupleComparator)typeComparator;
 
 		for(int i=0; i<this.keyPositions.length; i++) {
 			int cmp = this.comparators[i].compareToReference(other.comparators[i]);
@@ -153,14 +157,8 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 
 	public int compareSerialized(DataInputView firstSource, DataInputView secondSource) throws IOException {
 
-		int arity1 = this.tupleLength < 0 ? firstSource.readInt() : this.tupleLength;
-		int arity2 = this.tupleLength < 0 ? secondSource.readInt() : this.tupleLength;
-
-		boolean[] nullFields1 = new boolean[arity1];
-		boolean[] nullFields2 = new boolean[arity2];
-
-		TupleSerializer.readNullMask(nullFields1, arity1, firstSource);
-		TupleSerializer.readNullMask(nullFields2, arity2, secondSource);
+		NullMaskSerDeUtils.readNullMask(nullFields1, this.tupleLength, firstSource);
+		NullMaskSerDeUtils.readNullMask(nullFields2, this.tupleLength, secondSource);
 
 		for (int i=0; i < serializers.length; i++) {
 			if(!nullFields1[i]) {
@@ -261,7 +259,7 @@ public class TupleComparator extends CompositeTypeComparator<Tuple> {
 	}
 
 	public TypeComparator<Tuple> duplicate() {
-		return new TupleComparator(this);
+		return new DefinedTupleComparator(this);
 	}
 
 	@Override

@@ -20,55 +20,53 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataartisans.flink.cascading.types.field.FieldTypeInfo;
 import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.typeinfo.AtomicType;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
-import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 public class TupleTypeInfo extends CompositeType<Tuple> {
 
-	private Fields fields;
+	private final static int NEG_FIELD_POS_OFFSET = Integer.MAX_VALUE / 2;
+
+	private Fields schema;
 
 	private final int length;
-	private String[] fieldNames;
-	private FieldTypeInfo[] fieldTypes;
+	private LinkedHashMap<String, FieldTypeInfo> fieldTypes;
 
-	private int[] keyIdxs = new int[0];
-
-	private TypeComparator<?>[] fieldComparators;
-	private int[] logicalKeyFields;
-	private int comparatorHelperIndex;
-
-	public TupleTypeInfo(Fields fields) {
+	public TupleTypeInfo(Fields schema) {
 		super(Tuple.class);
 
-		this.fields = fields;
+		this.schema = schema;
 
-		if(fields.isDefined()) {
-			this.length = fields.size();
-			this.fieldNames = new String[length];
-			this.fieldTypes = new FieldTypeInfo[length];
+		if(schema.isDefined()) {
+			this.length = schema.size();
+			this.fieldTypes = new LinkedHashMap<String, FieldTypeInfo>(this.length);
 
-			Comparator[] comps = fields.getComparators();
-			Class[] typeClasses = fields.getTypesClasses();
+			Comparator[] comps = schema.getComparators();
+			Class[] typeClasses = schema.getTypesClasses();
 
 			for(int i=0; i<length; i++) {
-				this.fieldNames[i] = Integer.toString(i);
-				this.fieldTypes[i] = getFieldTypeInfo(i, typeClasses, comps);
+				String fieldName = Integer.toString(i);
+				FieldTypeInfo fieldType = getFieldTypeInfo(i, typeClasses, comps);
+
+				this.fieldTypes.put(fieldName, fieldType);
 			}
 		}
 		else {
-			if(fields.isUnknown()) {
+			if(schema.isUnknown()) {
 				this.length = -1;
-				this.fieldNames = new String[]{"0"};
-				this.fieldTypes = new FieldTypeInfo[] {new FieldTypeInfo()};
+				this.fieldTypes = new LinkedHashMap<String, FieldTypeInfo>(16);
+
+				this.fieldTypes.put("0", new FieldTypeInfo());
 			}
 			else {
-				throw new IllegalArgumentException("Unsupported Fields: "+fields);
+				throw new IllegalArgumentException("Unsupported Fields: "+schema);
 			}
 		}
 	}
@@ -77,13 +75,13 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 		int[] keyPos;
 		if(keyFields.isAll()) {
-			keyPos = new int[this.fields.size()];
+			keyPos = new int[this.schema.size()];
 			for(int i=0; i<keyPos.length; i++) {
 				keyPos[i] = i;
 			}
 		}
 		else {
-			keyPos = this.fields.getPos(keyFields);
+			keyPos = this.schema.getPos(keyFields);
 		}
 
 		String[] serdePos = new String[keyPos.length];
@@ -92,43 +90,33 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		Class[] keyTypes = keyFields.getTypesClasses();
 
 		for(int j=0; j<keyPos.length; j++) {
-			// update min length
-			extendFieldInfoArrays(keyPos[j] + 1);
+
+			String fieldName = Integer.toString(keyPos[j]);
+			FieldTypeInfo fieldType = this.fieldTypes.get(fieldName);
+			if(fieldType == null) {
+				fieldType = new FieldTypeInfo();
+				this.fieldTypes.put(fieldName, fieldType);
+			}
 
 			// set serde position
-			serdePos[j] = Integer.toString(keyPos[j]);
+			serdePos[j] = fieldName;
 
 			if(keyTypes != null && keyTypes.length > j && keyTypes[j] != null) {
 				// set key type
-				this.fieldTypes[keyPos[j]].setFieldType(keyTypes[j]);
+				fieldType.setFieldType(keyTypes[j]);
 			}
 
 			if(keyComps != null && keyComps.length > j && keyComps[j] != null) {
 				// set custom key comparator
-				this.fieldTypes[keyPos[j]].setCustomComparator(keyComps[j]);
+				fieldType.setCustomComparator(keyComps[j]);
 			}
 		}
 
 		return serdePos;
 	}
 
-	public Fields getFields() {
-		return this.fields;
-	}
-
-	private void extendFieldInfoArrays(int newLength) {
-		int curLength = this.fieldNames.length;
-
-		if(newLength > curLength) {
-
-			// update known field names & field types
-			this.fieldNames = Arrays.copyOf(this.fieldNames, newLength);
-			this.fieldTypes = Arrays.copyOf(this.fieldTypes, newLength);
-			for(int i=curLength; i<newLength; i++) {
-				fieldNames[i] = Integer.toString(i);
-				fieldTypes[i] = new FieldTypeInfo();
-			}
-		}
+	public Fields getSchema() {
+		return this.schema;
 	}
 
 	@Override
@@ -163,7 +151,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	@Override
 	public String[] getFieldNames() {
-		return this.fieldNames;
+		return (String[])this.fieldTypes.keySet().toArray();
 	}
 
 	@Override
@@ -171,8 +159,8 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 		try {
 			int idx = Integer.parseInt(fieldName);
-			if(idx < this.fieldTypes.length && this.fieldTypes[idx] != null) {
-				return idx;
+			if(this.fieldTypes.get(fieldName) != null) {
+				return getFlinkPos(idx);
 			}
 			else {
 				throw new IndexOutOfBoundsException("Field index out of bounds.");
@@ -191,8 +179,12 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	@Override
 	public <X> TypeInformation<X> getTypeAt(int idx) {
-		if(idx < this.fieldTypes.length && this.fieldTypes[idx] != null) {
-			return (TypeInformation<X>) this.fieldTypes[idx];
+
+		idx = getCascadingPos(idx);
+
+		String fieldName = Integer.toString(idx);
+		if(this.fieldTypes.get(fieldName) != null) {
+			return (TypeInformation<X>) this.fieldTypes.get(fieldName);
 		}
 		else {
 			throw new IndexOutOfBoundsException("Field index out of bounds.");
@@ -215,54 +207,83 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	@Override
 	public TypeSerializer<Tuple> createSerializer(ExecutionConfig config) {
-		return new TupleSerializer(new FieldTypeInfo().createSerializer(config), this.length);
+
+		if(this.length > 0) {
+			return new DefinedTupleSerializer(new FieldTypeInfo().createSerializer(config), this.length);
+		}
+		else {
+			return new UnknownTupleSerializer(new FieldTypeInfo().createSerializer(config));
+		}
+
+	}
+
+	@Override
+	public TypeComparator<Tuple> createComparator(int[] keyIdxs, boolean[] orders, int offset, ExecutionConfig config) {
+
+		if(keyIdxs.length == 0) {
+			throw new RuntimeException("Empty key indexes");
+		}
+		if(offset != 0) {
+			throw new RuntimeException("Only 0 offset supported.");
+		}
+
+		// get key comparators
+		TypeComparator<?>[] keyComps = new TypeComparator[keyIdxs.length];
+		for(int i = 0; i < keyIdxs.length; i++) {
+			keyComps[i] = ((AtomicType)this.getTypeAt(keyIdxs[i])).createComparator(orders[i], config);
+		}
+
+		if(length > 0) {
+			// comparator for tuples with defined schema
+			int maxKey = 0;
+			for(int i = 0; i < keyIdxs.length; ++i) {
+				int key = keyIdxs[i];
+				maxKey = Math.max(maxKey, key);
+			}
+
+			// get field serializers up to max key
+			TypeSerializer[] serializers = new TypeSerializer[maxKey + 1];
+			for(int i = 0; i <= maxKey; ++i) {
+				serializers[i] = new FieldTypeInfo().createSerializer(config);
+			}
+
+			return new DefinedTupleComparator(keyIdxs, keyComps, serializers, this.length);
+		}
+		else {
+			// comparator for unknown tuples
+			int[] cascadingKeyIdx = new int[keyIdxs.length];
+			for(int i=0; i<cascadingKeyIdx.length; i++) {
+				cascadingKeyIdx[i] = getCascadingPos(keyIdxs[i]);
+			}
+
+			return new UnknownTupleComparator(cascadingKeyIdx, keyComps, new FieldTypeInfo().createSerializer(config));
+		}
+
 	}
 
 	@Override
 	protected void initializeNewComparator(int localKeyCount) {
-		this.fieldComparators = new TypeComparator[localKeyCount];
-		this.logicalKeyFields = new int[localKeyCount];
-		this.comparatorHelperIndex = 0;
+		// unused
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	protected void addCompareField(int fieldId, TypeComparator<?> comparator) {
-		this.fieldComparators[this.comparatorHelperIndex] = comparator;
-		this.logicalKeyFields[this.comparatorHelperIndex] = fieldId;
-		this.comparatorHelperIndex++;
+		// unused
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	protected TypeComparator<Tuple> getNewComparator(ExecutionConfig executionConfig) {
-		TypeComparator[] finalFieldComparators = (TypeComparator[]) Arrays.copyOf(this.fieldComparators, this.comparatorHelperIndex);
-		int[] finalLogicalKeyFields = Arrays.copyOf(this.logicalKeyFields, this.comparatorHelperIndex);
-		int maxKey = 0;
-		int[] fieldSerializers = finalLogicalKeyFields;
-		int numKeyFields = finalLogicalKeyFields.length;
-
-		for(int i = 0; i < numKeyFields; ++i) {
-			int key = fieldSerializers[i];
-			maxKey = Math.max(maxKey, key);
-		}
-
-		TypeSerializer[] serializers = new TypeSerializer[maxKey + 1];
-
-		for(int i = 0; i <= maxKey; ++i) {
-			serializers[i] = new FieldTypeInfo().createSerializer(executionConfig);
-		}
-
-		if(finalFieldComparators.length != 0 && finalLogicalKeyFields.length != 0 && serializers.length != 0 && finalFieldComparators.length == finalLogicalKeyFields.length) {
-			return new TupleComparator(finalLogicalKeyFields, finalFieldComparators, serializers, this.length);
-		} else {
-			throw new IllegalArgumentException("Tuple comparator creation has a bug");
-		}
+		// unused
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public boolean equals(Object o) {
 
 		if (o instanceof TupleTypeInfo) {
-			return Arrays.equals(this.keyIdxs, ((TupleTypeInfo)o).keyIdxs);
+			return this.schema.equalsFields(((TupleTypeInfo) o).getSchema());
 		}
 		else {
 			return false;
@@ -291,5 +312,29 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		}
 
 		return fieldTypeInfo;
+	}
+
+	// this is an ugly hack to support negative relative positions on unknown schemas.
+	private int getFlinkPos(int cascadingPos) {
+		if(cascadingPos >= 0) {
+			if(cascadingPos > NEG_FIELD_POS_OFFSET) {
+				throw new RuntimeException("Maximum key position "+NEG_FIELD_POS_OFFSET+" exceeded");
+			}
+
+			return cascadingPos;
+		}
+		else {
+			return NEG_FIELD_POS_OFFSET + (-1 * cascadingPos);
+		}
+	}
+
+	// this is an ugly hack to support negative relative positions on unknown schemas.
+	private int getCascadingPos(int flinkPos) {
+		if(flinkPos > NEG_FIELD_POS_OFFSET) {
+			return (flinkPos - NEG_FIELD_POS_OFFSET) * -1;
+		}
+		else {
+			return flinkPos;
+		}
 	}
 }

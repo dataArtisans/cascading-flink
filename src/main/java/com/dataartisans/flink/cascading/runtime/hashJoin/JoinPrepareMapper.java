@@ -16,6 +16,7 @@
 
 package com.dataartisans.flink.cascading.runtime.hashJoin;
 
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -25,15 +26,17 @@ public class JoinPrepareMapper implements MapPartitionFunction<Tuple, Tuple2<Tup
 
 	final private Tuple2<Tuple, Tuple[]> out;
 	private final int initialPos;
-	final private int[] keyPos;
+	final private Fields schema;
+	final private Fields keyFields;
 	final private Tuple empty = new Tuple();
 
-	public JoinPrepareMapper(int numJoinInputs, int[] keyPos) {
-		this(numJoinInputs, 0, keyPos);
+	public JoinPrepareMapper(int numJoinInputs, Fields schema, Fields keyFields) {
+		this(numJoinInputs, 0, schema, keyFields);
 	}
 
-	public JoinPrepareMapper(int numJoinInputs, int initialPos, int[] keyPos) {
-		this.keyPos = keyPos;
+	public JoinPrepareMapper(int numJoinInputs, int initialPos, Fields schema, Fields keyFields) {
+		this.schema = schema;
+		this.keyFields = keyFields;
 		this.initialPos = initialPos;
 
 		Tuple[] tupleList = new Tuple[numJoinInputs];
@@ -46,11 +49,11 @@ public class JoinPrepareMapper implements MapPartitionFunction<Tuple, Tuple2<Tup
 	@Override
 	public void mapPartition(Iterable<Tuple> tuples, Collector<Tuple2<Tuple, Tuple[]>> collector) throws Exception {
 		for(Tuple t : tuples) {
-			if(keyPos == null) {
+			if(keyFields == null) {
 				out.f0 = empty;
 			}
 			else {
-				out.f0 = t.get(keyPos);
+				out.f0 = t.get(schema, keyFields);
 			}
 			out.f1[initialPos] = t;
 			collector.collect(out);

@@ -45,7 +45,6 @@ public class TupleAppendCoGrouper extends RichCoGroupFunction<Tuple2<Tuple, Tupl
 	private int tupleListSize;
 	private Fields inputFields;
 	private Fields keyFields;
-	private int[] keyPos;
 
 	private transient Tuple rightT;
 	private transient Tuple2<Tuple, Tuple[]> outT;
@@ -56,8 +55,6 @@ public class TupleAppendCoGrouper extends RichCoGroupFunction<Tuple2<Tuple, Tupl
 		this.tupleListSize = tupleListSize;
 		this.inputFields = inputFields;
 		this.keyFields = keyFields;
-
-		this.keyPos = inputFields.getPos(keyFields);
 	}
 
 	@Override
@@ -96,7 +93,7 @@ public class TupleAppendCoGrouper extends RichCoGroupFunction<Tuple2<Tuple, Tupl
 			// left input is empty
 			while(rightIt.hasNext()) {
 				Tuple rightT = rightIt.next();
-				outT.f0 = rightT.get(keyPos);
+				outT.f0 = rightT.get(inputFields, keyFields);
 				outT.f1[tupleListPos] = rightT;
 				out.collect(outT);
 			}

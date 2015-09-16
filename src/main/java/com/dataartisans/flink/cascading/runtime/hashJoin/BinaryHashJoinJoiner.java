@@ -24,6 +24,7 @@ import cascading.flow.SliceCounters;
 import cascading.flow.stream.duct.Duct;
 import cascading.flow.stream.element.ElementDuct;
 import cascading.pipe.Boundary;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
 import com.dataartisans.flink.cascading.util.FlinkConfigConverter;
@@ -45,7 +46,8 @@ public class BinaryHashJoinJoiner extends RichFlatJoinFunction<Tuple, Tuple, Tup
 	private static final Logger LOG = LoggerFactory.getLogger(BinaryHashJoinJoiner.class);
 
 	private FlowNode flowNode;
-	private int[] joinKeyPos;
+	private Fields leftSchema;
+	private Fields leftKeyFields;
 
 	private transient HashJoinStreamGraph streamGraph;
 	private transient FlinkFlowProcess currentProcess;
@@ -58,9 +60,10 @@ public class BinaryHashJoinJoiner extends RichFlatJoinFunction<Tuple, Tuple, Tup
 
 	public BinaryHashJoinJoiner() {}
 
-	public BinaryHashJoinJoiner(FlowNode flowNode, int[] joinKeys) {
+	public BinaryHashJoinJoiner(FlowNode flowNode, Fields leftSchema, Fields leftKeyFields) {
 		this.flowNode = flowNode;
-		this.joinKeyPos = joinKeys;
+		this.leftSchema = leftSchema;
+		this.leftKeyFields = leftKeyFields;
 	}
 
 	@Override
@@ -121,7 +124,7 @@ public class BinaryHashJoinJoiner extends RichFlatJoinFunction<Tuple, Tuple, Tup
 
 		this.streamGraph.setTupleCollector(output);
 
-		joinInput.f0 = left.get(joinKeyPos);
+		joinInput.f0 = left.get(leftSchema, leftKeyFields);
 		joinedTuples[0] = left;
 		joinedTuples[1] = right;
 
