@@ -18,11 +18,10 @@ package com.dataartisans.flink.cascading.runtime.hashJoin;
 
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.util.Collector;
 
-public class JoinPrepareMapper implements MapPartitionFunction<Tuple, Tuple2<Tuple, Tuple[]>> {
+public class JoinPrepareMapper implements MapFunction<Tuple, Tuple2<Tuple, Tuple[]>> {
 
 	final private Tuple2<Tuple, Tuple[]> out;
 	private final int initialPos;
@@ -47,17 +46,15 @@ public class JoinPrepareMapper implements MapPartitionFunction<Tuple, Tuple2<Tup
 	}
 
 	@Override
-	public void mapPartition(Iterable<Tuple> tuples, Collector<Tuple2<Tuple, Tuple[]>> collector) throws Exception {
-		for(Tuple t : tuples) {
-			if(keyFields == null) {
-				out.f0 = empty;
-			}
-			else {
-				out.f0 = t.get(schema, keyFields);
-			}
-			out.f1[initialPos] = t;
-			collector.collect(out);
+	public Tuple2<Tuple, Tuple[]> map(Tuple tuple) throws Exception {
+		if(keyFields == null) {
+			out.f0 = empty;
 		}
+		else {
+			out.f0 = tuple.get(schema, keyFields);
+		}
+		out.f1[initialPos] = tuple;
+		return out;
 	}
 
 }

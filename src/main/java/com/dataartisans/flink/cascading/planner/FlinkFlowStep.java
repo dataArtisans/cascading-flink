@@ -582,7 +582,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-				.mapPartition(new JoinPrepareMapper(numJoinInputs, 0, inputFields[0], keyFields[0]))
+				.map(new JoinPrepareMapper(numJoinInputs, 0, inputFields[0], keyFields[0]))
 				.returns(tupleJoinListsTypeInfo)
 				.setParallelism(mapDop);
 
@@ -619,7 +619,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-				.mapPartition(new JoinPrepareMapper(numJoinInputs, null, null))
+				.map(new JoinPrepareMapper(numJoinInputs, null, null))
 				.returns(tupleJoinListsTypeInfo)
 				.setParallelism(mapDop);
 
@@ -830,7 +830,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			// prepare tuple list for join
 			DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-					.mapPartition(new JoinPrepareMapper(numJoinInputs-1, inputFields, keyFields[0]))
+					.map(new JoinPrepareMapper(numJoinInputs - 1, inputFields, keyFields[0]))
 					.returns(tupleJoinListsTypeInfo)
 					.setParallelism(mapDop);
 
@@ -882,7 +882,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-				.mapPartition(new JoinPrepareMapper(numJoinInputs, null, null))
+				.map(new JoinPrepareMapper(numJoinInputs, null, null))
 				.returns(tupleJoinListsTypeInfo)
 				.setParallelism(mapDop);
 
