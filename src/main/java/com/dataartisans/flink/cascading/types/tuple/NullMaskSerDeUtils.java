@@ -50,6 +50,31 @@ public class NullMaskSerDeUtils {
 		}
 	}
 
+	public static void writeNullMask(
+			Object[] array, int length, DataOutputView target) throws IOException {
+
+		int b;
+		int bytePos;
+
+		for(int fieldPos = 0; fieldPos < length; ) {
+			b = 0x00;
+			// set bits in byte
+			for(bytePos = 0; bytePos < 8 && fieldPos < length; bytePos++, fieldPos++) {
+				b = b << 1;
+				// set bit if field is null
+				if(array[fieldPos] == null) {
+					b |= 0x01;
+				}
+			}
+			// shift bits if last byte is not completely filled
+			for(; bytePos < 8; bytePos++) {
+				b = b << 1;
+			}
+			// write byte
+			target.writeByte(b);
+		}
+	}
+
 	public static void readNullMask(
 			boolean[] mask, int length, DataInputView source) throws IOException {
 
