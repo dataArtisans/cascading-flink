@@ -153,8 +153,27 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	}
 
 	@Override
-	public boolean equals(Object o) {
-		return (o instanceof DefinedTupleSerializer);
+	public boolean equals(Object obj) {
+		if (obj instanceof DefinedTupleSerializer) {
+			DefinedTupleSerializer other = (DefinedTupleSerializer) obj;
+
+			return other.canEqual(this) &&
+					length == other.length &&
+					fieldSer.equals(other.fieldSer);
+		}
+		else {
+			return false;
+		}
+	}
+
+	@Override
+	public int hashCode() {
+		return 31 * this.fieldSer.hashCode() + length;
+	}
+
+	@Override
+	public boolean canEqual(Object obj) {
+		return obj instanceof DefinedTupleSerializer;
 	}
 
 }

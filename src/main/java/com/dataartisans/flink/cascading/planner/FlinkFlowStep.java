@@ -575,7 +575,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
 						keysTypeInfo,
-						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
+						ObjectArrayTypeInfo.getInfoFor(new TupleTypeInfo(Fields.UNKNOWN))
 				);
 
 		int mapDop = ((Operator)inputs.get(0)).getParallelism();
@@ -612,7 +612,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
 						new TupleTypeInfo(Fields.UNKNOWN),
-						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
+						ObjectArrayTypeInfo.getInfoFor(new TupleTypeInfo(Fields.UNKNOWN))
 				);
 
 		int mapDop = ((Operator)inputs.get(0)).getParallelism();
@@ -823,7 +823,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
 							keysTypeInfo,
-							ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
+							ObjectArrayTypeInfo.getInfoFor(new TupleTypeInfo(Fields.UNKNOWN))
 					);
 
 			int mapDop = ((Operator) inputs.get(0)).getParallelism();
@@ -875,7 +875,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
 						new TupleTypeInfo(Fields.UNKNOWN),
-						ObjectArrayTypeInfo.getInfoFor(Tuple[].class)
+						ObjectArrayTypeInfo.getInfoFor(new TupleTypeInfo(Fields.UNKNOWN))
 				);
 
 		int mapDop = ((Operator)inputs.get(0)).getParallelism();

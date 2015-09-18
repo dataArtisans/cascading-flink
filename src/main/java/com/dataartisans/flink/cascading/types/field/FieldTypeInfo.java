@@ -115,6 +115,11 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 	}
 
 	@Override
+	public String toString() {
+		return this.fieldTypeInfo.toString();
+	}
+
+	@Override
 	public TypeComparator<Comparable> createComparator(boolean sortOrderAscending, ExecutionConfig config) {
 
 		if(this.fieldTypeInfo != null) {
@@ -132,7 +137,26 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 	}
 
 	@Override
-	public boolean equals(Object o) {
-		return  (o instanceof FieldTypeInfo);
+	public boolean equals(Object obj) {
+		if (obj instanceof FieldTypeInfo) {
+			FieldTypeInfo other = (FieldTypeInfo) obj;
+
+			// sloppy equals check, Cascading does not always provide types.
+			// We rely on Cascading to do the type checking here.
+			return other.canEqual(this);
+		}
+		else {
+			return false;
+		}
+	}
+
+	@Override
+	public int hashCode() {
+		return this.fieldTypeInfo.hashCode();
+	}
+
+	@Override
+	public boolean canEqual(Object obj) {
+		return obj instanceof FieldTypeInfo;
 	}
 }

@@ -184,8 +184,25 @@ public class UnknownTupleSerializer extends TypeSerializer<Tuple> {
 	}
 
 	@Override
-	public boolean equals(Object o) {
-		return (o instanceof UnknownTupleSerializer);
+	public boolean equals(Object obj) {
+		if (obj instanceof UnknownTupleSerializer) {
+			UnknownTupleSerializer other = (UnknownTupleSerializer) obj;
+
+			return other.canEqual(this) &&
+					fieldSer == other.fieldSer;
+		}
+		else {
+			return false;
+		}
 	}
 
+	@Override
+	public int hashCode() {
+		return this.fieldSer.hashCode();
+	}
+
+	@Override
+	public boolean canEqual(Object obj) {
+		return obj instanceof UnknownTupleSerializer;
+	}
 }

@@ -192,6 +192,12 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 	}
 
 	@Override
+	protected TypeComparatorBuilder<Tuple> createTypeComparatorBuilder() {
+		// not required
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
 	public void getFlatFields(String fieldExpression, int offset, List<FlatFieldDescriptor> list) {
 
 		if(fieldExpression.equals("*")) {
@@ -259,24 +265,6 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			return new UnknownTupleComparator(cascadingKeyIdx, keyComps, new FieldTypeInfo().createSerializer(config));
 		}
 
-	}
-
-	@Override
-	protected void initializeNewComparator(int localKeyCount) {
-		// unused
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	protected void addCompareField(int fieldId, TypeComparator<?> comparator) {
-		// unused
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	protected TypeComparator<Tuple> getNewComparator(ExecutionConfig executionConfig) {
-		// unused
-		throw new UnsupportedOperationException();
 	}
 
 	@Override
