@@ -70,7 +70,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.Operator;
-import org.apache.flink.api.java.operators.SortPartitionOperator;
+import org.apache.flink.api.java.operators.SortedGrouping;
+import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -446,6 +447,81 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		Order sortOrder = groupBy.isSortReversed() ? Order.DESCENDING : Order.ASCENDING;
 
+		if(sortOrder == Order.DESCENDING) {
+			// translate groupBy with inverse sort order
+			return translateInverseSortedGroupBy(input, node, dop, groupKeys, sortKeys, outFields);
+		}
+		else if(groupKeys == null || groupKeys.length == 0) {
+			// translate key-less (global) groupBy
+			return translateGlobalGroupBy(input, node, dop, sortKeys, sortOrder, outFields);
+		}
+		else {
+
+			UnsortedGrouping<Tuple> grouping = input
+					.groupBy(groupKeys);
+
+			if(sortKeys != null && sortKeys.length > 0) {
+				// translate groupBy with group sorting
+
+				SortedGrouping<Tuple> sortedGrouping = grouping
+						.sortGroup(sortKeys[0], Order.ASCENDING);
+				for(int i=1; i<sortKeys.length; i++) {
+					sortedGrouping = sortedGrouping
+							.sortGroup(sortKeys[i], Order.DESCENDING);
+				}
+
+				return sortedGrouping
+						.reduceGroup(new GroupByReducer(node))
+						.returns(new TupleTypeInfo(outFields))
+						.withParameters(this.getFlinkNodeConfig(node))
+						.setParallelism(dop)
+						.name("reduce-" + node.getID());
+			}
+			else {
+				// translate groupBy without group sorting
+
+				return grouping
+						.reduceGroup(new GroupByReducer(node))
+						.returns(new TupleTypeInfo(outFields))
+						.withParameters(this.getFlinkNodeConfig(node))
+						.setParallelism(dop)
+						.name("reduce-" + node.getID());
+			}
+		}
+
+	}
+
+	private DataSet<Tuple> translateGlobalGroupBy(DataSet<Tuple> input, FlowNode node, int dop,
+													String[] sortKeys, Order sortOrder, Fields outFields) {
+
+		DataSet<Tuple> result = input;
+
+		// sort on sorting keys if necessary
+		if(sortKeys != null && sortKeys.length > 0) {
+
+			result = result
+					.sortPartition(sortKeys[0], sortOrder)
+					.setParallelism(1);
+			for(int i=1; i<sortKeys.length; i++) {
+				result = result
+						.sortPartition(sortKeys[i], sortOrder)
+						.setParallelism(1);
+			}
+		}
+
+		// group all data
+		return result
+				.reduceGroup(new GroupByReducer(node))
+				.returns(new TupleTypeInfo(outFields))
+				.withParameters(this.getFlinkNodeConfig(node))
+				.setParallelism(dop)
+				.name("reduce-"+ node.getID());
+
+	}
+
+	private DataSet<Tuple> translateInverseSortedGroupBy(DataSet<Tuple> input, FlowNode node, int dop,
+															String[] groupKeys, String[] sortKeys, Fields outFields) {
+
 		DataSet<Tuple> result = input;
 
 		// hash partition and sort on grouping keys if necessary
@@ -457,11 +533,11 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			// sort on grouping keys
 			result = result
-					.sortPartition(groupKeys[0], sortOrder)
+					.sortPartition(groupKeys[0], Order.DESCENDING)
 					.setParallelism(dop);
 			for(int i=1; i<groupKeys.length; i++) {
 				result = result
-						.sortPartition(groupKeys[i], sortOrder)
+						.sortPartition(groupKeys[i], Order.DESCENDING)
 						.setParallelism(dop);
 			}
 		}
@@ -470,43 +546,22 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		if(sortKeys != null && sortKeys.length > 0) {
 
 			result = result
-					.sortPartition(sortKeys[0], sortOrder)
+					.sortPartition(sortKeys[0], Order.DESCENDING)
 					.setParallelism(dop);
 			for(int i=1; i<sortKeys.length; i++) {
 				result = result
-						.sortPartition(sortKeys[i], sortOrder)
+						.sortPartition(sortKeys[i], Order.DESCENDING)
 						.setParallelism(dop);
 			}
 		}
 
-		// group by reduce
-		if(groupKeys != null && groupKeys.length > 0) {
-
-			return result
-					.groupBy(groupKeys)
-					.reduceGroup(new GroupByReducer(node))
-					.returns(new TupleTypeInfo(outFields))
-					.withParameters(this.getFlinkNodeConfig(node))
-					.setParallelism(dop)
-					.name("reduce-" + node.getID());
-
-		}
-		// all reduce (no group keys)
-		else {
-			// move all data to one partition before sorting
-			if(sortKeys != null && sortKeys.length > 0) {
-				((SortPartitionOperator)result).setParallelism(1);
-			}
-
-			// group all data
-			return result
-					.reduceGroup(new GroupByReducer(node))
-					.returns(new TupleTypeInfo(outFields))
-					.withParameters(this.getFlinkNodeConfig(node))
-					.setParallelism(dop)
-					.name("reduce-"+ node.getID());
-		}
-
+		return result
+				.groupBy(groupKeys)
+				.reduceGroup(new GroupByReducer(node))
+				.returns(new TupleTypeInfo(outFields))
+				.withParameters(this.getFlinkNodeConfig(node))
+				.setParallelism(dop)
+				.name("reduce-" + node.getID());
 	}
 
 	private DataSet<Tuple> translateMerge(List<DataSet<Tuple>> inputs, FlowNode node) {
