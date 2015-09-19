@@ -19,6 +19,10 @@ However, there are also a few limitations, which we are still working on, namely
 
 ## Install ##
 
+**WARNING** The Cascading Connector for Apache Flink does currently depend on unstable 0.10-SNAPSHOT builds of Apache Flink. 
+Since Flink APIs may be broken at any time, building the connector might not succeed. Please drop a note to fabian [at] data-artisans.com in this case.
+We will fix the Flink dependency as soon as Apache Flink releases a 0.10 version. 
+
 To retrieve the latest version of the Cascading Connector for Apache Flink, run the following command
 
     git clone https://github.com/dataArtisans/cascading-flink.git
