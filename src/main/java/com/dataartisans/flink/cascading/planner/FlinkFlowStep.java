@@ -46,6 +46,7 @@ import cascading.tuple.Tuple;
 import com.dataartisans.flink.cascading.runtime.coGroup.bufferJoin.BufferJoinKeyExtractor;
 import com.dataartisans.flink.cascading.runtime.coGroup.bufferJoin.CoGroupBufferReducer;
 import com.dataartisans.flink.cascading.runtime.coGroup.regularJoin.CoGroupReducer;
+import com.dataartisans.flink.cascading.runtime.coGroup.regularJoin.TupleCoGrouper;
 import com.dataartisans.flink.cascading.runtime.groupBy.GroupByReducer;
 import com.dataartisans.flink.cascading.runtime.hashJoin.NaryHashJoinJoiner;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
@@ -576,24 +577,29 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
 						keysTypeInfo,
-						new TupleArrayTypeInfo(numJoinInputs, Arrays.copyOf(inputFields, 1))
+						new TupleArrayTypeInfo(numJoinInputs, Arrays.copyOf(inputFields, 2))
 				);
 
-		int mapDop = ((Operator)inputs.get(0)).getParallelism();
-
-		// prepare tuple list for join
-		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
-				.map(new JoinPrepareMapper(numJoinInputs, inputFields[0], keyFields[0]))
-				.returns(tupleJoinListsTypeInfo)
-				.setParallelism(mapDop);
-
+		String[] listKeys = new String[flinkKeys[0].length];
+		String[] listKeysFwd = new String[flinkKeys[0].length];
 
 		for(int i=0; i<flinkKeys[0].length; i++) {
-			flinkKeys[0][i] = "f0."+i;
+			listKeys[i] = "f0."+i;
+			listKeysFwd[i] = flinkKeys[0][i]+" -> "+listKeys[i];
 		}
 
-		// outer join inputs with CoGroup
-		for (int i = 1; i < inputs.size(); i++) {
+		// first outer join with CoGroup
+		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0).coGroup(inputs.get(1))
+				.where(flinkKeys[0]).equalTo(flinkKeys[1])
+				.with(new TupleCoGrouper(numJoinInputs,
+						inputFields[0], keyFields[0],
+						inputFields[1], keyFields[1]))
+				.returns(tupleJoinListsTypeInfo)
+				.withForwardedFieldsFirst(listKeysFwd)
+				.setParallelism(dop);
+
+		// further outer joins with CoGroup
+		for (int i = 2; i < inputs.size(); i++) {
 
 			tupleJoinListsTypeInfo =
 					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
@@ -602,10 +608,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					);
 
 			tupleJoinLists = tupleJoinLists.coGroup(inputs.get(i))
-					.where(flinkKeys[0]).equalTo(flinkKeys[i])
+					.where(listKeys).equalTo(flinkKeys[i])
 					.with(new TupleAppendCoGrouper(i, numJoinInputs, inputFields[i], keyFields[i]))
 					.returns(tupleJoinListsTypeInfo)
-					.withForwardedFieldsFirst(flinkKeys[0])
+					.withForwardedFieldsFirst(listKeys)
 					.setParallelism(dop);
 		}
 

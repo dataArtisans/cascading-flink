@@ -27,6 +27,7 @@ import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -38,11 +39,13 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	private final int length;
 	private LinkedHashMap<String, FieldTypeInfo> fieldTypes;
+	private HashMap<String, Integer> fieldIndexes;
 
 	public TupleTypeInfo(Fields schema) {
 		super(Tuple.class);
 
 		this.schema = schema;
+		this.fieldIndexes = new HashMap<String, Integer>();
 
 		if(schema.isDefined()) {
 			this.length = schema.size();
@@ -52,10 +55,11 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 			Class[] typeClasses = schema.getTypesClasses();
 
 			for(int i=0; i<length; i++) {
-				String fieldName = Integer.toString(i);
+				String fieldName = getFieldName(i);
 				FieldTypeInfo fieldType = getFieldTypeInfo(i, typeClasses, comps);
 
 				this.fieldTypes.put(fieldName, fieldType);
+				this.fieldIndexes.put(fieldName, i);
 			}
 		}
 		else {
@@ -64,6 +68,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 				this.fieldTypes = new LinkedHashMap<String, FieldTypeInfo>(16);
 
 				this.fieldTypes.put("0", new FieldTypeInfo());
+				this.fieldIndexes.put("0", 0);
 			}
 			else {
 				throw new IllegalArgumentException("Unsupported Fields: "+schema);
@@ -91,7 +96,12 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 		for(int j=0; j<keyPos.length; j++) {
 
-			String fieldName = Integer.toString(keyPos[j]);
+			String fieldName = getFieldName(keyPos[j]);
+
+			if(!this.fieldIndexes.containsKey(fieldName)) {
+				this.fieldIndexes.put(fieldName, keyPos[j]);
+			}
+
 			FieldTypeInfo fieldType = this.fieldTypes.get(fieldName);
 			if(fieldType == null) {
 				fieldType = new FieldTypeInfo();
@@ -158,7 +168,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 	public int getFieldIndex(String fieldName) {
 
 		try {
-			int idx = Integer.parseInt(fieldName);
+			int idx = this.fieldIndexes.get(fieldName);
 			if(this.fieldTypes.get(fieldName) != null) {
 				return getFlinkPos(idx);
 			}
@@ -182,7 +192,7 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 		idx = getCascadingPos(idx);
 
-		String fieldName = Integer.toString(idx);
+		String fieldName = getFieldName(idx);
 		if(this.fieldTypes.get(fieldName) != null) {
 			return (TypeInformation<X>) this.fieldTypes.get(fieldName);
 		}
@@ -333,6 +343,15 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 		}
 		else {
 			return flinkPos;
+		}
+	}
+
+	private String getFieldName(int index) {
+		if(index >= 0) {
+			return Integer.toString(index);
+		}
+		else {
+			return "neg"+(-1*index);
 		}
 	}
 }
