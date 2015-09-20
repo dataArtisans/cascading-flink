@@ -6,6 +6,8 @@
 
 The **Cascading Connector for Apache Flink** enables you to execute Cascading flows on Apache Flink. Using this connector, your Cascading flows will benefit from Flink's runtime features such as its pipelined data shuffles and its efficient and robust in-memory operators.
 
+**Please report any problems with the Cascading on Flink Connector by opening an [issue](https://github.com/dataArtisans/cascading-flink/issues).**
+
 ## Features & Limitations ##
 
 The Cascading Connector for Apache Flink supports most Cascading and Flink features. 
@@ -15,12 +17,12 @@ The Cascading Connector for Apache Flink supports most Cascading and Flink featu
 
 However, there are also a few limitations, which we are still working on, namely:
 
-- Only InnerJoins for HashJoin pipes. The remaining join types will be available once Flink supports hash-based outer joins.
+- Only InnerJoins for HashJoin pipes. The remaining join types will be available once Flink supports hash-based outer joins. We expect to add support for hash-based LeftJoins very soon.
 
 ## Install ##
 
 **WARNING** The Cascading Connector for Apache Flink does currently depend on unstable 0.10-SNAPSHOT builds of Apache Flink. 
-Since Flink APIs may be broken at any time, building the connector might not succeed. Please drop a note to fabian [at] data-artisans.com in this case.
+Since Flink APIs may be broken at any time, building the connector might not succeed. Please open an [issue](https://github.com/dataArtisans/cascading-flink/issues) and report the incompatibility if this is the case.
 We will fix the Flink dependency as soon as Apache Flink releases a 0.10 version. 
 
 To retrieve the latest version of the Cascading Connector for Apache Flink, run the following command
