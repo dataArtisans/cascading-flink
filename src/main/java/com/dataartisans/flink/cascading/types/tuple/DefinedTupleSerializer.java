@@ -91,10 +91,12 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public Tuple copy(Tuple from, Tuple reuse) {
 
+		Tuple tuple = getReuseOrNew(reuse);
+
 		for (int i = 0; i < from.size(); i++) {
 			try {
-				Object copy = fieldSers[i].copy(from.getObject(i), reuse.getObject(i));
-				reuse.set(i, copy);
+				Object copy = fieldSers[i].copy(from.getObject(i), tuple.getObject(i));
+				tuple.set(i, copy);
 			}
 			catch(ClassCastException cce) {
 				throw new FlowException("Unexpected type of field \""+fields.get(i)+"\" encountered. " +
@@ -102,7 +104,7 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 			}
 		}
 
-		return reuse;
+		return tuple;
 	}
 
 	@Override
@@ -155,6 +157,8 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public Tuple deserialize(Tuple reuse, DataInputView source) throws IOException {
 
+		Tuple tuple = getReuseOrNew(reuse);
+
 		// read null mask
 		NullMaskSerDeUtils.readNullMask(nullFields, this.length, source);
 
@@ -166,10 +170,10 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 			else {
 				field = null;
 			}
-			reuse.set(i, field);
+			tuple.set(i, field);
 		}
 
-		return reuse;
+		return tuple;
 	}
 
 	@Override
@@ -208,6 +212,15 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public boolean canEqual(Object obj) {
 		return obj instanceof DefinedTupleSerializer;
+	}
+
+	private Tuple getReuseOrNew(Tuple reuse) {
+		if(reuse.isUnmodifiable()) {
+			return Tuple.size(this.length);
+		}
+		else {
+			return reuse;
+		}
 	}
 
 }

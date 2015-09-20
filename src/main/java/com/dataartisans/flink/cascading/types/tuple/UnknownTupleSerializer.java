@@ -66,12 +66,14 @@ public class UnknownTupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public Tuple copy(Tuple from, Tuple reuse) {
 
+		Tuple tuple = getReuseOrNew(reuse, from.size());
+
 		for (int i = 0; i < from.size(); i++) {
-			Object copy = fieldSer.copy(from.getObject(i), reuse.getObject(i));
-			reuse.set(i, copy);
+			Object copy = fieldSer.copy(from.getObject(i), tuple.getObject(i));
+			tuple.set(i, copy);
 		}
 
-		return reuse;
+		return tuple;
 	}
 
 	@Override
@@ -136,10 +138,8 @@ public class UnknownTupleSerializer extends TypeSerializer<Tuple> {
 		if(this.nullFields == null || this.nullFields.length < arity) {
 			this.nullFields = new boolean[arity];
 		}
-		// resize Tuple if necessary
-		if(reuse.size() != arity) {
-			reuse = Tuple.size(arity);
-		}
+
+		Tuple tuple = getReuseOrNew(reuse, arity);
 
 		// read null mask
 		NullMaskSerDeUtils.readNullMask(nullFields, arity, source);
@@ -152,10 +152,10 @@ public class UnknownTupleSerializer extends TypeSerializer<Tuple> {
 			else {
 				field = null;
 			}
-			reuse.set(i, field);
+			tuple.set(i, field);
 		}
 
-		return reuse;
+		return tuple;
 	}
 
 	@Override
@@ -204,5 +204,15 @@ public class UnknownTupleSerializer extends TypeSerializer<Tuple> {
 	@Override
 	public boolean canEqual(Object obj) {
 		return obj instanceof UnknownTupleSerializer;
+	}
+
+	private Tuple getReuseOrNew(Tuple reuse, int arity) {
+
+		if(reuse.isUnmodifiable() || reuse.size() != arity) {
+			return Tuple.size(arity);
+		}
+		else {
+			return reuse;
+		}
 	}
 }
