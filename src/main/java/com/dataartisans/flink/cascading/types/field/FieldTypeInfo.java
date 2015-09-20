@@ -22,7 +22,9 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeComparator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.typeutils.WritableTypeInfo;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
+import org.apache.hadoop.io.Writable;
 
 import java.util.Comparator;
 
@@ -41,15 +43,16 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 	}
 
 	public FieldTypeInfo(Class fieldType) {
-		this.fieldTypeInfo = BasicTypeInfo.getInfoFor(fieldType);
+
+		fieldTypeInfo = getTypeInfoForClass(fieldType);
 	}
 
 	public void setFieldType(Class fieldType) {
 
-		TypeInformation newFieldTypeInfo = BasicTypeInfo.getInfoFor(fieldType);
+		TypeInformation newFieldTypeInfo = getTypeInfoForClass(fieldType);
+
 		if(this.fieldComparator != null) {
 			// do not set type info, if we have to use a custom comparator
-			return;
 		}
 		else {
 			if(this.fieldTypeInfo != null && newFieldTypeInfo != null) {
@@ -158,5 +161,17 @@ public class FieldTypeInfo extends TypeInformation<Comparable> implements Atomic
 	@Override
 	public boolean canEqual(Object obj) {
 		return obj instanceof FieldTypeInfo;
+	}
+
+	private TypeInformation getTypeInfoForClass(Class typeClass) {
+		// try to create BasicTypeInfo
+		TypeInformation typeInfo = BasicTypeInfo.getInfoFor(typeClass);
+
+		// create TypeInformation for Writable type
+		if(typeInfo == null && Writable.class.isAssignableFrom(typeClass)) {
+			typeInfo = new WritableTypeInfo(typeClass);
+		}
+
+		return typeInfo;
 	}
 }
