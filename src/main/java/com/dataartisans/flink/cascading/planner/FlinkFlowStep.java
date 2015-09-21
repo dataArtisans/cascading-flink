@@ -77,6 +77,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -352,14 +353,17 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		tap.sourceConfInit(flowProcess, tapConfig);
 		tapConfig.set( "cascading.step.source", Tap.id( tap ) );
 
+		Fields outFields = tap.getSourceFields();
+		registerKryoTypes(outFields);
+
 		JobConf sourceConfig = new JobConf(this.getNodeConfig(node));
 		MultiInputFormat.addInputFormat(sourceConfig, tapConfig);
 
 		DataSet<Tuple> src = env
-				.createInput(new TapInputFormat(node), new TupleTypeInfo(tap.getSourceFields()))
-				.name(tap.getIdentifier())
-				.setParallelism(dop)
-				.withParameters(FlinkConfigConverter.toFlinkConfig(new Configuration(sourceConfig)));
+				.createInput(new TapInputFormat(node), new TupleTypeInfo(outFields))
+						.name(tap.getIdentifier())
+						.setParallelism(dop)
+						.withParameters(FlinkConfigConverter.toFlinkConfig(new Configuration(sourceConfig)));
 
 		return src;
 
@@ -384,12 +388,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private DataSet<Tuple> translateMap(DataSet<Tuple> input, FlowNode node) {
 
-		Scope outScope = getOutScope(node);
+		Fields outFields = getOutScope(node).getOutValuesFields();
+		registerKryoTypes(outFields);
+
 		int dop = ((Operator)input).getParallelism();
 
 		return input
 				.mapPartition(new EachMapper(node))
-				.returns(new TupleTypeInfo(outScope.getOutValuesFields()))
+				.returns(new TupleTypeInfo(outFields))
 				.withParameters(this.getFlinkNodeConfig(node))
 				.setParallelism(dop)
 				.name("map-" + node.getID());
@@ -431,6 +437,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		else {
 			outFields = outScope.getOutValuesFields();
 		}
+		registerKryoTypes(outFields);
 
 		// get input scope
 		Scope inScope = inScopes.get(0);
@@ -590,7 +597,6 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	private DataSet<?> prepareCoGroupInput(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
 
 		CoGroup coGroup = (CoGroup)getSingle(node.getSinkElements());
-		List<Scope> inScopes = getInputScopes(node, coGroup);
 
 		Joiner joiner = coGroup.getJoiner();
 
@@ -772,6 +778,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		else {
 			outFields = outScope.getOutValuesFields();
 		}
+		registerKryoTypes(outFields);
 
 		// get key and value fields of inputs
 		List<Scope> inScopes = getInputScopes(node, coGroup);
@@ -873,6 +880,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		} else {
 			outFields = outScope.getOutValuesFields();
 		}
+		registerKryoTypes(outFields);
 
 		if(numJoinInputs == 2) {
 			// binary join
@@ -953,6 +961,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		} else {
 			outFields = outScope.getOutValuesFields();
 		}
+		registerKryoTypes(outFields);
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
 				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
@@ -1144,6 +1153,23 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private String[] registerKeyFields(DataSet<Tuple> input, Fields keyFields) {
 		return ((TupleTypeInfo)input.getType()).registerKeyFields(keyFields);
+	}
+
+	private void registerKryoTypes(Fields fields) {
+
+		if(fields.hasTypes()) {
+			Class[] fieldTypeClasses = fields.getTypesClasses();
+			for(Class fieldTypeClass : fieldTypeClasses) {
+				if(!fieldTypeClass.isPrimitive() &&
+						!fieldTypeClass.equals(String.class) &&
+						!Writable.class.isAssignableFrom(fieldTypeClass)) {
+					// register type if it is neither a primitive, String, or Writable
+
+					env.getConfig().registerKryoType(fieldTypeClass);
+				}
+			}
+		}
+
 	}
 
 	private org.apache.flink.configuration.Configuration getFlinkNodeConfig(FlowNode node) {
