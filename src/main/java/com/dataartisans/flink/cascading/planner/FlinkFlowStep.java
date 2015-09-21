@@ -508,7 +508,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			result = result
 					.sortPartition(sortKeys[0], sortOrder)
-					.setParallelism(1);
+					.setParallelism(1)
+					.name("reduce-"+ node.getID());
 			for(int i=1; i<sortKeys.length; i++) {
 				result = result
 						.sortPartition(sortKeys[i], sortOrder)
@@ -536,16 +537,19 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			// hash partition
 			result = result
 					.partitionByHash(groupKeys)
-					.setParallelism(dop);
+					.setParallelism(dop)
+					.name("reduce-" + node.getID());
 
 			// sort on grouping keys
 			result = result
 					.sortPartition(groupKeys[0], Order.DESCENDING)
-					.setParallelism(dop);
+					.setParallelism(dop)
+					.name("reduce-" + node.getID());
 			for(int i=1; i<groupKeys.length; i++) {
 				result = result
 						.sortPartition(groupKeys[i], Order.DESCENDING)
-						.setParallelism(dop);
+						.setParallelism(dop)
+						.name("reduce-" + node.getID());
 			}
 		}
 
@@ -554,11 +558,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 			result = result
 					.sortPartition(sortKeys[0], Order.DESCENDING)
-					.setParallelism(dop);
+					.setParallelism(dop)
+					.name("reduce-" + node.getID());
 			for(int i=1; i<sortKeys.length; i++) {
 				result = result
 						.sortPartition(sortKeys[i], Order.DESCENDING)
-						.setParallelism(dop);
+						.setParallelism(dop)
+						.name("reduce-" + node.getID());
 			}
 		}
 
@@ -609,24 +615,24 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		if(joiner.getClass().equals(InnerJoin.class)) {
 			if(!keyFields[0].isNone()) {
-				return prepareFullOuterCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
+				return prepareFullOuterCoGroupInput(joinInputs, node, inputFields, keyFields, flinkKeys, dop);
 			}
 			else {
 				// Cartesian product
-				return prepareInnerCrossInput(joinInputs, inputFields, dop);
+				return prepareInnerCrossInput(joinInputs, node, inputFields, dop);
 			}
 		}
 		else if(joiner.getClass().equals(BufferJoin.class)) {
-			return prepareBufferCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
+			return prepareBufferCoGroupInput(joinInputs, node, inputFields, keyFields, flinkKeys, dop);
 		}
 		else {
-			return prepareFullOuterCoGroupInput(joinInputs, inputFields, keyFields, flinkKeys, dop);
+			return prepareFullOuterCoGroupInput(joinInputs, node, inputFields, keyFields, flinkKeys, dop);
 		}
 
 	}
 
 	private DataSet<Tuple2<Tuple, Tuple[]>> prepareFullOuterCoGroupInput(List<DataSet<Tuple>> inputs,
-						Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
+						FlowNode node, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
 
 		int numJoinInputs = inputs.size();
 
@@ -657,7 +663,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						inputFields[1], keyFields[1]))
 				.returns(tupleJoinListsTypeInfo)
 				.withForwardedFieldsFirst(listKeysFwd)
-				.setParallelism(dop);
+				.setParallelism(dop)
+				.name("coGroup-" + node.getID());
 
 		// further outer joins with CoGroup
 		for (int i = 2; i < inputs.size(); i++) {
@@ -673,14 +680,15 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.with(new TupleAppendCoGrouper(i, numJoinInputs, inputFields[i], keyFields[i]))
 					.returns(tupleJoinListsTypeInfo)
 					.withForwardedFieldsFirst(listKeys)
-					.setParallelism(dop);
+					.setParallelism(dop)
+					.name("coGroup-" + node.getID());
 		}
 
 		return tupleJoinLists;
 
 	}
 
-	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerCrossInput(List<DataSet<Tuple>> inputs, Fields[] inputFields, int dop) {
+	private DataSet<Tuple2<Tuple, Tuple[]>> prepareInnerCrossInput(List<DataSet<Tuple>> inputs, FlowNode node, Fields[] inputFields, int dop) {
 
 		int numJoinInputs = inputs.size();
 
@@ -696,7 +704,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 				.map(new JoinPrepareMapper(numJoinInputs, null, null))
 				.returns(tupleJoinListsTypeInfo)
-				.setParallelism(mapDop);
+				.setParallelism(mapDop)
+				.name("coGroup-" + node.getID());
 
 		for (int i = 1; i < inputs.size(); i++) {
 
@@ -709,14 +718,15 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			tupleJoinLists = tupleJoinLists.crossWithTiny(inputs.get(i))
 					.with(new TupleAppendCrosser(i))
 					.returns(tupleJoinListsTypeInfo)
-					.setParallelism(dop);
+					.setParallelism(dop)
+					.name("coGroup-" + node.getID());
 		}
 
 		return tupleJoinLists;
 	}
 
 	private DataSet<Tuple3<Tuple, Integer, Tuple>> prepareBufferCoGroupInput(List<DataSet<Tuple>> inputs,
-						Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
+						FlowNode node, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
 
 		DataSet<Tuple3<Tuple, Integer, Tuple>> coGroupInput = null;
 
@@ -750,7 +760,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			DataSet<Tuple3<Tuple, Integer, Tuple>> keyedInput = input
 					.map(new BufferJoinKeyExtractor(i, keyPos))
 					.returns(keyedType)
-					.setParallelism(inputDop);
+					.setParallelism(inputDop)
+					.name("coGroup-" + node.getID());
 
 			// add to groupByInput
 			if(coGroupInput == null) {
@@ -915,7 +926,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 					.map(new JoinPrepareMapper(numJoinInputs - 1, inputFields[0], keyFields[0]))
 					.returns(tupleJoinListsTypeInfo)
-					.setParallelism(mapDop);
+					.setParallelism(mapDop)
+					.name("hashjoin-" + node.getID());
 
 			for (int i = 0; i < flinkKeys[0].length; i++) {
 				flinkKeys[0][i] = "f0." + i;
@@ -935,7 +947,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						.with(new TupleAppendJoiner(i))
 						.returns(tupleJoinListsTypeInfo)
 						.withForwardedFieldsFirst(flinkKeys[0])
-						.setParallelism(dop);
+						.setParallelism(dop)
+						.name("hashjoin-" + node.getID());
 			}
 
 			// join last input
@@ -975,13 +988,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 				.map(new JoinPrepareMapper(numJoinInputs, null, null))
 				.returns(tupleJoinListsTypeInfo)
-				.setParallelism(mapDop);
+				.setParallelism(mapDop)
+				.name("hashjoin-" + node.getID());
 
 		for (int i = 1; i < inputs.size(); i++) {
 			tupleJoinLists = tupleJoinLists.crossWithTiny(inputs.get(i))
 					.with(new TupleAppendCrosser(i))
 					.returns(tupleJoinListsTypeInfo)
-					.setParallelism(dop);
+					.name("hashjoin-" + node.getID());
 		}
 
 		return tupleJoinLists
