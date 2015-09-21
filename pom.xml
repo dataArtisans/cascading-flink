@@ -97,6 +97,12 @@ limitations under the License.
 			<version>${cascading.version}</version>
 		</dependency>
 
+		<dependency>
+			<groupId>cascading</groupId>
+			<artifactId>cascading-expression</artifactId>
+			<version>3.1.0-wip-16</version>
+		</dependency>
+
 		<!-- CASCADING TESTS -->
 
 		<dependency>
@@ -236,7 +242,7 @@ limitations under the License.
 					</archive>
 				</configuration>
 			</plugin>
-			
+
 			<plugin>
 				<groupId>org.apache.rat</groupId>
 				<artifactId>apache-rat-plugin</artifactId>
@@ -347,7 +353,7 @@ limitations under the License.
 					</dependenciesToScan>
 					<!--<forkCount>1C</forkCount>-->
 					<reuseForks>false</reuseForks>
-                                        <testFailureIgnore>true</testFailureIgnore>
+										<testFailureIgnore>true</testFailureIgnore>
 					<argLine>-Xmx4G -Dlog4j.configuration=log4j-test.properties</argLine>
 				</configuration>
 			</plugin>
@@ -392,8 +398,8 @@ limitations under the License.
 									<groupId>cascading</groupId>
 									<artifactId>cascading-platform</artifactId>
 									<version>${cascading.version}</version>
-                                    <type>test-jar</type>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
+									<type>test-jar</type>
+									<outputDirectory>${project.build.directory}</outputDirectory>
 									<includes>**/data/**</includes>
 								</artifactItem>
 							</artifactItems>
