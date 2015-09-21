@@ -23,7 +23,6 @@ import cascading.flow.FlowProcess;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import riffle.process.ProcessConfiguration;
@@ -34,13 +33,11 @@ import java.util.Map;
 
 public class FlinkFlow extends BaseFlow<Configuration> {
 
-	private ExecutionEnvironment flinkEnv;
 	private Configuration config;
 
-	public FlinkFlow(ExecutionEnvironment env, PlatformInfo platformInfo, FlowDef flowDef, Map<Object, Object> properties, Configuration defaultConfig) {
+	public FlinkFlow(PlatformInfo platformInfo, FlowDef flowDef, Map<Object, Object> properties, Configuration defaultConfig) {
 
 		super(platformInfo, properties, defaultConfig, flowDef);
-		this.flinkEnv = env;
 	}
 
 	@Override
@@ -135,8 +132,8 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	}
 
 	@Override
-	public FlowProcess getFlowProcess() {
-		return new FlinkFlowProcess(getFlowSession(), getConfig()); // TODO!!!
+	public FlowProcess<Configuration> getFlowProcess() {
+		return new FlinkFlowProcess(getFlowSession(), getConfig());
 	}
 
 	@Override

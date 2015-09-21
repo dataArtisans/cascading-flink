@@ -33,8 +33,6 @@ import org.apache.flink.client.CliFrontend;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.GlobalConfiguration;
 import org.apache.hadoop.conf.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.List;
@@ -43,8 +41,6 @@ import java.util.Properties;
 import java.util.Set;
 
 public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
-
-	private static final Logger LOG = LoggerFactory.getLogger(FlinkPlanner.class);
 
 	private Configuration defaultConfig;
 
@@ -98,13 +94,9 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		super.configRuleRegistryDefaults( ruleRegistry );
 	}
 
-	public FlowStep<Configuration> createFlowStep( ElementGraph stepElementGraph, FlowNodeGraph flowNodeGraph ) {
-		return new FlinkFlowStep( env, stepElementGraph, flowNodeGraph, classPath );
-	}
-
 	@Override
 	protected FlinkFlow createFlow( FlowDef flowDef ) {
-		return new FlinkFlow(env, getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());
+		return new FlinkFlow(getPlatformInfo(), flowDef, getDefaultProperties(), getDefaultConfig());
 	}
 
 	@Override
