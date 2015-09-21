@@ -34,7 +34,15 @@ Then switch to the newly created directory and run Maven to build the Cascading 
     cd cascading-flink
     mvn clean install -DskipTests
 
-The Cascading Connector for Apache Flink is now installed in your local maven repository.
+The Cascading Connector for Apache Flink is now installed in your local maven repository and can be used in your project by adding the following Maven dependency:
+
+```java
+<dependency>
+    <groupId>com.dataArtisans</groupId>
+    <artifactId>cascading-flink</artifactId>
+    <version>0.1</version>
+</dependency>
+```
 
 ## WordCount Example
 
