@@ -29,6 +29,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.LocalEnvironment;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.ContextEnvironment;
+import org.apache.flink.client.program.JobWithJars;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.optimizer.DataStatistics;
@@ -46,8 +47,10 @@ import org.apache.hadoop.conf.Configuration;
 import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -176,6 +179,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			try {
 				String path = this.getClass().getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
 				jobGraph.addJar(new Path(path));
+				classPath.add(path);
 			} catch (URISyntaxException e) {
 				throw new IOException("Could not add the submission JAR as a dependency.");
 			}
@@ -183,10 +187,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			final Client client = ((ContextEnvironment) env).getClient();
 			accumulatorCache.setClient(client);
 
+			final ClassLoader loader;
+			List<File> fileList = new ArrayList<File>(classPath.size());
+			for (String path : classPath) {
+				fileList.add(new File(path));
+			}
+			loader = JobWithJars.buildUserCodeClassLoader(fileList, getClass().getClassLoader());
+
 			callable = new Callable<JobSubmissionResult>() {
 				@Override
 				public JobSubmissionResult call() throws Exception {
-					return client.run(jobGraph, true);
+					return client.runBlocking(jobGraph, loader);
 				}
 			};
 		}
