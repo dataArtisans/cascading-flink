@@ -48,6 +48,7 @@ import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -189,11 +190,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			accumulatorCache.setClient(client);
 
 			final ClassLoader loader;
-			List<URL> classPathUrls = new ArrayList<URL>(classPath.size());
+			List<URL> fileList = new ArrayList<URL>(classPath.size());
 			for (String path : classPath) {
-				classPathUrls.add(new URL(path));
+				URL url;
+				try {
+					url = new URL(path);
+				} catch (MalformedURLException e) {
+					url = new URL("file://" + path);
+				}
+				fileList.add(url);
 			}
-			loader = JobWithJars.buildUserCodeClassLoader(classPathUrls, Collections.<URL>emptyList(),getClass().getClassLoader());
+			loader = JobWithJars.buildUserCodeClassLoader(fileList, Collections.<URL>emptyList(), getClass().getClassLoader());
 
 			callable = new Callable<JobSubmissionResult>() {
 				@Override
