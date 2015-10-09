@@ -47,10 +47,11 @@ import org.apache.hadoop.conf.Configuration;
 import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -188,11 +189,11 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			accumulatorCache.setClient(client);
 
 			final ClassLoader loader;
-			List<File> fileList = new ArrayList<File>(classPath.size());
+			List<URL> classPathUrls = new ArrayList<URL>(classPath.size());
 			for (String path : classPath) {
-				fileList.add(new File(path));
+				classPathUrls.add(new URL(path));
 			}
-			loader = JobWithJars.buildUserCodeClassLoader(fileList, getClass().getClassLoader());
+			loader = JobWithJars.buildUserCodeClassLoader(classPathUrls, Collections.<URL>emptyList(),getClass().getClassLoader());
 
 			callable = new Callable<JobSubmissionResult>() {
 				@Override
