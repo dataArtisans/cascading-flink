@@ -358,7 +358,8 @@ public class CoGroupBufferClosure extends JoinerClosure {
 
 			try {
 				if (iterator == null) {
-					return Collections.emptyIterator();
+					// use emptyList() iterator for java 6 compatibility
+					return Collections.<Tuple>emptyList().iterator();
 				}
 
 				return iterator;

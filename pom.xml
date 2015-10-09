@@ -14,14 +14,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project
+		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+		xmlns="http://maven.apache.org/POM/4.0.0"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.dataArtisans</groupId>
+	<groupId>com.data-artisans</groupId>
 	<artifactId>cascading-flink</artifactId>
-	<version>0.1</version>
+	<version>0.1-SNAPSHOT</version>
 
 	<name>Cascading on Flink</name>
 	<packaging>jar</packaging>
@@ -38,13 +40,7 @@ limitations under the License.
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<hadoop-one.version>1.2.1</hadoop-one.version>
-		<hadoop-two.version>2.2.0</hadoop-two.version>
-		<scala.version>2.10.4</scala.version>
 		<slf4j.version>1.7.7</slf4j.version>
-		<guava.version>17.0</guava.version>
-		<kryoserialization.version>0.3.2</kryoserialization.version>
-
 		<cascading.version>3.1.0-wip-16</cascading.version>
 
 		<!-- Default parameters for mvn exec:exec -->
@@ -62,10 +58,25 @@ limitations under the License.
 		<repository>
 			<id>flink-snapshot-repo</id>
 			<url>https://repository.apache.org/content/repositories/snapshots/</url>
-			<releases><enabled>false</enabled></releases>
-			<snapshots><enabled>true</enabled></snapshots>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
 		</repository>
 	</repositories>
+
+	<distributionManagement>
+		<snapshotRepository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+		<repository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+		</repository>
+	</distributionManagement>
 
 	<dependencies>
 
@@ -212,16 +223,54 @@ limitations under the License.
 
 	</dependencies>
 
+	<profiles>
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.5</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+
+			</build>
+		</profile>
+	</profiles>
+
 	<build>
 		<plugins>
-
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>2.2.1</version><!--$NO-MVN-MAN-VER$-->
+				<version>2.2.1</version>
+				<!--$NO-MVN-MAN-VER$-->
 				<executions>
 					<execution>
 						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>2.9.1</version>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
 						<goals>
 							<goal>jar</goal>
 						</goals>
@@ -232,7 +281,8 @@ limitations under the License.
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
-				<version>2.4</version><!--$NO-MVN-MAN-VER$-->
+				<version>2.4</version>
+				<!--$NO-MVN-MAN-VER$-->
 				<configuration>
 					<archive>
 						<manifest>
@@ -246,7 +296,8 @@ limitations under the License.
 			<plugin>
 				<groupId>org.apache.rat</groupId>
 				<artifactId>apache-rat-plugin</artifactId>
-				<version>0.10</version><!--$NO-MVN-MAN-VER$-->
+				<version>0.10</version>
+				<!--$NO-MVN-MAN-VER$-->
 				<inherited>false</inherited>
 				<executions>
 					<execution>
@@ -275,13 +326,16 @@ limitations under the License.
 							See the License for the specific language governing permissions and
 							limitations under the License.
 						-->
-							<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
-							<licenseFamilyCategory>AL2 </licenseFamilyCategory>
+						<license
+								implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+							<licenseFamilyCategory>AL2</licenseFamilyCategory>
 							<licenseFamilyName>Apache License 2.0</licenseFamilyName>
-							<notes />
+							<notes/>
 							<patterns>
 								<pattern>Copyright 2015 data Artisans GmbH</pattern>
-								<pattern>Licensed under the Apache License, Version 2.0 (the "License");</pattern>
+								<pattern>Licensed under the Apache License, Version 2.0 (the
+									"License");
+								</pattern>
 							</patterns>
 						</license>
 					</licenses>
@@ -296,7 +350,7 @@ limitations under the License.
 						<exclude>**/*.prefs</exclude>
 						<exclude>**/*.properties</exclude>
 						<exclude>**/*.log</exclude>
-												<exclude>*.txt/**</exclude>
+						<exclude>*.txt/**</exclude>
 						<!-- Administrative files in the main trunk. -->
 						<exclude>**/README.md</exclude>
 						<exclude>CHANGELOG</exclude>
@@ -335,33 +389,35 @@ limitations under the License.
 				<!-- just define the Java version to be used for compiling and plugins -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.1</version><!--$NO-MVN-MAN-VER$-->
+				<version>3.1</version>
+				<!--$NO-MVN-MAN-VER$-->
 				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
-					<!-- High optimization, no debugging <compilerArgument>-g:none -O</compilerArgument> -->
+					<source>1.7</source>
+					<target>1.7</target>
 				</configuration>
 			</plugin>
 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>2.17</version><!--$NO-MVN-MAN-VER$-->
+				<version>2.17</version>
+				<!--$NO-MVN-MAN-VER$-->
 				<configuration>
 					<dependenciesToScan>
 						<dependency>cascading:cascading-platform</dependency>
 					</dependenciesToScan>
 					<!--<forkCount>1C</forkCount>-->
 					<reuseForks>false</reuseForks>
-										<testFailureIgnore>true</testFailureIgnore>
-					<argLine>-Xmx4G -Dlog4j.configuration=log4j-test.properties</argLine>
+					<testFailureIgnore>true</testFailureIgnore>
+                    <argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
 				</configuration>
 			</plugin>
 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>1.3.1</version><!--$NO-MVN-MAN-VER$-->
+				<version>1.3.1</version>
+				<!--$NO-MVN-MAN-VER$-->
 				<executions>
 					<execution>
 						<id>enforce-maven</id>
@@ -439,7 +495,7 @@ limitations under the License.
 					<executable>java</executable>
 					<arguments>
 						<argument>-classpath</argument>
-						<classpath />
+						<classpath/>
 						<argument>${clazz}</argument>
 						<argument>${input}</argument>
 						<argument>${output}</argument>
