@@ -56,8 +56,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 			// load the default parallelism from config
 			GlobalConfiguration.loadConfiguration(new File(CliFrontend.getConfigurationDirectoryFromEnv()).getAbsolutePath());
 			org.apache.flink.configuration.Configuration configuration = GlobalConfiguration.getConfiguration();
-			int parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY_OLD, -1);
-			parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY, parallelism);
+			int parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY, -1);
 			if (parallelism <= 0) {
 				throw new RuntimeException("Please set the default parallelism via the -p command-line flag");
 			} else {
