@@ -410,7 +410,7 @@ limitations under the License.
                     <!--<forkCount>1C</forkCount>-->
                     <reuseForks>false</reuseForks>
                     <testFailureIgnore>true</testFailureIgnore>
-                    <argLine>-Xmx4G -Dlog4j.configuration=log4j-test.properties</argLine>
+                    <argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
                 </configuration>
             </plugin>
 
