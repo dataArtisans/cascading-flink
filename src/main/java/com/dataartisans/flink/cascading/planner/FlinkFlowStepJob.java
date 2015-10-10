@@ -170,7 +170,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 				@Override
 				public JobSubmissionResult call() throws JobExecutionException {
 					return JobClient.submitJobAndWait(actorSystem, jobManager, jobGraph,
-							DEFAULT_TIMEOUT, true, ClassLoader.getSystemClassLoader());
+							DEFAULT_TIMEOUT, env.getConfig().isSysoutLoggingEnabled(), ClassLoader.getSystemClassLoader());
 				}
 			};
 
