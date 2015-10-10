@@ -392,9 +392,8 @@ limitations under the License.
                 <version>3.1</version>
                 <!--$NO-MVN-MAN-VER$-->
                 <configuration>
-                    <source>1.6</source>
-                    <target>1.6</target>
-                    <!-- High optimization, no debugging <compilerArgument>-g:none -O</compilerArgument> -->
+                    <source>1.7</source>
+                    <target>1.7</target>
                 </configuration>
             </plugin>
 
