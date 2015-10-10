@@ -14,440 +14,497 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+        xmlns="http://maven.apache.org/POM/4.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.dataArtisans</groupId>
-	<artifactId>cascading-flink</artifactId>
-	<version>0.1</version>
+    <groupId>com.data-artisans</groupId>
+    <artifactId>cascading-flink</artifactId>
+    <version>0.1-SNAPSHOT</version>
 
-	<name>Cascading on Flink</name>
-	<packaging>jar</packaging>
-	<inceptionYear>2015</inceptionYear>
+    <name>Cascading on Flink</name>
+    <packaging>jar</packaging>
+    <inceptionYear>2015</inceptionYear>
 
-	<licenses>
-		<license>
-			<name>The Apache Software License, Version 2.0</name>
-			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-			<distribution>repo</distribution>
-		</license>
-	</licenses>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<hadoop-one.version>1.2.1</hadoop-one.version>
-		<hadoop-two.version>2.2.0</hadoop-two.version>
-		<scala.version>2.10.4</scala.version>
-		<slf4j.version>1.7.7</slf4j.version>
-		<guava.version>17.0</guava.version>
-		<kryoserialization.version>0.3.2</kryoserialization.version>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <slf4j.version>1.7.7</slf4j.version>
+        <cascading.version>3.1.0-wip-16</cascading.version>
 
-		<cascading.version>3.1.0-wip-16</cascading.version>
+        <!-- Default parameters for mvn exec:exec -->
+        <clazz>com.dataartisans.flink.cascading.example.WordCount</clazz>
+        <input>kinglear.txt</input>
+        <output>wordcounts.txt</output>
+    </properties>
 
-		<!-- Default parameters for mvn exec:exec -->
-		<clazz>com.dataartisans.flink.cascading.example.WordCount</clazz>
-		<input>kinglear.txt</input>
-		<output>wordcounts.txt</output>
-	</properties>
+    <repositories>
+        <repository>
+            <id>conjars.org</id>
+            <url>http://conjars.org/repo</url>
+        </repository>
 
-	<repositories>
-		<repository>
-			<id>conjars.org</id>
-			<url>http://conjars.org/repo</url>
-		</repository>
+        <repository>
+            <id>flink-snapshot-repo</id>
+            <url>https://repository.apache.org/content/repositories/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
-		<repository>
-			<id>flink-snapshot-repo</id>
-			<url>https://repository.apache.org/content/repositories/snapshots/</url>
-			<releases><enabled>false</enabled></releases>
-			<snapshots><enabled>true</enabled></snapshots>
-		</repository>
-	</repositories>
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 
-	<dependencies>
+    <dependencies>
 
-		<!-- FLINK -->
+        <!-- FLINK -->
 
-		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-clients</artifactId>
-			<version>0.10-SNAPSHOT</version>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-clients</artifactId>
+            <version>0.10-SNAPSHOT</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-java</artifactId>
-			<version>0.10-SNAPSHOT</version>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-java</artifactId>
+            <version>0.10-SNAPSHOT</version>
+        </dependency>
 
-		<!-- CASCADING -->
+        <!-- CASCADING -->
 
-		<dependency>
-			<groupId>cascading</groupId>
-			<artifactId>cascading-core</artifactId>
-			<version>${cascading.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-core</artifactId>
+            <version>${cascading.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>cascading</groupId>
-			<artifactId>cascading-hadoop2-io</artifactId>
-			<version>${cascading.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-hadoop2-io</artifactId>
+            <version>${cascading.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>cascading</groupId>
-			<artifactId>cascading-expression</artifactId>
-			<version>3.1.0-wip-16</version>
-		</dependency>
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-expression</artifactId>
+            <version>3.1.0-wip-16</version>
+        </dependency>
 
-		<!-- CASCADING TESTS -->
+        <!-- CASCADING TESTS -->
 
-		<dependency>
-			<groupId>cascading</groupId>
-			<artifactId>cascading-core</artifactId>
-			<version>${cascading.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-core</artifactId>
+            <version>${cascading.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>cascading</groupId>
-			<artifactId>cascading-platform</artifactId>
-			<version>${cascading.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-platform</artifactId>
+            <version>${cascading.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>cascading</groupId>
-			<artifactId>cascading-hadoop</artifactId>
-			<version>${cascading.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>cascading</groupId>
+            <artifactId>cascading-hadoop</artifactId>
+            <version>${cascading.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<!-- OTHER LIBRARIES -->
+        <!-- OTHER LIBRARIES -->
 
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-hdfs</artifactId>
-			<version>2.2.0</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+            <version>2.2.0</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-log4j12</artifactId>
-			<version>${slf4j.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.clapper</groupId>
-			<artifactId>grizzled-slf4j_2.10</artifactId>
-			<version>1.0.2</version>
-		</dependency>
+        <dependency>
+            <groupId>org.clapper</groupId>
+            <artifactId>grizzled-slf4j_2.10</artifactId>
+            <version>1.0.2</version>
+        </dependency>
 
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.17</version>
-		</dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+        </dependency>
 
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.11</version>
-			<type>jar</type>
-			<!--<scope>test</scope>-->
-		</dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.11</version>
+            <type>jar</type>
+            <!--<scope>test</scope>-->
+        </dependency>
 
-		<dependency>
-			<groupId>com.codahale.metrics</groupId>
-			<artifactId>metrics-core</artifactId>
-			<version>3.0.2</version>
-			<type>jar</type>
-		</dependency>
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>3.0.2</version>
+            <type>jar</type>
+        </dependency>
 
-		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-all</artifactId>
-			<version>1.9.5</version>
-			<type>jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-all</artifactId>
+            <version>1.9.5</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.powermock</groupId>
-			<artifactId>powermock-module-junit4</artifactId>
-			<version>1.5.5</version>
-			<type>jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-module-junit4</artifactId>
+            <version>1.5.5</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.powermock</groupId>
-			<artifactId>powermock-api-mockito</artifactId>
-			<version>1.5.5</version>
-			<type>jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-api-mockito</artifactId>
+            <version>1.5.5</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
 
-		<dependency>
-			<groupId>org.hamcrest</groupId>
-			<artifactId>hamcrest-all</artifactId>
-			<version>1.3</version>
-			<type>jar</type>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-all</artifactId>
+            <version>1.3</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
 
-	</dependencies>
+    </dependencies>
 
-	<build>
-		<plugins>
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.5</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>2.2.1</version><!--$NO-MVN-MAN-VER$-->
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+            </build>
+        </profile>
+    </profiles>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>2.4</version><!--$NO-MVN-MAN-VER$-->
-				<configuration>
-					<archive>
-						<manifest>
-							<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-							<addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>2.2.1</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.9.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
-			<plugin>
-				<groupId>org.apache.rat</groupId>
-				<artifactId>apache-rat-plugin</artifactId>
-				<version>0.10</version><!--$NO-MVN-MAN-VER$-->
-				<inherited>false</inherited>
-				<executions>
-					<execution>
-						<phase>verify</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<excludeSubProjects>false</excludeSubProjects>
-					<numUnapprovedLicenses>0</numUnapprovedLicenses>
-					<licenses>
-						<!-- Enforce this license:
-							Copyright 2015 data Artisans GmbH
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.4</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
 
-							Licensed under the Apache License, Version 2.0 (the "License");
-							you may not use this file except in compliance with the License.
-							You may obtain a copy of the License at
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.10</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludeSubProjects>false</excludeSubProjects>
+                    <numUnapprovedLicenses>0</numUnapprovedLicenses>
+                    <licenses>
+                        <!-- Enforce this license:
+                            Copyright 2015 data Artisans GmbH
 
-							  http://www.apache.org/licenses/LICENSE-2.0
+                            Licensed under the Apache License, Version 2.0 (the "License");
+                            you may not use this file except in compliance with the License.
+                            You may obtain a copy of the License at
 
-							Unless required by applicable law or agreed to in writing, software
-							distributed under the License is distributed on an "AS IS" BASIS,
-							WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-							See the License for the specific language governing permissions and
-							limitations under the License.
-						-->
-							<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
-							<licenseFamilyCategory>AL2 </licenseFamilyCategory>
-							<licenseFamilyName>Apache License 2.0</licenseFamilyName>
-							<notes />
-							<patterns>
-								<pattern>Copyright 2015 data Artisans GmbH</pattern>
-								<pattern>Licensed under the Apache License, Version 2.0 (the "License");</pattern>
-							</patterns>
-						</license>
-					</licenses>
-					<licenseFamilies>
-						<licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
-							<familyName>Apache License 2.0</familyName>
-						</licenseFamily>
-					</licenseFamilies>
-					<excludes>
-						<!-- Additional files like .gitignore etc.-->
-						<exclude>**/.*</exclude>
-						<exclude>**/*.prefs</exclude>
-						<exclude>**/*.properties</exclude>
-						<exclude>**/*.log</exclude>
-												<exclude>*.txt/**</exclude>
-						<!-- Administrative files in the main trunk. -->
-						<exclude>**/README.md</exclude>
-						<exclude>CHANGELOG</exclude>
-						<exclude>CONTRIBUTORS</exclude>
-						<exclude>DEPENDENCIES</exclude>
-						<!-- Build files -->
-						<exclude>**/*.iml</exclude>
-						<!-- Generated content -->
-						<exclude>**/target/**</exclude>
-						<exclude>**/build/**</exclude>
-						<exclude>**/resources/data/**</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
+                              http://www.apache.org/licenses/LICENSE-2.0
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-checkstyle-plugin</artifactId>
-				<version>2.12.1</version>
-				<executions>
-					<execution>
-						<id>validate</id>
-						<phase>validate</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-				<configuration>
-					<configLocation>/tools/maven/checkstyle.xml</configLocation>
-					<logViolationsToConsole>true</logViolationsToConsole>
-				</configuration>
-			</plugin>
+                            Unless required by applicable law or agreed to in writing, software
+                            distributed under the License is distributed on an "AS IS" BASIS,
+                            WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                            See the License for the specific language governing permissions and
+                            limitations under the License.
+                        -->
+                        <license
+                                implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                            <licenseFamilyCategory>AL2</licenseFamilyCategory>
+                            <licenseFamilyName>Apache License 2.0</licenseFamilyName>
+                            <notes/>
+                            <patterns>
+                                <pattern>Copyright 2015 data Artisans GmbH</pattern>
+                                <pattern>Licensed under the Apache License, Version 2.0 (the
+                                    "License");
+                                </pattern>
+                            </patterns>
+                        </license>
+                    </licenses>
+                    <licenseFamilies>
+                        <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+                            <familyName>Apache License 2.0</familyName>
+                        </licenseFamily>
+                    </licenseFamilies>
+                    <excludes>
+                        <!-- Additional files like .gitignore etc.-->
+                        <exclude>**/.*</exclude>
+                        <exclude>**/*.prefs</exclude>
+                        <exclude>**/*.properties</exclude>
+                        <exclude>**/*.log</exclude>
+                        <exclude>*.txt/**</exclude>
+                        <!-- Administrative files in the main trunk. -->
+                        <exclude>**/README.md</exclude>
+                        <exclude>CHANGELOG</exclude>
+                        <exclude>CONTRIBUTORS</exclude>
+                        <exclude>DEPENDENCIES</exclude>
+                        <!-- Build files -->
+                        <exclude>**/*.iml</exclude>
+                        <!-- Generated content -->
+                        <exclude>**/target/**</exclude>
+                        <exclude>**/build/**</exclude>
+                        <exclude>**/resources/data/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
 
-			<plugin>
-				<!-- just define the Java version to be used for compiling and plugins -->
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.1</version><!--$NO-MVN-MAN-VER$-->
-				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
-					<!-- High optimization, no debugging <compilerArgument>-g:none -O</compilerArgument> -->
-				</configuration>
-			</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>2.12.1</version>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <configLocation>/tools/maven/checkstyle.xml</configLocation>
+                    <logViolationsToConsole>true</logViolationsToConsole>
+                </configuration>
+            </plugin>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>2.17</version><!--$NO-MVN-MAN-VER$-->
-				<configuration>
-					<dependenciesToScan>
-						<dependency>cascading:cascading-platform</dependency>
-					</dependenciesToScan>
-					<!--<forkCount>1C</forkCount>-->
-					<reuseForks>false</reuseForks>
-										<testFailureIgnore>true</testFailureIgnore>
-					<argLine>-Xmx4G -Dlog4j.configuration=log4j-test.properties</argLine>
-				</configuration>
-			</plugin>
+            <plugin>
+                <!-- just define the Java version to be used for compiling and plugins -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                    <!-- High optimization, no debugging <compilerArgument>-g:none -O</compilerArgument> -->
+                </configuration>
+            </plugin>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>1.3.1</version><!--$NO-MVN-MAN-VER$-->
-				<executions>
-					<execution>
-						<id>enforce-maven</id>
-						<goals>
-							<goal>enforce</goal>
-						</goals>
-						<configuration>
-							<rules>
-								<requireMavenVersion>
-									<!-- enforce at least mvn version 3.0.3 -->
-									<version>[3.0.3,)</version>
-								</requireMavenVersion>
-							</rules>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.17</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <configuration>
+                    <dependenciesToScan>
+                        <dependency>cascading:cascading-platform</dependency>
+                    </dependenciesToScan>
+                    <!--<forkCount>1C</forkCount>-->
+                    <reuseForks>false</reuseForks>
+                    <testFailureIgnore>true</testFailureIgnore>
+                    <argLine>-Xmx4G -Dlog4j.configuration=log4j-test.properties</argLine>
+                </configuration>
+            </plugin>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<version>2.10</version>
-				<executions>
-					<execution>
-						<id>unpack</id>
-						<phase>compile</phase>
-						<goals>
-							<goal>unpack</goal>
-						</goals>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>1.3.1</version>
+                <!--$NO-MVN-MAN-VER$-->
+                <executions>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <!-- enforce at least mvn version 3.0.3 -->
+                                    <version>[3.0.3,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
-						<configuration>
-							<artifactItems>
-								<artifactItem>
-									<groupId>cascading</groupId>
-									<artifactId>cascading-platform</artifactId>
-									<version>${cascading.version}</version>
-									<type>test-jar</type>
-									<outputDirectory>${project.build.directory}</outputDirectory>
-									<includes>**/data/**</includes>
-								</artifactItem>
-							</artifactItems>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.10</version>
+                <executions>
+                    <execution>
+                        <id>unpack</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>2.4.1</version>
-				<configuration>
-					<!-- get all project dependencies -->
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>cascading</groupId>
+                                    <artifactId>cascading-platform</artifactId>
+                                    <version>${cascading.version}</version>
+                                    <type>test-jar</type>
+                                    <outputDirectory>${project.build.directory}</outputDirectory>
+                                    <includes>**/data/**</includes>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
-				</configuration>
-				<executions>
-					<execution>
-						<id>make-assembly</id>
-						<!-- bind to the packaging phase -->
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>2.4.1</version>
+                <configuration>
+                    <!-- get all project dependencies -->
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
 
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>exec-maven-plugin</artifactId>
-				<version>1.2.1</version>
-				<configuration>
-					<executable>java</executable>
-					<arguments>
-						<argument>-classpath</argument>
-						<classpath />
-						<argument>${clazz}</argument>
-						<argument>${input}</argument>
-						<argument>${output}</argument>
-					</arguments>
-				</configuration>
-			</plugin>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <!-- bind to the packaging phase -->
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
-		</plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.2.1</version>
+                <configuration>
+                    <executable>java</executable>
+                    <arguments>
+                        <argument>-classpath</argument>
+                        <classpath/>
+                        <argument>${clazz}</argument>
+                        <argument>${input}</argument>
+                        <argument>${output}</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
 
-	</build>
+        </plugins>
+
+    </build>
 </project>
