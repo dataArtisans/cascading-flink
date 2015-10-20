@@ -26,7 +26,6 @@ import cascading.pipe.Boundary;
 import cascading.pipe.CoGroup;
 import cascading.pipe.GroupBy;
 import cascading.tuple.Tuple;
-import com.amazonaws.services.cloudfront.model.InvalidArgumentException;
 import com.dataartisans.flink.cascading.runtime.boundaryStages.BoundaryOutStage;
 import com.dataartisans.flink.cascading.runtime.util.CollectorOutput;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
@@ -73,7 +72,7 @@ public class CoGroupBufferReduceStreamGraph extends NodeStreamGraph {
 			return (BoundaryOutStage)this.sinkStage;
 		}
 
-		throw new InvalidArgumentException("Boundary may only be used as sink in CoGroupBufferReduceStreamGraph");
+		throw new IllegalArgumentException("Boundary may only be used as sink in CoGroupBufferReduceStreamGraph");
 	}
 
 	@Override
