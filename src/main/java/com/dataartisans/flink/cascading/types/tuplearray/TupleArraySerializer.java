@@ -66,7 +66,12 @@ public class TupleArraySerializer extends TypeSerializer<Tuple[]> {
 
 		Tuple[] copy = new Tuple[this.length];
 		for(int i=0; i<this.fillLength; i++) {
-			copy[i] = this.tupleSerializers[i].copy(from[i]);
+			if(from[i] != null) {
+				copy[i] = this.tupleSerializers[i].copy(from[i]);
+			}
+			else {
+				copy[i] = null;
+			}
 		}
 		return copy;
 	}
@@ -74,7 +79,12 @@ public class TupleArraySerializer extends TypeSerializer<Tuple[]> {
 	@Override
 	public Tuple[] copy(Tuple[] from, Tuple[] reuse) {
 		for(int i=0; i<this.fillLength; i++) {
-			reuse[i] = this.tupleSerializers[i].copy(from[i]);
+			if(from[i] != null) {
+				reuse[i] = this.tupleSerializers[i].copy(from[i]);
+			}
+			else {
+				reuse[i] = null;
+			}
 		}
 		return reuse;
 	}
