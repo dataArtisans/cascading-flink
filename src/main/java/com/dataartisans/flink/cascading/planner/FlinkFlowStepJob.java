@@ -16,7 +16,6 @@
 
 package com.dataartisans.flink.cascading.planner;
 
-import akka.actor.ActorSystem;
 import cascading.flow.planner.FlowStepJob;
 import cascading.management.state.ClientState;
 import cascading.stats.FlowNodeStats;
@@ -36,8 +35,6 @@ import org.apache.flink.optimizer.DataStatistics;
 import org.apache.flink.optimizer.Optimizer;
 import org.apache.flink.optimizer.plan.OptimizedPlan;
 import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
-import org.apache.flink.runtime.client.JobClient;
-import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.messages.JobManagerMessages;
@@ -151,28 +148,22 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		jobID = jobGraph.getJobID();
 		accumulatorCache.setJobID(jobID);
 
-		Callable<JobSubmissionResult> callable;
+
+		final Client client;
+		final ClassLoader loader;
 
 		if (isLocalExecution()) {
 
 			flowStep.logInfo("Executing in local mode.");
 
-			final ActorSystem actorSystem = JobClient.startJobClientActorSystem(new org.apache.flink.configuration.Configuration());
-
 			startLocalCluster();
 
-			final ActorGateway jobManager = localCluster.getLeaderGateway(DEFAULT_TIMEOUT);
-			accumulatorCache.setLocalJobManager(jobManager);
+			org.apache.flink.configuration.Configuration config = new org.apache.flink.configuration.Configuration();
+			config.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, localCluster.hostname());
 
-			JobClient.uploadJarFiles(jobGraph, jobManager, DEFAULT_TIMEOUT);
+			client = new Client(config);
 
-			callable = new Callable<JobSubmissionResult>() {
-				@Override
-				public JobSubmissionResult call() throws JobExecutionException {
-					return JobClient.submitJobAndWait(actorSystem, jobManager, jobGraph,
-							DEFAULT_TIMEOUT, true, ClassLoader.getSystemClassLoader());
-				}
-			};
+			loader = ClassLoader.getSystemClassLoader();
 
 		} else {
 
@@ -186,10 +177,9 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 				throw new IOException("Could not add the submission JAR as a dependency.");
 			}
 
-			final Client client = ((ContextEnvironment) env).getClient();
+			client = ((ContextEnvironment) env).getClient();
 			accumulatorCache.setClient(client);
 
-			final ClassLoader loader;
 			List<URL> fileList = new ArrayList<URL>(classPath.size());
 			for (String path : classPath) {
 				URL url;
@@ -200,15 +190,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 				}
 				fileList.add(url);
 			}
+
 			loader = JobWithJars.buildUserCodeClassLoader(fileList, Collections.<URL>emptyList(), getClass().getClassLoader());
 
-			callable = new Callable<JobSubmissionResult>() {
+		}
+
+		final Callable<JobSubmissionResult> callable = new Callable<JobSubmissionResult>() {
 				@Override
 				public JobSubmissionResult call() throws Exception {
 					return client.runBlocking(jobGraph, loader);
 				}
 			};
-		}
 
 		jobSubmission = executorService.submit(callable);
 
@@ -285,7 +277,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			if (localCluster == null) {
 				org.apache.flink.configuration.Configuration configuration = new org.apache.flink.configuration.Configuration();
 				configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, env.getParallelism() * 2);
-				localCluster = new LocalFlinkMiniCluster(configuration);
+				localCluster = new LocalFlinkMiniCluster(configuration, false);
 				localCluster.start();
 			}
 			localClusterUsers++;
