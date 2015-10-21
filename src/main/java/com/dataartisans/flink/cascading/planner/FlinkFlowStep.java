@@ -38,6 +38,7 @@ import cascading.pipe.Splice;
 import cascading.pipe.joiner.BufferJoin;
 import cascading.pipe.joiner.InnerJoin;
 import cascading.pipe.joiner.Joiner;
+import cascading.pipe.joiner.LeftJoin;
 import cascading.property.ConfigDef;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.io.MultiInputFormat;
@@ -64,7 +65,6 @@ import com.dataartisans.flink.cascading.types.tuple.TupleTypeInfo;
 import com.dataartisans.flink.cascading.types.tuplearray.TupleArrayTypeInfo;
 import com.dataartisans.flink.cascading.util.FlinkConfigConverter;
 import org.apache.flink.api.common.operators.Order;
-import org.apache.flink.api.common.operators.base.JoinOperatorBase;
 import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -867,18 +867,19 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		List<DataSet<Tuple>> joinInputs = computeSpliceInputsFieldsKeys(hashJoin, node, inputs, inputFields, keyFields, flinkKeys);
 
-		if(joiner.getClass().equals(InnerJoin.class)) {
-			if(!keyFields[0].isNone()) {
-				// inner join with keys
-				return translateInnerHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys, dop);
-			}
-			else {
-				// Cartesian product
-				return translateInnerCrossProduct(node, joinInputs, dop);
-			}
+		if(keyFields[0].isNone()) {
+			// Cartesian product
+			return translateInnerCrossProduct(node, joinInputs, dop);
+		}
+		else if(joiner.getClass().equals(InnerJoin.class)) {
+			// inner join with keys
+			return translateInnerHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys, dop);
+		}
+		else if (joiner.getClass().equals(LeftJoin.class)) {
+			return translateLeftHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys, dop);
 		}
 		else {
-			throw new FlowException("HashJoin does only support InnerJoin.");
+			throw new FlowException("HashJoin does only support InnerJoin and LeftJoin.");
 		}
 	}
 
@@ -899,7 +900,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		if(numJoinInputs == 2) {
 			// binary join
 
-			return inputs.get(0).join(inputs.get(1), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
+			return inputs.get(0).join(inputs.get(1), JoinHint.BROADCAST_HASH_SECOND)
 					.where(flinkKeys[0]).equalTo(flinkKeys[1])
 					.with(new BinaryHashJoinJoiner(node, inputFields[0], keyFields[0]))
 					.withParameters(this.getFlinkNodeConfig(node))
@@ -945,7 +946,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 								new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, i+1))
 						);
 
-				tupleJoinLists = tupleJoinLists.join(inputs.get(i), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
+				tupleJoinLists = tupleJoinLists.join(inputs.get(i), JoinHint.BROADCAST_HASH_SECOND)
 						.where(flinkKeys[0]).equalTo(flinkKeys[i])
 						.with(new TupleAppendJoiner(i))
 						.returns(tupleJoinListsTypeInfo)
@@ -955,7 +956,93 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 
 			// join last input
-			return tupleJoinLists.join(inputs.get(numJoinInputs-1), JoinOperatorBase.JoinHint.BROADCAST_HASH_SECOND)
+			return tupleJoinLists.join(inputs.get(numJoinInputs-1), JoinHint.BROADCAST_HASH_SECOND)
+					.where(flinkKeys[0]).equalTo(flinkKeys[numJoinInputs-1])
+					.with(new NaryHashJoinJoiner(node, numJoinInputs))
+					.withParameters(this.getFlinkNodeConfig(node))
+					.setParallelism(dop)
+					.returns(new TupleTypeInfo(outFields))
+					.name("hashjoin-" + node.getID());
+		}
+	}
+
+	private DataSet<Tuple> translateLeftHashJoin(FlowNode node, List<DataSet<Tuple>> inputs, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
+
+		int numJoinInputs = inputs.size();
+
+		// get out fields of node
+		Scope outScope = getOutScope(node);
+		Fields outFields;
+		if (outScope.isEvery()) {
+			outFields = outScope.getOutGroupingFields();
+		} else {
+			outFields = outScope.getOutValuesFields();
+		}
+		registerKryoTypes(outFields);
+
+		if(numJoinInputs == 2) {
+			// binary join
+
+			return inputs.get(0)
+					.leftOuterJoin(inputs.get(1), JoinHint.BROADCAST_HASH_SECOND)
+					.where(flinkKeys[0]).equalTo(flinkKeys[1])
+					.with(new BinaryHashJoinJoiner(node, inputFields[0], keyFields[0]))
+					.withParameters(this.getFlinkNodeConfig(node))
+					.setParallelism(dop)
+					.returns(new TupleTypeInfo(outFields))
+					.name("hashjoin-" + node.getID());
+
+		}
+		else {
+			// nary join
+
+			TupleTypeInfo keysTypeInfo = inputFields[0].isDefined() ?
+					new TupleTypeInfo(inputFields[0].select(keyFields[0])) :
+					new TupleTypeInfo(Fields.UNKNOWN);
+			keysTypeInfo.registerKeyFields(keyFields[0]);
+
+
+			TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+							keysTypeInfo,
+							new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, 1))
+					);
+
+			int mapDop = ((Operator) inputs.get(0)).getParallelism();
+
+			// prepare tuple list for join
+			DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
+					.map(new JoinPrepareMapper(numJoinInputs - 1, inputFields[0], keyFields[0]))
+					.returns(tupleJoinListsTypeInfo)
+					.setParallelism(mapDop)
+					.name("hashjoin-" + node.getID());
+
+			for (int i = 0; i < flinkKeys[0].length; i++) {
+				flinkKeys[0][i] = "f0." + i;
+			}
+
+			// join all inputs except last
+			for (int i = 1; i < inputs.size()-1; i++) {
+
+				tupleJoinListsTypeInfo =
+						new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+								keysTypeInfo,
+								new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, i+1))
+						);
+
+				tupleJoinLists = tupleJoinLists
+						.join(inputs.get(i), JoinHint.BROADCAST_HASH_SECOND)
+						.where(flinkKeys[0]).equalTo(flinkKeys[i])
+						.with(new TupleAppendJoiner(i))
+						.returns(tupleJoinListsTypeInfo)
+						.withForwardedFieldsFirst(flinkKeys[0])
+						.setParallelism(dop)
+						.name("hashjoin-" + node.getID());
+			}
+
+			// join last input
+			return tupleJoinLists
+					.leftOuterJoin(inputs.get(numJoinInputs-1), JoinHint.BROADCAST_HASH_SECOND)
 					.where(flinkKeys[0]).equalTo(flinkKeys[numJoinInputs-1])
 					.with(new NaryHashJoinJoiner(node, numJoinInputs))
 					.withParameters(this.getFlinkNodeConfig(node))

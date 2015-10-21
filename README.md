@@ -1,6 +1,6 @@
 # Cascading Connector for Apache Flink
 
-[Cascading](http://www.cascading.org/projects/cascading) is a popular framework to develop, maintain, and execute large-scale and robust data analysis applications. Originally, Cascading flows have been executed on [Apache Hadoop](http://hadoop.apache.org). The most recent [3.0 release](http://www.cascading.org/2015/06/08/cascading-3-0-release) of Cascading added support for [Apache Tez](http://tez.apache.org) as a runtime backend.
+[Cascading](http://www.cascading.org/projects/cascading) is a popular framework to develop, maintain, and execute large-scale and robust data analysis applications. Originally, Cascading flows have been executed on [Apache Hadoop](http://hadoop.apache.org). Cascading's [3.0 release](http://www.cascading.org/2015/06/08/cascading-3-0-release) added support for [Apache Tez](http://tez.apache.org) as a runtime backend.
 
 [Apache Flink](http://flink.apache.org) is a platform for scalable stream and batch processing. Flink's execution engine features low-latency pipelined and scalable batched data transfers and high-performance, in-memory operators for sorting and joining that gracefully go out-of-core in case of scarce memory resources. Flink can execute programs on a local machine, in a dedicated cluster, or on Hadoop YARN setups.
 
@@ -12,12 +12,12 @@ The **Cascading Connector for Apache Flink** enables you to execute Cascading fl
 
 The Cascading Connector for Apache Flink supports most Cascading and Flink features. 
 
-- Most Cascading operators are directly executed on Flink's memory-safe operators. This significantly reduces the need for cumbersome parameter tuning such as spill thresholds and the risk for `OutOfMemoryErrors`.
+- All Cascading operators (except for BufferJoins) are directly executed on Flink's memory-safe operators. This significantly reduces the need for cumbersome parameter tuning such as spill thresholds and the risk for `OutOfMemoryErrors`.
 - Flink's runtime leverages field type information of Cascading programs. Apache Flink uses specialized serializers and comparators to efficiently operate on binary data. Cascading flows that specify the type of key fields benefit from significant performance improvements.
 
 However, there are also a few limitations, which we are still working on, namely:
 
-- Only InnerJoins for HashJoin pipes. The remaining join types will be available once Flink supports hash-based outer joins. We expect to add support for hash-based LeftJoins very soon.
+- Only Inner- and LeftJoins are supported for HashJoin pipes. The remaining join types will be available once Flink supports hash-based full outer joins.
 
 ## Install ##
 
