@@ -42,6 +42,8 @@ limitations under the License.
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<slf4j.version>1.7.7</slf4j.version>
 		<cascading.version>3.1.0-wip-16</cascading.version>
+		<excluded.tests/>
+		<ignore.failed.tests>true</ignore.failed.tests>
 
 		<!-- Default parameters for mvn exec:exec -->
 		<clazz>com.dataartisans.flink.cascading.example.WordCount</clazz>
@@ -246,6 +248,14 @@ limitations under the License.
 
 			</build>
 		</profile>
+
+		<profile>
+			<id>travis</id>
+			<properties>
+				<excluded.tests>**/JoinFieldedPipesPlatformTest.java</excluded.tests>
+				<ignore.failed.tests>false</ignore.failed.tests>
+			</properties>
+		</profile>
 	</profiles>
 
 	<build>
@@ -406,9 +416,12 @@ limitations under the License.
 					<dependenciesToScan>
 						<dependency>cascading:cascading-platform</dependency>
 					</dependenciesToScan>
+					<excludes>
+						<exclude>${excluded.tests}</exclude>
+					</excludes>
 					<!--<forkCount>1C</forkCount>-->
 					<reuseForks>false</reuseForks>
-					<testFailureIgnore>true</testFailureIgnore>
+					<testFailureIgnore>${ignore.failed.tests}</testFailureIgnore>
                     <argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
 				</configuration>
 			</plugin>
