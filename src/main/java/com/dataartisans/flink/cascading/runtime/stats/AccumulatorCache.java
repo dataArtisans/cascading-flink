@@ -18,16 +18,9 @@ package com.dataartisans.flink.cascading.runtime.stats;
 
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.api.common.accumulators.AccumulatorHelper;
 import org.apache.flink.client.program.Client;
-import org.apache.flink.runtime.instance.ActorGateway;
-import org.apache.flink.runtime.messages.accumulators.AccumulatorResultsFound;
-import org.apache.flink.runtime.messages.accumulators.RequestAccumulatorResults;
-import org.apache.flink.util.SerializedValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.concurrent.Await;
-import scala.concurrent.duration.FiniteDuration;
 
 import java.util.Collections;
 import java.util.Map;
@@ -38,19 +31,15 @@ public class AccumulatorCache {
 
 	private JobID jobID;
 
-	private ActorGateway localJobManager;
 	private Client client;
 
 	private volatile Map<String, Object> currentAccumulators = Collections.emptyMap();
 
-	private FiniteDuration defaultTimeout;
-
 	private final long updateIntervalMillis;
 	private long lastUpdateTime;
 
-	public AccumulatorCache(int updateIntervalSecs, FiniteDuration defaultTimeout) {
+	public AccumulatorCache(int updateIntervalSecs) {
 		this.updateIntervalMillis = updateIntervalSecs * 1000;
-		this.defaultTimeout = defaultTimeout;
 	}
 
 	public void update() {
@@ -68,35 +57,7 @@ public class AccumulatorCache {
 			return;
 		}
 
-		if (localJobManager != null) {
-
-			scala.concurrent.Future<Object> response =
-					localJobManager.ask(new RequestAccumulatorResults(jobID), defaultTimeout);
-
-			try {
-
-				Object result = Await.result(response, defaultTimeout);
-
-				if (result instanceof AccumulatorResultsFound) {
-					Map<String, SerializedValue<Object>> serializedAccumulators =
-							((AccumulatorResultsFound) result).result();
-
-					currentAccumulators = AccumulatorHelper.deserializeAccumulators(
-							serializedAccumulators, ClassLoader.getSystemClassLoader());
-
-					lastUpdateTime = currentTime;
-
-					LOG.debug("Updated accumulators: {}", currentAccumulators);
-				} else {
-					LOG.warn("Failed to fetch accumulators for job {}.", jobID);
-				}
-
-			} catch (Exception e) {
-				LOG.error("Error occurred while fetching accumulators for {}.", jobID, e);
-			}
-
-
-		} else if (client != null) {
+		if (client != null) {
 
 			try {
 				currentAccumulators = client.getAccumulators(jobID);
@@ -117,10 +78,6 @@ public class AccumulatorCache {
 
 	public void setJobID(JobID jobID) {
 		this.jobID = jobID;
-	}
-
-	public void setLocalJobManager(ActorGateway localJobManager) {
-		this.localJobManager = localJobManager;
 	}
 
 	public void setClient(Client client) {

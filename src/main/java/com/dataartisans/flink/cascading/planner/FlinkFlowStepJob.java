@@ -35,13 +35,10 @@ import org.apache.flink.optimizer.DataStatistics;
 import org.apache.flink.optimizer.Optimizer;
 import org.apache.flink.optimizer.plan.OptimizedPlan;
 import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
-import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.messages.JobManagerMessages;
 import org.apache.flink.runtime.minicluster.FlinkMiniCluster;
 import org.apache.flink.runtime.minicluster.LocalFlinkMiniCluster;
 import org.apache.hadoop.conf.Configuration;
-import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.io.IOException;
@@ -63,6 +60,8 @@ import java.util.concurrent.TimeoutException;
 public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 {
 	private final Configuration currentConf;
+
+	private Client client;
 
 	private JobID jobID;
 	private Throwable jobException;
@@ -106,28 +105,17 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	@Override
 	protected FlowStepStats createStepStats(ClientState clientState) {
-		this.accumulatorCache = new AccumulatorCache(accumulatorUpdateIntervalSecs, DEFAULT_TIMEOUT);
+		this.accumulatorCache = new AccumulatorCache(accumulatorUpdateIntervalSecs);
 		return new FlinkFlowStepStats(this.flowStep, clientState, accumulatorCache);
 	}
 
 	protected void internalBlockOnStop() throws IOException {
+
 		if (jobSubmission != null && !jobSubmission.isDone()) {
-			if (isLocalExecution()) {
-				final ActorGateway jobManager = localCluster.getLeaderGateway(DEFAULT_TIMEOUT);
-
-				scala.concurrent.Future<Object> response = jobManager.ask(new JobManagerMessages.CancelJob(jobID), DEFAULT_TIMEOUT);
-
-				try {
-					Await.result(response, DEFAULT_TIMEOUT);
-				} catch (Exception e) {
-					throw new IOException("Canceling the job with ID " + jobID + " failed.", e);
-				}
-			} else {
-				try {
-					((ContextEnvironment) env).getClient().cancel(jobID);
-				} catch (Exception e) {
-					throw new IOException("An exception occurred while stopping the Flink job:\n" + e.getMessage());
-				}
+			try {
+				client.cancel(jobID);
+			} catch (Exception e) {
+				throw new IOException("An exception occurred while stopping the Flink job with ID: " + jobID + ": " + e.getMessage());
 			}
 		}
 
@@ -149,9 +137,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		accumulatorCache.setJobID(jobID);
 
 
-		final Client client;
-		final ClassLoader loader;
-
 		if (isLocalExecution()) {
 
 			flowStep.logInfo("Executing in local mode.");
@@ -162,8 +147,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			config.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, localCluster.hostname());
 
 			client = new Client(config);
-
-			loader = ClassLoader.getSystemClassLoader();
 
 		} else {
 
@@ -178,22 +161,24 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			}
 
 			client = ((ContextEnvironment) env).getClient();
-			accumulatorCache.setClient(client);
-
-			List<URL> fileList = new ArrayList<URL>(classPath.size());
-			for (String path : classPath) {
-				URL url;
-				try {
-					url = new URL(path);
-				} catch (MalformedURLException e) {
-					url = new URL("file://" + path);
-				}
-				fileList.add(url);
-			}
-
-			loader = JobWithJars.buildUserCodeClassLoader(fileList, Collections.<URL>emptyList(), getClass().getClassLoader());
 
 		}
+
+		List<URL> fileList = new ArrayList<URL>(classPath.size());
+		for (String path : classPath) {
+			URL url;
+			try {
+				url = new URL(path);
+			} catch (MalformedURLException e) {
+				url = new URL("file://" + path);
+			}
+			fileList.add(url);
+		}
+
+		final ClassLoader loader =
+				JobWithJars.buildUserCodeClassLoader(fileList, Collections.<URL>emptyList(), getClass().getClassLoader());
+
+		accumulatorCache.setClient(client);
 
 		final Callable<JobSubmissionResult> callable = new Callable<JobSubmissionResult>() {
 				@Override
@@ -237,6 +222,8 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		boolean isDone = jobSubmission.isDone();
 		if (isDone) {
 			accumulatorCache.update(true);
+			accumulatorCache.setJobID(null);
+			accumulatorCache.setClient(null);
 			stopCluster();
 		}
 
@@ -292,7 +279,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 					localCluster.awaitTermination();
 					localCluster = null;
 					localClusterUsers = 0;
-					accumulatorCache.setLocalJobManager(null);
 				}
 			}
 			if (executorService != null) {
