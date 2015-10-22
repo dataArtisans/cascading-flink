@@ -372,6 +372,7 @@ limitations under the License.
 						<exclude>**/target/**</exclude>
 						<exclude>**/build/**</exclude>
 						<exclude>**/resources/data/**</exclude>
+						<exclude>**dependency-reduced-pom.xml</exclude>
 					</excludes>
 				</configuration>
 			</plugin>
