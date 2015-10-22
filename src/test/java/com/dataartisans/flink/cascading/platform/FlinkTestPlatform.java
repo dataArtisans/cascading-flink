@@ -58,7 +58,7 @@ public class FlinkTestPlatform extends TestPlatform {
 
 		File testDataLocation = new File("./target/data/");
 		if (testDataLocation.exists() && testDataLocation.canRead()) {
-			properties.setProperty(InputData.TEST_DATA_PATH, testDataLocation.getAbsolutePath());
+			properties.setProperty(InputData.TEST_DATA_PATH, testDataLocation.getAbsolutePath() + "/");
 		} else {
 			throw new IllegalStateException("The test data is not available. To extract the data, " +
 					"please execute 'mvn clean compile' once.");
