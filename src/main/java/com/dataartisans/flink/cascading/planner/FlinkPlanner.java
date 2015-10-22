@@ -52,6 +52,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 		super();
 		this.classPath = classPath;
 
+		env.getConfig().disableSysoutLogging();
 		if (env.getParallelism() <= 0) {
 			// load the default parallelism from config
 			GlobalConfiguration.loadConfiguration(new File(CliFrontend.getConfigurationDirectoryFromEnv()).getAbsolutePath());
