@@ -147,6 +147,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			config.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, localCluster.hostname());
 
 			client = new Client(config);
+			client.setPrintStatusDuringExecution(env.getConfig().isSysoutLoggingEnabled());
 
 		} else {
 
