@@ -14,6 +14,8 @@ The Cascading Connector for Apache Flink supports most Cascading and Flink featu
 
 - All Cascading operators (except for BufferJoins) are directly executed on Flink's memory-safe operators. This significantly reduces the need for cumbersome parameter tuning such as spill thresholds and the risk for `OutOfMemoryErrors`.
 - Flink's runtime leverages field type information of Cascading programs. Apache Flink uses specialized serializers and comparators to efficiently operate on binary data. Cascading flows that specify the type of key fields benefit from significant performance improvements.
+- Supports all execution modes of Apache Flink, i.e., local, cluster, YARN, and in-IDE debugging.
+- Supports all Cascading Hadoop Taps and Schemes. Local Taps and Schemes are not supported, but Hadoop Taps support reading from local file systems.
 
 However, there are also a few limitations, which we are still working on, namely:
 
