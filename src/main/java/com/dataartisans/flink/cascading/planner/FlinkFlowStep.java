@@ -174,14 +174,14 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		int numMappers;
 		try {
-			numMappers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.mappers"));
+			numMappers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.sourceTasks"));
 		} catch (NumberFormatException e) {
 			numMappers = -1;
 		}
 
 		int numReducers;
 		try {
-			numReducers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.reducers"));
+			numReducers = Integer.parseInt(((FlinkFlowProcess) flowProcess).getConfig().get("flink.num.shuffleTasks"));
 		} catch (NumberFormatException e) {
 			numReducers = -1;
 		}
@@ -192,7 +192,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		FlowNodeGraph flowNodeGraph = getFlowNodeGraph();
 		Iterator<FlowNode> iterator = flowNodeGraph.getTopologicalIterator();
 
-		Map<FlowElement, DataSet<?>> flinkMemo = new HashMap<FlowElement, DataSet<?>>();
+		Map<FlowElement, DataSet<?>> flinkMemo = new HashMap<>();
 
 		while(iterator.hasNext()) {
 			FlowNode node = iterator.next();
@@ -244,7 +244,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 				GroupBy groupBy = (GroupBy)getSingle(sinks);
 
-				List<DataSet<Tuple>> groupByInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				List<DataSet<Tuple>> groupByInputs = new ArrayList<>(sources.size());
 				for(FlowElement e : sources) {
 					groupByInputs.add((DataSet<Tuple>)flinkMemo.get(e));
 				}
@@ -273,7 +273,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 				CoGroup coGroup = (CoGroup)getSingle(sinks);
 
-				List<DataSet<Tuple>> coGroupInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				List<DataSet<Tuple>> coGroupInputs = new ArrayList<>(sources.size());
 				for(FlowElement e : getNodeInputsInOrder(node, coGroup)) {
 					coGroupInputs.add((DataSet<Tuple>)flinkMemo.get(e));
 				}
@@ -301,12 +301,12 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					getCommonSuccessor(sources, node) instanceof HashJoin) {
 
 				HashJoin hashJoin = (HashJoin)getCommonSuccessor(sources, node);
-				List<DataSet<Tuple>> hashJoinInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				List<DataSet<Tuple>> hashJoinInputs = new ArrayList<>(sources.size());
 				for(FlowElement e : getNodeInputsInOrder(node, hashJoin)) {
 					hashJoinInputs.add((DataSet<Tuple>)flinkMemo.get(e));
 				}
 
-				DataSet<Tuple> joined = translateHashJoin(hashJoinInputs, node, numMappers);
+				DataSet<Tuple> joined = translateHashJoin(hashJoinInputs, node);
 				for(FlowElement sink : sinks) {
 					flinkMemo.put(sink, joined);
 				}
@@ -320,7 +320,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					inner.size() == 1 &&
 					allOfType(inner, Merge.class)) {
 
-				List<DataSet<Tuple>> mergeInputs = new ArrayList<DataSet<Tuple>>(sources.size());
+				List<DataSet<Tuple>> mergeInputs = new ArrayList<>(sources.size());
 				for(FlowElement e : sources) {
 					mergeInputs.add((DataSet<Tuple>)flinkMemo.get(e));
 				}
@@ -643,7 +643,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		keysTypeInfo.registerKeyFields(keyFields[0]);
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+				new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 						keysTypeInfo,
 						new TupleArrayTypeInfo(numJoinInputs, Arrays.copyOf(inputFields, 2))
 				);
@@ -672,7 +672,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		for (int i = 2; i < inputs.size(); i++) {
 
 			tupleJoinListsTypeInfo =
-					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 							keysTypeInfo,
 							new TupleArrayTypeInfo(numJoinInputs, Arrays.copyOf(inputFields, i+1))
 					);
@@ -696,7 +696,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		int numJoinInputs = inputs.size();
 
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+				new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 						new TupleTypeInfo(Fields.UNKNOWN),
 						new TupleArrayTypeInfo(numJoinInputs, Arrays.copyOf(inputFields, 1))
 				);
@@ -713,7 +713,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		for (int i = 1; i < inputs.size(); i++) {
 
 			tupleJoinListsTypeInfo =
-					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 							new TupleTypeInfo(Fields.UNKNOWN),
 							new TupleArrayTypeInfo(numJoinInputs, Arrays.copyOf(inputFields, i+1))
 					);
@@ -751,7 +751,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					new TupleTypeInfo(Fields.UNKNOWN);
 
 			TypeInformation<Tuple3<Tuple, Integer, Tuple>> keyedType =
-					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple3<Tuple, Integer, Tuple>>(
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 							keysTypeInfo,
 							BasicTypeInfo.INT_TYPE_INFO,
 							new TupleTypeInfo(inputFields[i])
@@ -854,7 +854,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 	}
 
-	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node, int dop) {
+	private DataSet<Tuple> translateHashJoin(List<DataSet<Tuple>> inputs, FlowNode node) {
 
 		HashJoin hashJoin = (HashJoin) getCommonSuccessor(node.getSourceElements(), node);
 		Joiner joiner = hashJoin.getJoiner();
@@ -869,21 +869,21 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		if(keyFields[0].isNone()) {
 			// Cartesian product
-			return translateInnerCrossProduct(node, joinInputs, dop);
+			return translateInnerCrossProduct(node, joinInputs);
 		}
 		else if(joiner.getClass().equals(InnerJoin.class)) {
 			// inner join with keys
-			return translateInnerHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys, dop);
+			return translateInnerHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys);
 		}
 		else if (joiner.getClass().equals(LeftJoin.class)) {
-			return translateLeftHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys, dop);
+			return translateLeftHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys);
 		}
 		else {
 			throw new FlowException("HashJoin does only support InnerJoin and LeftJoin.");
 		}
 	}
 
-	private DataSet<Tuple> translateInnerHashJoin(FlowNode node, List<DataSet<Tuple>> inputs, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
+	private DataSet<Tuple> translateInnerHashJoin(FlowNode node, List<DataSet<Tuple>> inputs, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys) {
 
 		int numJoinInputs = inputs.size();
 
@@ -897,6 +897,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		registerKryoTypes(outFields);
 
+		int probeSideDOP = ((Operator)inputs.get(0)).getParallelism();
+
 		if(numJoinInputs == 2) {
 			// binary join
 
@@ -904,7 +906,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.where(flinkKeys[0]).equalTo(flinkKeys[1])
 					.with(new BinaryHashJoinJoiner(node, inputFields[0], keyFields[0]))
 					.withParameters(this.getFlinkNodeConfig(node))
-					.setParallelism(dop)
+					.setParallelism(probeSideDOP)
 					.returns(new TupleTypeInfo(outFields))
 					.name("hashjoin-" + node.getID());
 
@@ -919,7 +921,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 
 			TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 							keysTypeInfo,
 							new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, 1))
 					);
@@ -941,7 +943,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			for (int i = 1; i < inputs.size()-1; i++) {
 
 				tupleJoinListsTypeInfo =
-						new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+						new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 								keysTypeInfo,
 								new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, i+1))
 						);
@@ -951,7 +953,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						.with(new TupleAppendJoiner(i))
 						.returns(tupleJoinListsTypeInfo)
 						.withForwardedFieldsFirst(flinkKeys[0])
-						.setParallelism(dop)
+						.setParallelism(probeSideDOP)
 						.name("hashjoin-" + node.getID());
 			}
 
@@ -960,13 +962,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.where(flinkKeys[0]).equalTo(flinkKeys[numJoinInputs-1])
 					.with(new NaryHashJoinJoiner(node, numJoinInputs))
 					.withParameters(this.getFlinkNodeConfig(node))
-					.setParallelism(dop)
+					.setParallelism(probeSideDOP)
 					.returns(new TupleTypeInfo(outFields))
 					.name("hashjoin-" + node.getID());
 		}
 	}
 
-	private DataSet<Tuple> translateLeftHashJoin(FlowNode node, List<DataSet<Tuple>> inputs, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys, int dop) {
+	private DataSet<Tuple> translateLeftHashJoin(FlowNode node, List<DataSet<Tuple>> inputs, Fields[] inputFields, Fields[] keyFields, String[][] flinkKeys) {
 
 		int numJoinInputs = inputs.size();
 
@@ -980,6 +982,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		registerKryoTypes(outFields);
 
+		int probeSideDOP = ((Operator)inputs.get(0)).getParallelism();
+
 		if(numJoinInputs == 2) {
 			// binary join
 
@@ -988,7 +992,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.where(flinkKeys[0]).equalTo(flinkKeys[1])
 					.with(new BinaryHashJoinJoiner(node, inputFields[0], keyFields[0]))
 					.withParameters(this.getFlinkNodeConfig(node))
-					.setParallelism(dop)
+					.setParallelism(probeSideDOP)
 					.returns(new TupleTypeInfo(outFields))
 					.name("hashjoin-" + node.getID());
 
@@ -1003,18 +1007,16 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 
 			TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-					new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+					new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 							keysTypeInfo,
 							new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, 1))
 					);
-
-			int mapDop = ((Operator) inputs.get(0)).getParallelism();
 
 			// prepare tuple list for join
 			DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 					.map(new JoinPrepareMapper(numJoinInputs - 1, inputFields[0], keyFields[0]))
 					.returns(tupleJoinListsTypeInfo)
-					.setParallelism(mapDop)
+					.setParallelism(probeSideDOP)
 					.name("hashjoin-" + node.getID());
 
 			for (int i = 0; i < flinkKeys[0].length; i++) {
@@ -1025,7 +1027,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			for (int i = 1; i < inputs.size()-1; i++) {
 
 				tupleJoinListsTypeInfo =
-						new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+						new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 								keysTypeInfo,
 								new TupleArrayTypeInfo(numJoinInputs-1, Arrays.copyOf(inputFields, i+1))
 						);
@@ -1036,7 +1038,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 						.with(new TupleAppendJoiner(i))
 						.returns(tupleJoinListsTypeInfo)
 						.withForwardedFieldsFirst(flinkKeys[0])
-						.setParallelism(dop)
+						.setParallelism(probeSideDOP)
 						.name("hashjoin-" + node.getID());
 			}
 
@@ -1046,13 +1048,13 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 					.where(flinkKeys[0]).equalTo(flinkKeys[numJoinInputs-1])
 					.with(new NaryHashJoinJoiner(node, numJoinInputs))
 					.withParameters(this.getFlinkNodeConfig(node))
-					.setParallelism(dop)
+					.setParallelism(probeSideDOP)
 					.returns(new TupleTypeInfo(outFields))
 					.name("hashjoin-" + node.getID());
 		}
 	}
 
-	private DataSet<Tuple> translateInnerCrossProduct(FlowNode node, List<DataSet<Tuple>> inputs, int dop) {
+	private DataSet<Tuple> translateInnerCrossProduct(FlowNode node, List<DataSet<Tuple>> inputs) {
 
 		int numJoinInputs = inputs.size();
 
@@ -1066,32 +1068,33 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		}
 		registerKryoTypes(outFields);
 
+		int probeSideDOP = ((Operator)inputs.get(0)).getParallelism();
+
 		TypeInformation<Tuple2<Tuple, Tuple[]>> tupleJoinListsTypeInfo =
-				new org.apache.flink.api.java.typeutils.TupleTypeInfo<Tuple2<Tuple, Tuple[]>>(
+				new org.apache.flink.api.java.typeutils.TupleTypeInfo<>(
 						new TupleTypeInfo(Fields.UNKNOWN),
 						ObjectArrayTypeInfo.getInfoFor(new TupleTypeInfo(Fields.UNKNOWN))
 				);
-
-		int mapDop = ((Operator)inputs.get(0)).getParallelism();
 
 		// prepare tuple list for join
 		DataSet<Tuple2<Tuple, Tuple[]>> tupleJoinLists = inputs.get(0)
 				.map(new JoinPrepareMapper(numJoinInputs, null, null))
 				.returns(tupleJoinListsTypeInfo)
-				.setParallelism(mapDop)
+				.setParallelism(probeSideDOP)
 				.name("hashjoin-" + node.getID());
 
 		for (int i = 1; i < inputs.size(); i++) {
 			tupleJoinLists = tupleJoinLists.crossWithTiny(inputs.get(i))
 					.with(new TupleAppendCrosser(i))
 					.returns(tupleJoinListsTypeInfo)
+					.setParallelism(probeSideDOP)
 					.name("hashjoin-" + node.getID());
 		}
 
 		return tupleJoinLists
 				.mapPartition(new HashJoinMapper(node))
 				.withParameters(this.getFlinkNodeConfig(node))
-				.setParallelism(dop)
+				.setParallelism(probeSideDOP)
 				.returns(new TupleTypeInfo(outFields))
 				.name("hashjoin-" + node.getID());
 
@@ -1135,7 +1138,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			}
 
 			// duplicate self join input to treat it like a regular join
-			inputs2 = new ArrayList<DataSet<Tuple>>(numJoinInputs);
+			inputs2 = new ArrayList<>(numJoinInputs);
 			for(int i=0; i<numJoinInputs; i++) {
 				inputs2.add(inputs.get(0));
 			}
@@ -1147,7 +1150,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	private List<Scope> getInputScopes(FlowNode node, Splice splice) {
 
 		Pipe[] inputs = splice.getPrevious();
-		List<Scope> inScopes = new ArrayList<Scope>(inputs.length);
+		List<Scope> inScopes = new ArrayList<>(inputs.length);
 		for(Pipe input : inputs) {
 			boolean found = false;
 			for (Scope inScope : node.getPreviousScopes(splice)) {
@@ -1189,10 +1192,10 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 	}
 
 	private Set<FlowElement> getInnerElements(FlowNode node) {
-		Set<FlowElement> inner = new HashSet(node.getElementGraph().vertexSet());
+		Set<FlowElement> inner = new HashSet<>(node.getElementGraph().vertexSet());
 		inner.removeAll(getSources(node));
 		inner.removeAll(getSinks(node));
-		Set<FlowElement> toRemove = new HashSet<FlowElement>();
+		Set<FlowElement> toRemove = new HashSet<>();
 		for(FlowElement e : inner) {
 			if(e instanceof Extent) {
 				toRemove.add(e);

@@ -129,8 +129,8 @@ public class FlinkTestPlatform extends TestPlatform {
 	@Override
 	public FlowConnector getFlowConnector(Map<Object, Object> properties) {
 
-		properties.put("flink.num.mappers", this.numMappers+"");
-		properties.put("flink.num.reducers", this.numGatherPartitions+"");
+		properties.put("flink.num.sourceTasks", this.numMappers+"");
+		properties.put("flink.num.shuffleTasks", this.numGatherPartitions+"");
 
 		return new FlinkConnector(properties);
 	}
