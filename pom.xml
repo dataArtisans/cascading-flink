@@ -41,7 +41,7 @@ limitations under the License.
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<slf4j.version>1.7.7</slf4j.version>
-		<cascading.version>3.1.0-wip-16</cascading.version>
+		<cascading.version>3.1.0-wip-39</cascading.version>
 		<excluded.tests/>
 		<ignore.failed.tests>true</ignore.failed.tests>
 
@@ -87,13 +87,13 @@ limitations under the License.
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-clients</artifactId>
-			<version>0.10-SNAPSHOT</version>
+			<version>0.10.0</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-java</artifactId>
-			<version>0.10-SNAPSHOT</version>
+			<version>0.10.0</version>
 		</dependency>
 
 		<!-- CASCADING -->
@@ -113,7 +113,7 @@ limitations under the License.
 		<dependency>
 			<groupId>cascading</groupId>
 			<artifactId>cascading-expression</artifactId>
-			<version>3.1.0-wip-16</version>
+			<version>${cascading.version}</version>
 		</dependency>
 
 		<!-- CASCADING TESTS -->
