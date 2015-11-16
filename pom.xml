@@ -28,6 +28,12 @@ limitations under the License.
 	<name>Cascading on Flink</name>
 	<packaging>jar</packaging>
 	<inceptionYear>2015</inceptionYear>
+	<description>The Cascading Connector for Apache Flink enables you to execute Cascading flows on Apache Flink.</description>
+	<url>https://github.com/dataArtisans/cascading-flink</url>
+	<scm>
+		<url>https://github.com/dataArtisans/cascading-flink</url>
+		<connection>scm:git:https://github.com/dataArtisans/cascading-flink.git</connection>
+	</scm>
 
 	<licenses>
 		<license>
@@ -36,6 +42,13 @@ limitations under the License.
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
+
+	<developers>
+		<developer>
+			<organization>data Artisans</organization>
+			<url>http://data-artisans.com/</url>
+		</developer>
+	</developers>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
