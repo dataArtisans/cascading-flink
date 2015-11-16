@@ -23,7 +23,7 @@ limitations under the License.
 
 	<groupId>com.data-artisans</groupId>
 	<artifactId>cascading-flink</artifactId>
-	<version>0.1-SNAPSHOT</version>
+	<version>0.1</version>
 
 	<name>Cascading on Flink</name>
 	<packaging>jar</packaging>
@@ -57,16 +57,6 @@ limitations under the License.
 			<url>http://conjars.org/repo</url>
 		</repository>
 
-		<repository>
-			<id>flink-snapshot-repo</id>
-			<url>https://repository.apache.org/content/repositories/snapshots/</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</repository>
 	</repositories>
 
 	<distributionManagement>
