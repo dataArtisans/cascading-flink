@@ -25,16 +25,8 @@ However, there are also a few limitations, which we are still working on, namely
 
 The Cascading Connector for Apache Flink does depends on Apache Flink 0.10.0 and Cascading 3.1.0 which is not released yet but available as 3.1.0-wip-39 at [Conjars](http://conjars.org/). All required dependencies are provided by including the Cascading Flink connector in your project.
 
-To retrieve the latest version of the Cascading Connector for Apache Flink, run the following command
 
-    git clone https://github.com/dataArtisans/cascading-flink.git
-
-Then switch to the newly created directory and run Maven to build the Cascading Connector for Apache Flink:
-
-    cd cascading-flink
-    mvn clean install -DskipTests
-
-The Cascading Connector for Apache Flink is now installed in your local maven repository and can be used in your project by adding the following Maven dependency:
+The Cascading Connector for Apache Flink is available on [Maven central](http://search.maven.org/#search%7Cga%7C1%7Ccascading-flink) can be used in your project by adding the following Maven dependency:
 
 ```java
 <dependency>
@@ -134,3 +126,16 @@ Now let's run the included WordCount example on the cluster.
 Or on a YARN cluster:
 
     ./flink run  -m yarn-cluster -yn 10 -c com.dataartisans.flinkCascading.example.WordCount cascading-flink.jar hdfs:///input hdfs:///output
+
+
+# Building
+
+
+To retrieve the latest development version of the Cascading Connector for Apache Flink, run the following command
+
+    git clone https://github.com/dataArtisans/cascading-flink.git
+
+Then switch to the newly created directory and run Maven to build the Cascading Connector for Apache Flink:
+
+    cd cascading-flink
+    mvn clean install -DskipTests
