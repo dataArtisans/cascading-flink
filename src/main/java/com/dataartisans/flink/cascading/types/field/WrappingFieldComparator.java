@@ -137,7 +137,7 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 
 	@Override
 	public boolean isNormalizedKeyPrefixOnly(int numBytes) {
-		return this.wrappedComparator.isNormalizedKeyPrefixOnly(numBytes + 1);
+		return this.wrappedComparator.isNormalizedKeyPrefixOnly(numBytes - 1);
 	}
 
 	@Override
