@@ -83,6 +83,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -858,6 +859,19 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 		HashJoin hashJoin = (HashJoin) getCommonSuccessor(node.getSourceElements(), node);
 		Joiner joiner = hashJoin.getJoiner();
+
+		// check if joiner is a Scalding WrappedJoiner and
+		//   try to extract the joiner which is wrapped inside
+		if (joiner.getClass().getName().equals("com.twitter.scalding.WrappedJoiner")) {
+			try {
+				Field joinerField = joiner.getClass().getDeclaredField("joiner");
+				joiner = (Joiner)joinerField.get(joiner);
+			}
+			catch(NoSuchFieldException | IllegalAccessException nsfe) {
+				LOG.warn("Could not extract joiner from Scalding's WrappedJoiner. " +
+						"Will continue without extracting joiner.");
+			}
+		}
 
 		int numJoinInputs = hashJoin.isSelfJoin() ? hashJoin.getNumSelfJoins() + 1 : inputs.size();
 
