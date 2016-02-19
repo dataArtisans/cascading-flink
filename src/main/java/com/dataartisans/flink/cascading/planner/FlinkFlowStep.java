@@ -596,7 +596,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				unioned = unioned.union(input);
 			}
 		}
-		return unioned.mapPartition(new IdMapper())
+		return unioned.map(new IdMapper())
 				.returns(type)
 				.setParallelism(maxDop);
 

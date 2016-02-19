@@ -17,15 +17,12 @@
 package com.dataartisans.flink.cascading.runtime.util;
 
 import cascading.tuple.Tuple;
-import org.apache.flink.api.common.functions.MapPartitionFunction;
-import org.apache.flink.util.Collector;
+import org.apache.flink.api.common.functions.MapFunction;
 
-public class IdMapper implements MapPartitionFunction<Tuple, Tuple> {
+public class IdMapper implements MapFunction<Tuple, Tuple> {
 
 	@Override
-	public void mapPartition(Iterable<Tuple> values, Collector<Tuple> out) throws Exception {
-		for(Tuple t : values) {
-			out.collect(t);
-		}
+	public Tuple map(Tuple value) throws Exception {
+		return value;
 	}
 }
