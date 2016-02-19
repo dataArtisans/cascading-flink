@@ -28,7 +28,7 @@ public class BufferJoinKeyExtractor implements MapFunction<Tuple, Tuple3<Tuple, 
 
 	public BufferJoinKeyExtractor(int inputId, int[] keyPos) {
 		this.keyPos = keyPos;
-		this.outT = new Tuple3<Tuple, Integer, Tuple>(null, inputId, null);
+		this.outT = new Tuple3<>(null, inputId, null);
 	}
 
 	@Override

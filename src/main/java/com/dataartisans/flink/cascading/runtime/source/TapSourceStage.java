@@ -70,7 +70,7 @@ public class TapSourceStage extends SourceStage {
 			while(iterator.hasNext()) {
 
 				// read and forward next record
-				TupleEntry tupleEntry = null;
+				TupleEntry tupleEntry;
 
 				try {
 					tupleEntry = iterator.next();

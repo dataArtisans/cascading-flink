@@ -72,7 +72,7 @@ public class BinaryHashJoinJoiner extends RichFlatJoinFunction<Tuple, Tuple, Tup
 		try {
 
 			this.joinedTuples = new Tuple[2];
-			this.joinInput = new Tuple2<Tuple, Tuple[]>(new Tuple(), this.joinedTuples);
+			this.joinInput = new Tuple2<>(new Tuple(), this.joinedTuples);
 
 			currentProcess = new FlinkFlowProcess(FlinkConfigConverter.toHadoopConfig(config), getRuntimeContext(), flowNode.getID());
 

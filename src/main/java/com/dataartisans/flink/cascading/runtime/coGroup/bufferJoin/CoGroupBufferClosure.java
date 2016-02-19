@@ -237,7 +237,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 			// if this is the first (lhs) co-group, just use values iterator
 			// we are guaranteed all the remainder tuples in the iterator are from pos == 0
 			if( numSelfJoins == 0 && pos == 0 ) {
-				( (FalseCollection) collections[ 0 ] ).reset( createIterator( current, new FlinkUnwrappingIterator<Tuple, Integer>(values[0])) );
+				( (FalseCollection) collections[ 0 ] ).reset( createIterator( current, new FlinkUnwrappingIterator<>(values[0])) );
 				break;
 			}
 
