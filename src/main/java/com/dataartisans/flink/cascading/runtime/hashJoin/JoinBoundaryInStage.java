@@ -38,8 +38,11 @@ public class JoinBoundaryInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[
 	}
 
 	@Override
-	public void complete(Duct next) {
-		next.complete(this);
+	public void complete(Duct previous) {
+
+		if( next != null ) {
+			super.complete(previous);
+		}
 	}
 
 	@Override
