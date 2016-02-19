@@ -865,9 +865,11 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		if (joiner.getClass().getName().equals("com.twitter.scalding.WrappedJoiner")) {
 			try {
 				Field joinerField = joiner.getClass().getDeclaredField("joiner");
+				joinerField.setAccessible(true);
 				joiner = (Joiner)joinerField.get(joiner);
 			}
 			catch(NoSuchFieldException | IllegalAccessException nsfe) {
+				nsfe.printStackTrace();
 				LOG.warn("Could not extract joiner from Scalding's WrappedJoiner. " +
 						"Will continue without extracting joiner.");
 			}
@@ -893,7 +895,9 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 			return translateLeftHashJoin(node, joinInputs, inputFields, keyFields, flinkKeys);
 		}
 		else {
-			throw new FlowException("HashJoin does only support InnerJoin and LeftJoin.");
+			System.out.println(joiner.getClass().getName());
+			throw new FlowException("HashJoin does only support InnerJoin and LeftJoin but is " +
+					joiner.getClass().getName());
 		}
 	}
 
