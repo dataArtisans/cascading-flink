@@ -42,7 +42,7 @@ public class JoinPrepareMapper implements MapFunction<Tuple, Tuple2<Tuple, Tuple
 		for(int i=0; i<numJoinInputs-1; i++) {
 			tupleList[i] = new Tuple();
 		}
-		out = new Tuple2<Tuple, Tuple[]>(null, tupleList);
+		out = new Tuple2<>(null, tupleList);
 	}
 
 	@Override

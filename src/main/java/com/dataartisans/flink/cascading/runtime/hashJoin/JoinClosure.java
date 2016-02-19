@@ -85,7 +85,7 @@ public class JoinClosure extends JoinerClosure {
 		return joinedKeysTuple;
 	}
 
-	static interface TupleBuilder {
+	interface TupleBuilder {
 		Tuple makeResult(Tuple[] tuples);
 	}
 

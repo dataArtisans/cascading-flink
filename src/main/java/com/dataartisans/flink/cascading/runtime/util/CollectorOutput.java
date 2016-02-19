@@ -21,6 +21,6 @@ import org.apache.flink.util.Collector;
 
 public interface CollectorOutput {
 
-	public void setTupleCollector(Collector<Tuple> tupleCollector);
+	void setTupleCollector(Collector<Tuple> tupleCollector);
 
 }

@@ -44,7 +44,7 @@ public class TupleOuterJoiner extends RichJoinFunction<Tuple, Tuple, Tuple2<Tupl
 
 	@Override
 	public void open(Configuration config) {
-		this.outT = new Tuple2<Tuple, Tuple[]>(null, new Tuple[tupleListSize]);
+		this.outT = new Tuple2<>(null, new Tuple[tupleListSize]);
 	}
 
 	@Override

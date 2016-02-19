@@ -85,7 +85,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public Collection<String> getPropertyKeys() {
-		Set<String> keys = new HashSet<String>();
+		Set<String> keys = new HashSet<>();
 
 		for( Map.Entry<String, String> entry : this.conf ) {
 			keys.add(entry.getKey());
@@ -105,7 +105,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 			return InstantiationUtil.instantiate(clazz);
 		}
 		catch( ClassNotFoundException exception ) {
-			throw new CascadingException( "unable to load class: " + className.toString(), exception );
+			throw new CascadingException( "unable to load class: " + className, exception );
 		}
 	}
 
@@ -139,7 +139,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 			return getOrInitCounter(EnumStringConverter.mergeGroupCounter(group, counter)).getLocalValue();
 		}
 		else {
-			return 0l;
+			return 0L;
 		}
 	}
 
@@ -210,17 +210,17 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	@Override
 	public <C> Map<String, String> diffConfigIntoMap(C defaultConfig, C updatedConfig) {
 
-		Map<String, String> newConf = new HashMap<String, String>();
+		Map<String, String> newConf = new HashMap<>();
 		for(Map.Entry<String,String> e : ((Configuration)updatedConfig)) {
 			String key = e.getKey();
 			String val = ((Configuration) updatedConfig).get(key);
 			String defaultVal = ((Configuration)defaultConfig).get(key);
 
 			// add keys that are different from default
-			if((val == null && defaultVal == null) || val.equals(defaultVal)) {
-				continue;
+			if(val != null && defaultVal != null && !val.equals(defaultVal)) {
+				newConf.put(key, val);
 			}
-			else {
+			else if((val == null && defaultVal != null) || (val != null && defaultVal == null)) {
 				newConf.put(key, val);
 			}
 		}
