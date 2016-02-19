@@ -149,6 +149,7 @@ public class BinaryHashJoinJoiner extends RichFlatJoinFunction<Tuple, Tuple, Tup
 
 		try {
 			if( this.prepareCalled) {
+				this.sourceStage.complete(this.sourceStage);
 				this.streamGraph.cleanup();
 			}
 		}

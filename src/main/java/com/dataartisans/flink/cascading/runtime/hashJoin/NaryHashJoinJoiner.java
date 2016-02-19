@@ -119,9 +119,7 @@ public class NaryHashJoinJoiner extends RichFlatJoinFunction<Tuple2<Tuple, Tuple
 
 		this.streamGraph.setTupleCollector(output);
 
-		for(int i=0; i<numJoinInputs-1; i++) {
-			joinedTuples[i] = left.f1[i];
-		}
+		System.arraycopy(left.f1, 0, joinedTuples, 0, numJoinInputs - 1);
 		joinedTuples[numJoinInputs-1] = right;
 		left.f1 = joinedTuples;
 
@@ -146,6 +144,7 @@ public class NaryHashJoinJoiner extends RichFlatJoinFunction<Tuple2<Tuple, Tuple
 
 		try {
 			if( this.prepareCalled) {
+				this.sourceStage.complete(this.sourceStage);
 				this.streamGraph.cleanup();
 			}
 		}
