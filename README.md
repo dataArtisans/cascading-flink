@@ -30,7 +30,7 @@ The Cascading Connector for Apache Flink is available on [Maven central](http://
 
 ```java
 <dependency>
-    <groupId>com.dataArtisans</groupId>
+    <groupId>com.data-artisans</groupId>
     <artifactId>cascading-flink</artifactId>
     <version>0.1</version>
 </dependency>
