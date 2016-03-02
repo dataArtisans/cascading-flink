@@ -268,15 +268,8 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 				// Forward call() to get Cascading's internal job stats right.
 				//   The job will be skipped due to the overridden isSkipFlowStep method.
 				super.call();
-				// NOTE: This is a really ugly hack!
-				//   We return an OutOfMemoryError, because
-				//     1. Cascading's BaseFlow.complete() forwards OOME's without wrapping
-				//     2. Flink's PackagedProgram.callMainMethod() forwards errors without wrapping
-				//        them in ProgramInvokationException
-				//     3. And finally, Flink's OptimizerPlanEnvironment.getOptimizedPlan errors
-				//        on ProgramInvokationException
-				return new OutOfMemoryError("Not an OutOfMemoryError. " +
-						"Used as a marker exception for OptimizerPlanEnvironment.getOptimizedPlan()");
+				// forward expected ProgramAbortException
+				return pae;
 			}
 			//
 			catch(Exception e) {

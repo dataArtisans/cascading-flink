@@ -23,6 +23,7 @@ import cascading.flow.FlowProcess;
 import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
+import org.apache.flink.client.program.OptimizerPlanEnvironment;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import riffle.process.ProcessConfiguration;
@@ -68,6 +69,23 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	@Override
 	protected Configuration newConfig(Configuration defaultConfig) {
 		return defaultConfig == null ? new Configuration() : HadoopUtil.copyJobConf(defaultConfig);
+	}
+
+	@Override
+	public void complete() {
+		try {
+			super.complete();
+		}
+		catch(FlowException fe) {
+			// check if we need to unwrap a ProgramAbortException
+			Throwable t = fe.getCause();
+			if (t instanceof OptimizerPlanEnvironment.ProgramAbortException) {
+				throw (OptimizerPlanEnvironment.ProgramAbortException)t;
+			}
+			else {
+				throw fe;
+			}
+		}
 	}
 
 	@Override
