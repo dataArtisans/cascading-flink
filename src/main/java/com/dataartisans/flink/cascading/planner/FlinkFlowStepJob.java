@@ -21,6 +21,7 @@ import cascading.management.state.ClientState;
 import cascading.stats.FlowNodeStats;
 import cascading.stats.FlowStepStats;
 import com.dataartisans.flink.cascading.runtime.stats.AccumulatorCache;
+import com.dataartisans.flink.cascading.util.FlinkConfigConstants;
 import org.apache.flink.api.common.ExecutionMode;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
@@ -132,17 +133,18 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		Plan plan = env.createProgramPlan();
 
 		// set exchange mode, BATCH is default
-		String execMode = getConfig().get("flink.executionMode");
-		if (execMode == null || "BATCH".equals(execMode)) {
+		String execMode = getConfig().get(FlinkConfigConstants.EXECUTION_MODE);
+		if (execMode == null || FlinkConfigConstants.EXECUTION_MODE_BATCH.equals(execMode)) {
 			env.getConfig().setExecutionMode(ExecutionMode.BATCH);
 		}
-		else if ("PIPELINED".equals(execMode)) {
+		else if (FlinkConfigConstants.EXECUTION_MODE_PIPELINED.equals(execMode)) {
 			env.getConfig().setExecutionMode(ExecutionMode.PIPELINED);
 		}
 		else {
-			LOG.warn("Unknow value for 'flink.executionMode' parameter. " +
-					"Only 'BATCH' or 'PIPELINED' supported. " +
-					"Using BATCH exchange by default.");
+			LOG.warn("Unknow value for '" + FlinkConfigConstants.EXECUTION_MODE + "' parameter. " +
+					"Only '" + FlinkConfigConstants.EXECUTION_MODE_BATCH + "' " +
+					"or '" + FlinkConfigConstants.EXECUTION_MODE_PIPELINED + "' supported. " +
+					"Using " + FlinkConfigConstants.EXECUTION_MODE_BATCH + " exchange by default.");
 			env.getConfig().setExecutionMode(ExecutionMode.BATCH);
 		}
 
