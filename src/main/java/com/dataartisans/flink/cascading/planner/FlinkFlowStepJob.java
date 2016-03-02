@@ -170,7 +170,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			client = new Client(config);
 			client.setPrintStatusDuringExecution(env.getConfig().isSysoutLoggingEnabled());
 
-		} else {
+		} else if (isRemoteExecution()) {
 
 			flowStep.logInfo("Executing in cluster mode.");
 
@@ -252,8 +252,56 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	}
 
 	@Override
+	public Throwable call()
+	{
+		if (env instanceof OptimizerPlanEnvironment) {
+			// We have an OptimizerPlanEnvironment.
+			//   This environment is only used to to fetch the Flink execution plan.
+			try {
+				// OptimizerPlanEnvironment does not execute but only build the execution plan.
+				env.execute("plan generation");
+			}
+			// execute() throws a ProgramAbortException if everything goes well
+			catch(OptimizerPlanEnvironment.ProgramAbortException pae) {
+				// Forward call() to get Cascading's internal job stats right.
+				//   The job will be skipped due to the overridden isSkipFlowStep method.
+				super.call();
+				// NOTE: This is a really ugly hack!
+				//   We return an OutOfMemoryError, because
+				//     1. Cascading's BaseFlow.complete() forwards OOME's without wrapping
+				//     2. Flink's PackagedProgram.callMainMethod() forwards errors without wrapping
+				//        them in ProgramInvokationException
+				//     3. And finally, Flink's OptimizerPlanEnvironment.getOptimizedPlan errors
+				//        on ProgramInvokationException
+				return new OutOfMemoryError("Not an OutOfMemoryError. " +
+						"Used as a marker exception for OptimizerPlanEnvironment.getOptimizedPlan()");
+			}
+			//
+			catch(Exception e) {
+				// forward unexpected exception
+				return e;
+			}
+		}
+		// forward to call() if we have a regular ExecutionEnvironment
+		return super.call();
+
+	}
+
+	protected boolean isSkipFlowStep() throws IOException
+	{
+		if (env instanceof OptimizerPlanEnvironment) {
+			// We have an OptimizerPlanEnvironment.
+			//   This environment is only used to to fetch the Flink execution plan.
+			//   We do not want to execute the job in this case.
+			return true;
+		} else {
+			return super.isSkipFlowStep();
+		}
+	}
+
+	@Override
 	protected boolean isRemoteExecution() {
-		return isLocalExecution();
+		return env instanceof ContextEnvironment;
 	}
 
 	@Override
