@@ -58,7 +58,7 @@ public static void main(String[] args) {
     wcPipe = new AggregateBy( wcPipe, token, new CountBy(new Fields("count")));
 
     Tap inTap = new Hfs(new TextDelimited(text, "\n" ), args[0]);
-    Tap outTap = new Hfs(new TextDelimited(false, "\n"), args[1]);
+    Tap outTap = new Hfs(new TextDelimited(false, "\n"), args[1], SinkMode.REPLACE);
 
     FlowDef flowDef = FlowDef.flowDef().setName( "wc" )
             .addSource( docPipe, inTap )
