@@ -77,8 +77,13 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 		Tuple target = Tuple.size(from.size());
 		for (int i = 0; i < from.size(); i++) {
 			try {
-				Object copy = fieldSers[i].copy(from.getObject(i));
-				target.set(i, copy);
+				Object orig = from.getObject(i);
+				if (orig != null) {
+					target.set(i, fieldSers[i].copy(orig));
+				}
+				else {
+					target.set(i, null);
+				}
 			}
 			catch(ClassCastException cce) {
 				throw new FlowException("Unexpected type of field \""+fields.get(i)+"\" encountered. " +
@@ -95,7 +100,19 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 
 		for (int i = 0; i < from.size(); i++) {
 			try {
-				Object copy = fieldSers[i].copy(from.getObject(i), tuple.getObject(i));
+				Object fromOrig = from.getObject(i);
+				Object reuseOrig = tuple.getObject(i);
+
+				Object copy;
+				if (fromOrig == null) {
+					copy = null;
+				}
+				else if (reuseOrig != null) {
+					copy = fieldSers[i].copy(fromOrig, reuseOrig);
+				}
+				else {
+					copy = fieldSers[i].copy(fromOrig);
+				}
 				tuple.set(i, copy);
 			}
 			catch(ClassCastException cce) {

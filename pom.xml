@@ -23,7 +23,7 @@ limitations under the License.
 
 	<groupId>com.data-artisans</groupId>
 	<artifactId>cascading-flink</artifactId>
-	<version>0.1-SNAPSHOT</version>
+	<version>0.2-SNAPSHOT</version>
 
 	<name>Cascading on Flink</name>
 	<packaging>jar</packaging>
@@ -51,10 +51,13 @@ limitations under the License.
 	</developers>
 
 	<properties>
+		<!-- dependency versions -->
+		<cascading.version>3.1.0-wip-56</cascading.version>
+		<flink.version>1.0.1</flink.version>
+		<slf4j.version>1.7.7</slf4j.version>
+
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<slf4j.version>1.7.7</slf4j.version>
-		<cascading.version>3.1.0-wip-39</cascading.version>
 		<excluded.tests/>
 		<ignore.failed.tests>true</ignore.failed.tests>
 
@@ -65,21 +68,26 @@ limitations under the License.
 	</properties>
 
 	<repositories>
+
 		<repository>
 			<id>conjars.org</id>
 			<url>http://conjars.org/repo</url>
 		</repository>
 
+		<!--
 		<repository>
-			<id>flink-snapshot-repo</id>
-			<url>https://repository.apache.org/content/repositories/snapshots/</url>
+			<id>flink.release-staging</id>
+			<name>Apache Development Snapshot Repository</name>
+			<url>https://repository.apache.org/content/repositories/orgapacheflink-1063</url>
 			<releases>
-				<enabled>false</enabled>
+				<enabled>true</enabled>
 			</releases>
 			<snapshots>
-				<enabled>true</enabled>
+				<enabled>false</enabled>
 			</snapshots>
 		</repository>
+		-->
+
 	</repositories>
 
 	<distributionManagement>
@@ -99,14 +107,14 @@ limitations under the License.
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-clients</artifactId>
-			<version>0.10.0</version>
+			<artifactId>flink-clients_2.10</artifactId>
+			<version>${flink.version}</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-java</artifactId>
-			<version>0.10.0</version>
+			<version>${flink.version}</version>
 		</dependency>
 
 		<!-- CASCADING -->
@@ -432,11 +440,12 @@ limitations under the License.
 					</dependenciesToScan>
 					<excludes>
 						<exclude>${excluded.tests}</exclude>
+						<exclude>**/*TestCase.java</exclude>
 					</excludes>
 					<!--<forkCount>1C</forkCount>-->
 					<reuseForks>false</reuseForks>
 					<testFailureIgnore>${ignore.failed.tests}</testFailureIgnore>
-                    <argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
+					<argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
 				</configuration>
 			</plugin>
 
@@ -489,41 +498,6 @@ limitations under the License.
 						</configuration>
 					</execution>
 				</executions>
-			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.4.1</version>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<configuration>
-							<transformers>
-							</transformers>
-							<artifactSet>
-								<excludes>
-									<exclude>org.apache.flink:*</exclude>
-								</excludes>
-							</artifactSet>
-						</configuration>
-					</execution>
-				</executions>
-				<configuration>
-					<filters>
-						<filter>
-							<artifact>*:*</artifact>
-							<excludes>
-								<exclude>META-INF/*.SF</exclude>
-								<exclude>META-INF/*.DSA</exclude>
-								<exclude>META-INF/*.RSA</exclude>
-							</excludes>
-						</filter>
-					</filters>
-				</configuration>
 			</plugin>
 
 			<plugin>

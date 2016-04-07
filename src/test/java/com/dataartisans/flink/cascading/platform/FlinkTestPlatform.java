@@ -200,4 +200,9 @@ public class FlinkTestPlatform extends TestPlatform {
 	public boolean isDAG() {
 		return true;
 	}
+
+	@Override
+	public boolean supportsGroupByAfterMerge() {
+		return true;
+	}
 }

@@ -64,6 +64,7 @@ import com.dataartisans.flink.cascading.runtime.util.IdMapper;
 import com.dataartisans.flink.cascading.types.tuple.TupleTypeInfo;
 import com.dataartisans.flink.cascading.types.tuplearray.TupleArrayTypeInfo;
 import com.dataartisans.flink.cascading.util.FlinkConfigConverter;
+import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -73,7 +74,6 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.Operator;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
-import org.apache.flink.api.java.operators.translation.JavaPlan;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
@@ -141,7 +141,7 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		return this.env;
 	}
 
-	public JavaPlan getFlinkPlan() {
+	public Plan getFlinkPlan() {
 		return this.env.createProgramPlan();
 	}
 
@@ -377,7 +377,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Configuration sinkConfig = this.getNodeConfig(node);
 		tap.sinkConfInit(flowProcess, sinkConfig);
 
-		int dop = ((Operator)input).getParallelism();
+		int desiredDop = tap.getScheme().getNumSinkParts();
+		int dop = desiredDop > 0 ? desiredDop : ((Operator)input).getParallelism();
 
 		input
 				.output(new TapOutputFormat(node))

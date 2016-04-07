@@ -21,6 +21,8 @@ import cascading.management.state.ClientState;
 import cascading.stats.FlowNodeStats;
 import cascading.stats.FlowStepStats;
 import com.dataartisans.flink.cascading.runtime.stats.AccumulatorCache;
+import com.dataartisans.flink.cascading.util.FlinkConfigConstants;
+import org.apache.flink.api.common.ExecutionMode;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.Plan;
@@ -29,6 +31,7 @@ import org.apache.flink.api.java.LocalEnvironment;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.ContextEnvironment;
 import org.apache.flink.client.program.JobWithJars;
+import org.apache.flink.client.program.OptimizerPlanEnvironment;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.optimizer.DataStatistics;
@@ -39,6 +42,8 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.FlinkMiniCluster;
 import org.apache.flink.runtime.minicluster.LocalFlinkMiniCluster;
 import org.apache.hadoop.conf.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.io.IOException;
@@ -59,6 +64,8 @@ import java.util.concurrent.TimeoutException;
 
 public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 {
+	private static final Logger LOG = LoggerFactory.getLogger( FlinkFlowStepJob.class );
+
 	private final Configuration currentConf;
 
 	private Client client;
@@ -125,6 +132,22 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 		Plan plan = env.createProgramPlan();
 
+		// set exchange mode, BATCH is default
+		String execMode = getConfig().get(FlinkConfigConstants.EXECUTION_MODE);
+		if (execMode == null || FlinkConfigConstants.EXECUTION_MODE_BATCH.equals(execMode)) {
+			env.getConfig().setExecutionMode(ExecutionMode.BATCH);
+		}
+		else if (FlinkConfigConstants.EXECUTION_MODE_PIPELINED.equals(execMode)) {
+			env.getConfig().setExecutionMode(ExecutionMode.PIPELINED);
+		}
+		else {
+			LOG.warn("Unknow value for '" + FlinkConfigConstants.EXECUTION_MODE + "' parameter. " +
+					"Only '" + FlinkConfigConstants.EXECUTION_MODE_BATCH + "' " +
+					"or '" + FlinkConfigConstants.EXECUTION_MODE_PIPELINED + "' supported. " +
+					"Using " + FlinkConfigConstants.EXECUTION_MODE_BATCH + " exchange by default.");
+			env.getConfig().setExecutionMode(ExecutionMode.BATCH);
+		}
+
 		Optimizer optimizer = new Optimizer(new DataStatistics(), new org.apache.flink.configuration.Configuration());
 		OptimizedPlan optimizedPlan = optimizer.compile(plan);
 
@@ -149,7 +172,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			client = new Client(config);
 			client.setPrintStatusDuringExecution(env.getConfig().isSysoutLoggingEnabled());
 
-		} else {
+		} else if (isRemoteExecution()) {
 
 			flowStep.logInfo("Executing in cluster mode.");
 
@@ -162,7 +185,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			}
 
 			client = ((ContextEnvironment) env).getClient();
-
 		}
 
 		List<URL> fileList = new ArrayList<URL>(classPath.size());
@@ -232,8 +254,49 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 	}
 
 	@Override
+	public Throwable call()
+	{
+		if (env instanceof OptimizerPlanEnvironment) {
+			// We have an OptimizerPlanEnvironment.
+			//   This environment is only used to to fetch the Flink execution plan.
+			try {
+				// OptimizerPlanEnvironment does not execute but only build the execution plan.
+				env.execute("plan generation");
+			}
+			// execute() throws a ProgramAbortException if everything goes well
+			catch(OptimizerPlanEnvironment.ProgramAbortException pae) {
+				// Forward call() to get Cascading's internal job stats right.
+				//   The job will be skipped due to the overridden isSkipFlowStep method.
+				super.call();
+				// forward expected ProgramAbortException
+				return pae;
+			}
+			//
+			catch(Exception e) {
+				// forward unexpected exception
+				return e;
+			}
+		}
+		// forward to call() if we have a regular ExecutionEnvironment
+		return super.call();
+
+	}
+
+	protected boolean isSkipFlowStep() throws IOException
+	{
+		if (env instanceof OptimizerPlanEnvironment) {
+			// We have an OptimizerPlanEnvironment.
+			//   This environment is only used to to fetch the Flink execution plan.
+			//   We do not want to execute the job in this case.
+			return true;
+		} else {
+			return super.isSkipFlowStep();
+		}
+	}
+
+	@Override
 	protected boolean isRemoteExecution() {
-		return isLocalExecution();
+		return env instanceof ContextEnvironment;
 	}
 
 	@Override
