@@ -438,11 +438,12 @@ limitations under the License.
 					</dependenciesToScan>
 					<excludes>
 						<exclude>${excluded.tests}</exclude>
+						<exclude>**/*TestCase.java</exclude>
 					</excludes>
 					<!--<forkCount>1C</forkCount>-->
 					<reuseForks>false</reuseForks>
 					<testFailureIgnore>${ignore.failed.tests}</testFailureIgnore>
-                    <argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
+					<argLine>-Xmx4G -Dlog4j.configuration=file://${basedir}/tools/log4j-travis.properties</argLine>
 				</configuration>
 			</plugin>
 
