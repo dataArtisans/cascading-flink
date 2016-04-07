@@ -377,7 +377,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		Configuration sinkConfig = this.getNodeConfig(node);
 		tap.sinkConfInit(flowProcess, sinkConfig);
 
-		int dop = ((Operator)input).getParallelism();
+		int desiredDop = tap.getScheme().getNumSinkParts();
+		int dop = desiredDop > 0 ? desiredDop : ((Operator)input).getParallelism();
 
 		input
 				.output(new TapOutputFormat(node))
