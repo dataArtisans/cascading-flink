@@ -26,6 +26,7 @@ import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
 import org.apache.flink.client.program.OptimizerPlanEnvironment;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
+import riffle.process.ProcessComplete;
 import riffle.process.ProcessConfiguration;
 
 import java.io.IOException;
@@ -72,6 +73,7 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 	}
 
 	@Override
+	@ProcessComplete
 	public void complete() {
 		try {
 			super.complete();
