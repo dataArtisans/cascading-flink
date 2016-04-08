@@ -45,7 +45,9 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 	private Configuration conf;
 	private String taskId;
 
-	public FlinkFlowProcess() {}
+	public FlinkFlowProcess() {
+		this.conf = new Configuration();
+	}
 
 	public FlinkFlowProcess(Configuration conf) {
 		this.conf = conf;
