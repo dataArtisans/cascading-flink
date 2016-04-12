@@ -23,8 +23,7 @@ However, there are also a few limitations, which we are still working on, namely
 
 ## Install ##
 
-The Cascading Connector for Apache Flink does depends on Apache Flink 0.10.0 and Cascading 3.1.0 which is not released yet but available as 3.1.0-wip-39 at [Conjars](http://conjars.org/). All required dependencies are provided by including the Cascading Flink connector in your project.
-
+The latest version of the Cascading Connector for Apache Flink is version 0.2 (released on 2016-04-12). It depends on Apache Flink 1.0.1 and Cascading 3.1.0 which is not released yet but available as 3.1.0-wip-56 at [Conjars](http://conjars.org/). All required dependencies are provided by including the Cascading Flink connector in your project.
 
 The Cascading Connector for Apache Flink is available on [Maven central](http://search.maven.org/#search%7Cga%7C1%7Ccascading-flink) can be used in your project by adding the following Maven dependency:
 
@@ -32,7 +31,7 @@ The Cascading Connector for Apache Flink is available on [Maven central](http://
 <dependency>
     <groupId>com.data-artisans</groupId>
     <artifactId>cascading-flink</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
 </dependency>
 ```
 
@@ -131,7 +130,7 @@ Or on a YARN cluster:
 # Building
 
 
-To retrieve the latest development version of the Cascading Connector for Apache Flink, run the following command
+To retrieve the latest development version (0.3-SNAPSHOT) of the Cascading Connector for Apache Flink, run the following command
 
     git clone https://github.com/dataArtisans/cascading-flink.git
 
