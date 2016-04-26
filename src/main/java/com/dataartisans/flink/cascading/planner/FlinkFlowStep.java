@@ -71,7 +71,11 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.operators.GroupReduceOperator;
+import org.apache.flink.api.java.operators.JoinOperator;
 import org.apache.flink.api.java.operators.Operator;
+import org.apache.flink.api.java.operators.PartitionOperator;
+import org.apache.flink.api.java.operators.SortPartitionOperator;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -378,7 +382,27 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 		tap.sinkConfInit(flowProcess, sinkConfig);
 
 		int desiredDop = tap.getScheme().getNumSinkParts();
-		int dop = desiredDop > 0 ? desiredDop : ((Operator)input).getParallelism();
+		int inputDop = ((Operator)input).getParallelism();
+		int dop;
+
+		if (inputDop == 1) {
+			// input operators have dop 1. Probably because they perform a non-keyed reduce or coGroup
+			dop = 1;
+		}
+		else {
+			if (desiredDop > 0) {
+				// output dop explicitly set.
+				if (input instanceof GroupReduceOperator) {
+					// input is a reduce and we must preserve its sorting.
+					// we must set the desired dop also for reduce and related operators
+					adjustDopOfReduceOrCoGroup((GroupReduceOperator) input, desiredDop);
+				}
+				dop = desiredDop;
+			}
+			else {
+				dop = inputDop;
+			}
+		}
 
 		input
 				.output(new TapOutputFormat(node))
@@ -386,6 +410,51 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 				.setParallelism(dop)
 				.withParameters(FlinkConfigConverter.toFlinkConfig(sinkConfig));
 
+	}
+
+	/**
+	 * Adjusts the parallelism of a GroupReduce operator (and all associated operators) that
+	 * belongs to a Cascading GroupBy or CoGroup pipe.
+	 * This needs to be done if the result must be emitted in order and a specific sink
+	 * parallelism is requested.
+	 *
+	 * @param reduceOp The operator whose DOP needs to be adjusted
+	 * @param dop The parallelism to set
+	 */
+	private void adjustDopOfReduceOrCoGroup(GroupReduceOperator reduceOp, int dop) {
+
+		reduceOp.setParallelism(dop);
+
+		DataSet reduceInput = reduceOp.getInput();
+		if (reduceInput instanceof SortPartitionOperator) {
+			// We have a Reduce operator whose grouping keys need to be reversely ordered.
+			// This yields: input -> PartitionOperator -> SortPartitionOperator -> GroupReduceOperator.
+			// The DOPs of the PartitionOperator and SortPartitionOperator must be adjusted.
+			SortPartitionOperator sortOp = (SortPartitionOperator)reduceInput;
+			sortOp.setParallelism(dop);
+			DataSet sortInput = sortOp.getInput();
+			if (sortInput instanceof PartitionOperator) {
+				PartitionOperator partitionOp = (PartitionOperator)sortInput;
+				partitionOp.setParallelism(dop);
+			}
+		}
+		else if (reduceInput instanceof JoinOperator &&
+				((JoinOperator)reduceInput).getJoinHint() == JoinHint.REPARTITION_SORT_MERGE) {
+			// We have a CoGroup operator whose input is processed by one or more sort-merge outer joins.
+			// The DOPs of all outer joins must be adjusted.
+			JoinOperator joinOp = (JoinOperator)reduceInput;
+			while (joinOp != null && joinOp.getJoinHint() == JoinHint.REPARTITION_SORT_MERGE) {
+
+				joinOp.setParallelism(dop);
+				DataSet leftJoinInput = joinOp.getInput1();
+				if (leftJoinInput instanceof JoinOperator) {
+					joinOp = (JoinOperator)leftJoinInput;
+				}
+				else {
+					joinOp = null;
+				}
+			}
+		}
 	}
 
 
