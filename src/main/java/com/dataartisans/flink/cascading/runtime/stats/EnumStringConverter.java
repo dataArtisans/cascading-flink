@@ -22,7 +22,13 @@ public class EnumStringConverter {
 		return e.getDeclaringClass().getName();
 	}
 
-	public static String enumToKey(Enum e) {
+	/**
+	 * Convert an Enum to the counter portion of its name.
+	 * 
+	 * @param e
+	 * @return
+	 */
+	public static String enumToCounter(Enum e) {
 		return e.name();
 	}
 
@@ -40,6 +46,10 @@ public class EnumStringConverter {
 
 	public static String groupCounterToGroup(String groupKey) {
 		return groupKey.split("->")[0];
+	}
+
+	public static String groupCounterToCounter(String groupKey) {
+		return groupKey.split("->")[1];
 	}
 
 }

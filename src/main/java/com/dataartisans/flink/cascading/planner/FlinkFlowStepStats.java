@@ -81,15 +81,16 @@ public class FlinkFlowStepStats extends FlowStepStats {
 
 		for (String key : currentAccumulators.keySet()) {
 			if (EnumStringConverter.accInGroup(group, key)) {
-				result.add(key);
+				result.add(EnumStringConverter.groupCounterToCounter(key));
 			}
 		}
+		
 		return result;
 	}
 
 	@Override
 	public long getCounterValue(Enum counter) {
-		return getCounterValue(EnumStringConverter.enumToGroup(counter), EnumStringConverter.enumToKey(counter));
+		return getCounterValue(EnumStringConverter.enumToGroup(counter), EnumStringConverter.enumToCounter(counter));
 	}
 
 	@Override
