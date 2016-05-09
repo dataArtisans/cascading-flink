@@ -119,7 +119,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public void increment(Enum e, long l) {
-		increment(EnumStringConverter.enumToGroup(e), EnumStringConverter.enumToKey(e), l);
+		increment(EnumStringConverter.enumToGroup(e), EnumStringConverter.enumToCounter(e), l);
 	}
 
 	@Override
@@ -132,7 +132,7 @@ public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	@Override
 	public long getCounterValue(Enum e) {
-		return getCounterValue(EnumStringConverter.enumToGroup(e), EnumStringConverter.enumToKey(e));
+		return getCounterValue(EnumStringConverter.enumToGroup(e), EnumStringConverter.enumToCounter(e));
 	}
 
 	@Override

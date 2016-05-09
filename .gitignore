@@ -4,4 +4,12 @@ target/*
 .idea
 .idea/*
 build
+build.log
 build/*
+bin/
+
+# Eclipse
+
+.classpath
+.settings
+.project
