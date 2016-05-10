@@ -1,7 +1,17 @@
+# Maven
 target
 target/*
+
+# IntelliJ
 *.iml
 .idea
 .idea/*
 build
+build.log
 build/*
+bin/
+
+# Eclipse
+.classpath
+.settings
+.project
