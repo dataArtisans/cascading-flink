@@ -130,7 +130,7 @@ Or on a YARN cluster:
 # Building
 
 
-To retrieve the latest development version (0.3-SNAPSHOT) of the Cascading Connector for Apache Flink, run the following command
+To retrieve the latest development version (0.3.0-SNAPSHOT) of the Cascading Connector for Apache Flink, run the following command
 
     git clone https://github.com/dataArtisans/cascading-flink.git
 
