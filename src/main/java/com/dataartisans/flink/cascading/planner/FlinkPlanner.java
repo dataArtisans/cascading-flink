@@ -79,7 +79,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	@Override
 	public PlatformInfo getPlatformInfo() {
-		return new PlatformInfo("Apache Flink", "data Artisans GmbH", "0.1");
+		return new PlatformInfo("Apache Flink", "data Artisans GmbH", "${project.version}");
 	}
 
 	@Override
