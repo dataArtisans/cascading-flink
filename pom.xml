@@ -52,7 +52,7 @@ limitations under the License.
 
 	<properties>
 		<!-- dependency versions -->
-		<cascading.version>3.1.0-wip-60</cascading.version>
+		<cascading.version>3.1.0</cascading.version>
 		<flink.version>1.0.3</flink.version>
 		<slf4j.version>1.7.7</slf4j.version>
 
