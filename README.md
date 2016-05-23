@@ -25,6 +25,8 @@ However, there are also a few limitations, which we are still working on, namely
 
 The latest version of the Cascading Connector for Apache Flink is version 0.2 (released on 2016-04-12). It depends on Apache Flink 1.0.1 and Cascading 3.1.0 which is not released yet but available as 3.1.0-wip-56 at [Conjars](http://conjars.org/). All required dependencies are provided by including the Cascading Flink connector in your project.
 
+The upcoming 0.3.0 release depends on Cascading 3.1.0 final release.
+
 The Cascading Connector for Apache Flink is available on [Maven central](http://search.maven.org/#search%7Cga%7C1%7Ccascading-flink) can be used in your project by adding the following Maven dependency:
 
 ```java
