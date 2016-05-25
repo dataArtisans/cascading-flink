@@ -28,6 +28,7 @@ import cascading.flow.planner.process.FlowNodeGraph;
 import cascading.flow.planner.process.FlowStepFactory;
 import cascading.flow.planner.rule.RuleRegistry;
 import cascading.tap.Tap;
+import com.dataartisans.flink.cascading.util.Version;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.client.CliFrontend;
 import org.apache.flink.configuration.ConfigConstants;
@@ -79,7 +80,7 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	@Override
 	public PlatformInfo getPlatformInfo() {
-		return new PlatformInfo("Apache Flink", "data Artisans GmbH", "0.1");
+		return Version.getPlatformInfo();
 	}
 
 	@Override
