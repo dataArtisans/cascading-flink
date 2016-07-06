@@ -1,19 +1,19 @@
-# Cascading Connector for Apache Flink
+# Cascading Connector for Apache Flink™
 
-[Cascading](http://www.cascading.org/projects/cascading) is a popular framework to develop, maintain, and execute large-scale and robust data analysis applications. Originally, Cascading flows have been executed on [Apache Hadoop](http://hadoop.apache.org). Cascading's [3.0 release](http://www.cascading.org/2015/06/08/cascading-3-0-release) added support for [Apache Tez](http://tez.apache.org) as a runtime backend.
+[Cascading](http://www.cascading.org/projects/cascading) is a popular framework to develop, maintain, and execute large-scale and robust data analysis applications. Originally, Cascading flows have been executed on [Apache Hadoop®](http://hadoop.apache.org). Cascading's [3.0 release](http://www.cascading.org/2015/06/08/cascading-3-0-release) added support for [Apache Tez™](http://tez.apache.org) as a runtime backend.
 
-[Apache Flink](http://flink.apache.org) is a platform for scalable stream and batch processing. Flink's execution engine features low-latency pipelined and scalable batched data transfers and high-performance, in-memory operators for sorting and joining that gracefully go out-of-core in case of scarce memory resources. Flink can execute programs on a local machine, in a dedicated cluster, or on Hadoop YARN setups.
+[Apache Flink™](http://flink.apache.org) is a platform for scalable stream and batch processing. Flink's execution engine features low-latency pipelined and scalable batched data transfers and high-performance, in-memory operators for sorting and joining that gracefully go out-of-core in case of scarce memory resources. Flink can execute programs on a local machine, in a dedicated cluster, or on Hadoop YARN setups.
 
-The **Cascading Connector for Apache Flink** enables you to execute Cascading flows on Apache Flink. Using this connector, your Cascading flows will benefit from Flink's runtime features such as its pipelined data shuffles and its efficient and robust in-memory operators.
+The **Cascading Connector for Apache Flink™** enables you to execute Cascading flows on Apache Flink™. Using this connector, your Cascading flows will benefit from Flink's runtime features such as its pipelined data shuffles and its efficient and robust in-memory operators.
 
 **Please report any problems with the Cascading on Flink Connector by opening an [issue](https://github.com/dataArtisans/cascading-flink/issues).**
 
 ## Features & Limitations ##
 
-The Cascading Connector for Apache Flink supports most Cascading and Flink features. 
+The Cascading Connector for Apache Flink™ supports most Cascading and Flink features. 
 
 - All Cascading operators (except for BufferJoins) are directly executed on Flink's memory-safe operators. This significantly reduces the need for cumbersome parameter tuning such as spill thresholds and the risk for `OutOfMemoryErrors`.
-- Flink's runtime leverages field type information of Cascading programs. Apache Flink uses specialized serializers and comparators to efficiently operate on binary data. Cascading flows that specify the type of key fields benefit from significant performance improvements.
+- Flink's runtime leverages field type information of Cascading programs. Apache Flink™ uses specialized serializers and comparators to efficiently operate on binary data. Cascading flows that specify the type of key fields benefit from significant performance improvements.
 - Supports all execution modes of Apache Flink, i.e., local, cluster, YARN, and in-IDE debugging.
 - Supports all Cascading Hadoop Taps and Schemes. Local Taps and Schemes are not supported, but Hadoop Taps support reading from local file systems.
 
@@ -23,9 +23,9 @@ However, there are also a few limitations, which we are still working on, namely
 
 ## Install ##
 
-The latest version of the Cascading Connector for Apache Flink is version 0.3.0 (released on 2016-05-26). It depends on Apache Flink 1.0.3 and Cascading 3.1.0. All required dependencies are provided by including the Cascading Flink connector in your project.
+The latest version of the Cascading Connector for Apache Flink™ is version 0.3.0 (released on 2016-05-26). It depends on Apache Flink™ 1.0.3 and Cascading 3.1.0. All required dependencies are provided by including the Cascading Flink connector in your project.
 
-The Cascading Connector for Apache Flink is available on [Maven central](http://search.maven.org/#search%7Cga%7C1%7Ccascading-flink) can be used in your project by adding the following Maven dependency:
+The Cascading Connector for Apache Flink™ is available on [Maven central](http://search.maven.org/#search%7Cga%7C1%7Ccascading-flink) can be used in your project by adding the following Maven dependency:
 
 ```java
 <dependency>
@@ -38,7 +38,7 @@ The Cascading Connector for Apache Flink is available on [Maven central](http://
 ## WordCount Example
 
 Next, let's run the classic WordCount example. Before running it in our ETL pipeline on the cluster,
-we want to run it locally first. The Cascading Connector for Apache Flink contains a built-in local execution mode to test
+we want to run it locally first. The Cascading Connector for Apache Flink™ contains a built-in local execution mode to test
 your applications before deploying them.
 
 Here is the main method of our WordCount example:
@@ -85,7 +85,7 @@ Then let's run the included WordCount locally on your machine:
 
     mvn exec:exec -Dinput=kinglear.txt -Doutput=wordcounts.txt
 
-Congratulations! You have run your first Cascading application on top of Apache Flink.
+Congratulations! You have run your first Cascading application on top of Apache Flink™.
 
 ## Cluster Execution
 
@@ -130,11 +130,16 @@ Or on a YARN cluster:
 # Building
 
 
-To retrieve the latest development version (0.4.0-SNAPSHOT) of the Cascading Connector for Apache Flink, run the following command
+To retrieve the latest development version (0.4.0-SNAPSHOT) of the Cascading Connector for Apache Flink™, run the following command
 
     git clone https://github.com/dataArtisans/cascading-flink.git
 
-Then switch to the newly created directory and run Maven to build the Cascading Connector for Apache Flink:
+Then switch to the newly created directory and run Maven to build the Cascading Connector for Apache Flink™:
 
     cd cascading-flink
     mvn clean install -DskipTests
+
+
+# Disclaimer
+
+Apache®, Apache Hadoop, Hadoop®, Apache Flink, Flink™, Apache Tez, Tez™, the yellow elephant logo and the squirrel logo are either registered trademarks or trademarks of the [Apache Software Foundation](http://apache.org) in the United States and/or other countries.
