@@ -33,7 +33,7 @@ public class JoinBoundaryInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[
 	}
 
 	@Override
-	public void receive(Duct previous, Void v) {
+	public void receive(Duct previous, int ordinal, Void v) {
 		throw new UnsupportedOperationException( "use run() instead" );
 	}
 
@@ -65,6 +65,6 @@ public class JoinBoundaryInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[
 		flowProcess.increment( StepCounters.Tuples_Read, 1 );
 		flowProcess.increment( SliceCounters.Tuples_Read, 1 );
 
-		next.receive(this, joinInputTuples);
+		next.receive(this, 0, joinInputTuples);
 	}
 }

@@ -40,7 +40,7 @@ public class BoundaryOutStage extends ElementStage<TupleEntry, Void> implements 
 	}
 
 	@Override
-	public void receive(Duct previous, TupleEntry tupleEntry) {
+	public void receive(Duct previous, int ordinal, TupleEntry tupleEntry) {
 		this.tupleCollector.collect(tupleEntry.getTuple());
 	}
 

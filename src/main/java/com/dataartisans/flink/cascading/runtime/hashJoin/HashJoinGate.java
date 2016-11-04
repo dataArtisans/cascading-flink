@@ -77,14 +77,14 @@ public class HashJoinGate extends SpliceGate<Tuple2<Tuple, Tuple[]>, TupleEntry>
 	}
 
 	@Override
-	public void receive(Duct previous, Tuple2<Tuple, Tuple[]> t) {
+	public void receive(Duct previous, int ordinal, Tuple2<Tuple, Tuple[]> t) {
 
 		closure.reset(t);
 
 		entryIterator.reset(joiner.getIterator(closure));
 
 		while(entryIterator.hasNext()) {
-			next.receive(this, entryIterator.next());
+			next.receive(this, ordinal, entryIterator.next());
 		}
 
 	}

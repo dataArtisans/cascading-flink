@@ -48,10 +48,6 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 		if( role != IORole.sink ) {
 			next = getNextFor(streamGraph);
 		}
-
-		if( role == IORole.sink ) {
-			setOrdinalMap(streamGraph);
-		}
 	}
 
 
@@ -97,7 +93,7 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 		}
 	}
 
-	public void receive( Duct previous, TupleEntry incomingEntry ) {
+	public void receive( Duct previous, int ordinal, TupleEntry incomingEntry ) {
 		throw new UnsupportedOperationException("Receive not implemented for CoGroupInGate.");
 	}
 
@@ -118,7 +114,7 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 		tupleEntryIterator.reset(resultIterator);
 		keyEntry.setTuple( this.closure.getGroupTuple(null) );
 
-		next.receive( this, grouping );
+		next.receive( this, 0, grouping );
 	}
 
 	@Override

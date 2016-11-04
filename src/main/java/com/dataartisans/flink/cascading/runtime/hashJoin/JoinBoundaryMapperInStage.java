@@ -37,7 +37,7 @@ public class JoinBoundaryMapperInStage extends ElementStage<Void, Tuple2<Tuple, 
 	}
 
 	@Override
-	public void receive(Duct previous, Void v) {
+	public void receive(Duct previous, int ordinal, Void v) {
 		throw new UnsupportedOperationException( "use run() instead" );
 	}
 
@@ -73,7 +73,7 @@ public class JoinBoundaryMapperInStage extends ElementStage<Void, Tuple2<Tuple, 
 				continue;
 			}
 
-			next.receive( this, joinListTuple );
+			next.receive( this, 0, joinListTuple );
 
 		}
 

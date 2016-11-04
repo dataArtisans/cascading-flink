@@ -50,10 +50,6 @@ public class CoGroupBufferInGate extends GroupingSpliceGate implements InputSour
 		if( role != IORole.sink ) {
 			next = getNextFor(streamGraph);
 		}
-
-		if( role == IORole.sink ) {
-			setOrdinalMap(streamGraph);
-		}
 	}
 
 
@@ -81,7 +77,7 @@ public class CoGroupBufferInGate extends GroupingSpliceGate implements InputSour
 		}
 	}
 
-	public void receive( Duct previous, TupleEntry incomingEntry ) {
+	public void receive( Duct previous, int ordinal, TupleEntry incomingEntry ) {
 		throw new UnsupportedOperationException("Receive not implemented for CoGroupBufferInGate.");
 	}
 
@@ -107,7 +103,7 @@ public class CoGroupBufferInGate extends GroupingSpliceGate implements InputSour
 
 		keyEntry.setTuple( this.closure.getGroupTuple(key) );
 
-		next.receive( this, grouping );
+		next.receive( this, 0, grouping );
 	}
 
 	@Override

@@ -34,7 +34,7 @@ public class SingleOutBoundaryStage extends ElementStage<TupleEntry, Void> {
 	}
 
 	@Override
-	public void receive(Duct prev, TupleEntry entry) {
+	public void receive(Duct prev, int ordinal, TupleEntry entry) {
 		
 		if(this.nextTuple == null) {
 			this.nextTuple = entry.getTuple();

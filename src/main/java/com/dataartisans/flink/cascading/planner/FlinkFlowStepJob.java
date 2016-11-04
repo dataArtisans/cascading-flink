@@ -28,10 +28,11 @@ import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.LocalEnvironment;
-import org.apache.flink.client.program.Client;
+import org.apache.flink.client.program.ClusterClient;
+import org.apache.flink.client.program.OptimizerPlanEnvironment;
+import org.apache.flink.client.program.StandaloneClusterClient;
 import org.apache.flink.client.program.ContextEnvironment;
 import org.apache.flink.client.program.JobWithJars;
-import org.apache.flink.client.program.OptimizerPlanEnvironment;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.optimizer.DataStatistics;
@@ -68,7 +69,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 
 	private final Configuration currentConf;
 
-	private Client client;
+	private ClusterClient client;
 
 	private JobID jobID;
 	private Throwable jobException;
@@ -169,7 +170,20 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 			org.apache.flink.configuration.Configuration config = new org.apache.flink.configuration.Configuration();
 			config.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, localCluster.hostname());
 
-			client = new Client(config);
+			final org.apache.flink.configuration.Configuration tmpConfig = localCluster.generateConfiguration(localCluster.configuration());
+
+			final int resourceManagerPort = tmpConfig.getInteger(
+					ConfigConstants.RESOURCE_MANAGER_IPC_PORT_KEY,
+					ConfigConstants.DEFAULT_RESOURCE_MANAGER_IPC_PORT);
+
+			final int jobManagerPort = tmpConfig
+					.getInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY, ConfigConstants.DEFAULT_JOB_MANAGER_IPC_PORT);
+
+			config.setInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY, jobManagerPort);
+
+			flowStep.logWarn("Using local cluster at " + localCluster.hostname() + " RM port: " + resourceManagerPort + " JM port: " + jobManagerPort);
+
+			client = new StandaloneClusterClient(config);
 			client.setPrintStatusDuringExecution(env.getConfig().isSysoutLoggingEnabled());
 
 		} else if (isRemoteExecution()) {
@@ -206,7 +220,7 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration>
 		final Callable<JobSubmissionResult> callable = new Callable<JobSubmissionResult>() {
 				@Override
 				public JobSubmissionResult call() throws Exception {
-					return client.runBlocking(jobGraph, loader);
+					return client.run(jobGraph, loader);
 				}
 			};
 

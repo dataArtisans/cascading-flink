@@ -18,7 +18,7 @@ package com.dataartisans.flink.cascading.runtime.stats;
 
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.client.program.Client;
+import org.apache.flink.client.program.ClusterClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +31,7 @@ public class AccumulatorCache {
 
 	private JobID jobID;
 
-	private Client client;
+	private ClusterClient client;
 
 	private volatile Map<String, Object> currentAccumulators = Collections.emptyMap();
 
@@ -80,7 +80,7 @@ public class AccumulatorCache {
 		this.jobID = jobID;
 	}
 
-	public void setClient(Client client) {
+	public void setClient(ClusterClient client) {
 		this.client = client;
 	}
 
