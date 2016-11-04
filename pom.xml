@@ -204,14 +204,7 @@ limitations under the License.
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
-
-		<dependency>
-			<groupId>com.codahale.metrics</groupId>
-			<artifactId>metrics-core</artifactId>
-			<version>3.0.2</version>
-			<type>jar</type>
-		</dependency>
-
+		
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-all</artifactId>
