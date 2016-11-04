@@ -46,6 +46,7 @@ import com.dataartisans.flink.cascading.planner.rules.BoundaryBeforeMergeTransfo
 import com.dataartisans.flink.cascading.planner.rules.BoundaryAfterSourceTapTransformer;
 import com.dataartisans.flink.cascading.planner.rules.DoubleBoundaryRemovalTransformer;
 import com.dataartisans.flink.cascading.planner.rules.TopDownSplitBoundariesNodePartitioner;
+import org.apache.flink.api.java.ExecutionEnvironment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,12 +57,20 @@ public class FlinkConnector extends FlowConnector {
 
 	List<String> classPath = new ArrayList<String>();
 
+	private ExecutionEnvironment env;
+
 	public FlinkConnector() {
 		this(new Properties());
 	}
 
 	public FlinkConnector(Map<Object, Object> properties) {
+		this(ExecutionEnvironment.getExecutionEnvironment(), properties);
+	}
+
+	public FlinkConnector(ExecutionEnvironment env, Map<Object, Object> properties) {
+
 		super(properties);
+		this.env = env;
 	}
 
 	@Override
@@ -71,7 +80,7 @@ public class FlinkConnector extends FlowConnector {
 
 	@Override
 	protected FlowPlanner createFlowPlanner() {
-		return new FlinkPlanner(classPath);
+		return new FlinkPlanner(env, classPath);
 	}
 
 	@Override

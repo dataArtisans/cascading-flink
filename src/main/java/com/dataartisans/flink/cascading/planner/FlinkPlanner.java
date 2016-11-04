@@ -47,15 +47,19 @@ public class FlinkPlanner extends FlowPlanner<FlinkFlow, Configuration> {
 
 	private List<String> classPath;
 
-	private ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+	private ExecutionEnvironment env;
 
-	public FlinkPlanner(List<String> classPath) {
+	public FlinkPlanner(List<String> classPath) { this(ExecutionEnvironment.getExecutionEnvironment(), classPath); }
+
+	public FlinkPlanner(ExecutionEnvironment env, List<String> classPath) {
 		super();
+		this.env = env;
 		this.classPath = classPath;
 
 		env.getConfig().disableSysoutLogging();
 		if (env.getParallelism() <= 0) {
 			// load the default parallelism from config
+
 			GlobalConfiguration.loadConfiguration(new File(CliFrontend.getConfigurationDirectoryFromEnv()).getAbsolutePath());
 			org.apache.flink.configuration.Configuration configuration = GlobalConfiguration.getConfiguration();
 			int parallelism = configuration.getInteger(ConfigConstants.DEFAULT_PARALLELISM_KEY, -1);
