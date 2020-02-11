@@ -54,7 +54,7 @@ public class SinkBoundaryInStage extends ElementStage<Void, TupleEntry> implemen
 	}
 
 	@Override
-	public void receive(Duct previous, Void v) {
+	public void receive(Duct previous, int ordinal, Void v) {
 		throw new UnsupportedOperationException( "use run() instead" );
 	}
 
@@ -82,7 +82,7 @@ public class SinkBoundaryInStage extends ElementStage<Void, TupleEntry> implemen
 			handleException(new DuctException("internal error", throwable), null);
 		}
 
-		next.receive( this, tupleEntry );
+		next.receive( this, 0, tupleEntry );
 
 	}
 }

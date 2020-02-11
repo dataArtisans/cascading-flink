@@ -52,8 +52,8 @@ limitations under the License.
 
 	<properties>
 		<!-- dependency versions -->
-		<cascading.version>3.1.0</cascading.version>
-		<flink.version>1.0.3</flink.version>
+		<cascading.version>3.2.0-wip-6</cascading.version>
+		<flink.version>1.1.3</flink.version>
 		<slf4j.version>1.7.7</slf4j.version>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -204,14 +204,7 @@ limitations under the License.
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
-
-		<dependency>
-			<groupId>com.codahale.metrics</groupId>
-			<artifactId>metrics-core</artifactId>
-			<version>3.0.2</version>
-			<type>jar</type>
-		</dependency>
-
+		
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-all</artifactId>

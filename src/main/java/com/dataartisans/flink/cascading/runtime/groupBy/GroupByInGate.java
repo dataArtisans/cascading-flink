@@ -49,10 +49,6 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 		if( role != IORole.sink ) {
 			next = getNextFor(streamGraph);
 		}
-
-		if( role == IORole.sink ) {
-			setOrdinalMap(streamGraph);
-		}
 	}
 
 
@@ -80,7 +76,7 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 		}
 	}
 
-	public void receive( Duct previous, TupleEntry incomingEntry ) {
+	public void receive( Duct previous, int ordinal, TupleEntry incomingEntry ) {
 		throw new UnsupportedOperationException("Receive not implemented for GroupByInGate.");
 	}
 
@@ -110,7 +106,7 @@ public class GroupByInGate extends GroupingSpliceGate implements InputSource {
 		Tuple groupTuple = keyPeekingIt.peekNextKey();
 		keyEntry.setTuple( groupTuple );
 
-		next.receive( this, grouping );
+		next.receive( this, 0, grouping );
 
 	}
 

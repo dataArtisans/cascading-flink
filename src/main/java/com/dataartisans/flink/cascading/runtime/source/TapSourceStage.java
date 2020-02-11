@@ -86,7 +86,7 @@ public class TapSourceStage extends SourceStage {
 					continue;
 				}
 
-				next.receive(this, tupleEntry);
+				next.receive(this, 0, tupleEntry);
 				hasNext = true;
 				break;
 			}

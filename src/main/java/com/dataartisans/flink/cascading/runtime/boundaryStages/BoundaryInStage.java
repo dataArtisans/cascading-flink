@@ -37,7 +37,7 @@ public class BoundaryInStage extends ElementStage<Void, TupleEntry> implements I
 	}
 
 	@Override
-	public void receive(Duct previous, Void v) {
+	public void receive(Duct previous, int ordinal, Void v) {
 		throw new UnsupportedOperationException( "use run() instead" );
 	}
 
@@ -80,7 +80,7 @@ public class BoundaryInStage extends ElementStage<Void, TupleEntry> implements I
 				continue;
 			}
 
-			next.receive( this, tupleEntry );
+			next.receive( this, 0, tupleEntry );
 
 		}
 
