@@ -22,9 +22,9 @@ import org.apache.flink.api.java.tuple.Tuple3;
 
 public class BufferJoinKeyExtractor implements MapFunction<Tuple, Tuple3<Tuple, Integer, Tuple>> {
 
-	private int[] keyPos;
-	private Tuple3<Tuple, Integer, Tuple> outT;
-	private Tuple defaultKey = new Tuple(1);
+	private final int[] keyPos;
+	private final Tuple3<Tuple, Integer, Tuple> outT;
+	private final Tuple defaultKey = new Tuple(1);
 
 	public BufferJoinKeyExtractor(int inputId, int[] keyPos) {
 		this.keyPos = keyPos;

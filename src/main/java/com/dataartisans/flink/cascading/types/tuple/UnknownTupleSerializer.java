@@ -18,6 +18,7 @@ package com.dataartisans.flink.cascading.types.tuple;
 
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
@@ -201,7 +202,12 @@ public class UnknownTupleSerializer extends TypeSerializer<Tuple> {
 		return this.fieldSer.hashCode();
 	}
 
+	// TODO: address checkpoint serailization
 	@Override
+	public TypeSerializerSnapshot<Tuple> snapshotConfiguration() {
+		return null;
+	}
+
 	public boolean canEqual(Object obj) {
 		return obj instanceof UnknownTupleSerializer;
 	}

@@ -33,7 +33,7 @@ public class TapSourceStage extends SourceStage {
 
 	private static final Logger LOG = LoggerFactory.getLogger(TapSourceStage.class);
 
-	private Tap source;
+	private final Tap source;
 	private TupleEntryIterator iterator;
 
 	public TapSourceStage(FlowProcess flowProcess, Tap tap) {

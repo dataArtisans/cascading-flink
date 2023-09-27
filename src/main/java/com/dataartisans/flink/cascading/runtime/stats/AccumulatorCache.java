@@ -18,7 +18,8 @@ package com.dataartisans.flink.cascading.runtime.stats;
 
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.client.program.Client;
+import org.apache.flink.client.program.MiniClusterClient;
+import org.apache.flink.core.execution.JobClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +32,7 @@ public class AccumulatorCache {
 
 	private JobID jobID;
 
-	private Client client;
+	private JobClient client;
 
 	private volatile Map<String, Object> currentAccumulators = Collections.emptyMap();
 
@@ -39,7 +40,7 @@ public class AccumulatorCache {
 	private long lastUpdateTime;
 
 	public AccumulatorCache(int updateIntervalSecs) {
-		this.updateIntervalMillis = updateIntervalSecs * 1000;
+		this.updateIntervalMillis = updateIntervalSecs * 1000L;
 	}
 
 	public void update() {
@@ -53,35 +54,25 @@ public class AccumulatorCache {
 			return;
 		}
 
-		if (jobID == null) {
-			return;
-		}
-
 		if (client != null) {
 
 			try {
-				currentAccumulators = client.getAccumulators(jobID);
+				currentAccumulators = client.getAccumulators().get();
 				lastUpdateTime = currentTime;
 
 				LOG.debug("Updated accumulators: {}", currentAccumulators);
 			} catch (Exception e) {
 				LOG.error("Failed to fetch accumulators for job {}.", jobID);
 			}
-
 		}
-
 	}
 
 	public Map<String, Object> getCurrentAccumulators() {
 		return currentAccumulators;
 	}
-
-	public void setJobID(JobID jobID) {
-		this.jobID = jobID;
-	}
-
-	public void setClient(Client client) {
+	public void setClient(JobClient client) {
 		this.client = client;
+		if(client != null) this.jobID = client.getJobID();
 	}
 
 	public long getLastUpdateTime() {

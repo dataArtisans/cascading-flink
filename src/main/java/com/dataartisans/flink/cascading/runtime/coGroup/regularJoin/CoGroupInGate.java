@@ -133,8 +133,8 @@ public class CoGroupInGate extends GroupingSpliceGate implements InputSource {
 
 		private Iterator<Tuple2<Tuple, Tuple[]>> input;
 
-		private JoinClosure closure;
-		private Joiner joiner;
+		private final JoinClosure closure;
+		private final Joiner joiner;
 
 		private Iterator<Tuple> joinedTuples;
 

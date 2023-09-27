@@ -62,8 +62,8 @@ public class JoinBoundaryInStage extends ElementStage<Void, Tuple2<Tuple, Tuple[
 			throw new RuntimeException("JoinBoundaryInStage expects Tuple2<Tuple, Tuple[]>", cce);
 		}
 
-		flowProcess.increment( StepCounters.Tuples_Read, 1 );
-		flowProcess.increment( SliceCounters.Tuples_Read, 1 );
+		//flowProcess.increment( StepCounters.Tuples_Read, 1 );
+		//flowProcess.increment( SliceCounters.Tuples_Read, 1 );
 
 		next.receive(this, joinInputTuples);
 	}

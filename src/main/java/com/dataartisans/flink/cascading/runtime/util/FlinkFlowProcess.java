@@ -42,7 +42,7 @@ import java.util.Set;
 public class FlinkFlowProcess extends FlowProcess<Configuration> {
 
 	private transient RuntimeContext runtimeContext;
-	private Configuration conf;
+	private final Configuration conf;
 	private String taskId;
 
 	public FlinkFlowProcess() {

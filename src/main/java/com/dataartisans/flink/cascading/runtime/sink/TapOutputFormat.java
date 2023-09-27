@@ -47,7 +47,7 @@ public class TapOutputFormat extends RichOutputFormat<Tuple> implements Finalize
 
 	private static final Logger LOG = LoggerFactory.getLogger(TapOutputFormat.class);
 
-	private FlowNode flowNode;
+	private final FlowNode flowNode;
 
 	private transient org.apache.hadoop.conf.Configuration config;
 	private transient FlinkFlowProcess flowProcess;

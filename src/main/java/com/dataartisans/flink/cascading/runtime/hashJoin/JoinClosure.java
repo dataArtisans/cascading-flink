@@ -99,7 +99,7 @@ public class JoinClosure extends JoinerClosure {
 
 		return new TupleBuilder()
 		{
-			Tuple result = TupleViews.createComposite(fields);
+			final Tuple result = TupleViews.createComposite(fields);
 
 			@Override
 			public Tuple makeResult( Tuple[] tuples )

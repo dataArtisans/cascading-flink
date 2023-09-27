@@ -29,7 +29,7 @@ import cascading.tap.Tap;
 
 public class SourceStreamGraph extends NodeStreamGraph {
 
-	private TapSourceStage sourceStage;
+	private final TapSourceStage sourceStage;
 	private SingleOutBoundaryStage sinkStage;
 
 	public SourceStreamGraph(FlowProcess flowProcess, FlowNode node, Tap tap) {

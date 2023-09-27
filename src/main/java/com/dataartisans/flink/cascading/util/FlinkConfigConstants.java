@@ -18,8 +18,16 @@ package com.dataartisans.flink.cascading.util;
 
 public class FlinkConfigConstants {
 
-	public static final String EXECUTION_MODE = "flink.executionMode";
-	public static final String EXECUTION_MODE_BATCH = "BATCH";
-	public static final String EXECUTION_MODE_PIPELINED = "PIPELINED";
+    public static final String EXECUTION_MODE = "flink.executionMode";
+    public static final String EXECUTION_MODE_BATCH = "BATCH";
+    public static final String EXECUTION_MODE_PIPELINED = "PIPELINED";
+
+    public static final String PIPELINE_CLASSPATHS = "pipeline.classpaths";
+
+    public static final String LEAK_CLASSLOADER_CHECK = "classloader.check-leaked-classloader";
+
+    public static final String NETWORK_MEMORY_MIN = "taskmanager.memory.network.min";
+
+    public static final String TASKMANAGER_MEMORY_MANAGED_SIZE = "taskmanager.memory.managed.size";
 
 }

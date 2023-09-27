@@ -30,7 +30,7 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 
 	private final boolean ascending;
 	private final Class<T> type;
-	private TypeSerializer<T> serializer;
+	private final TypeSerializer<T> serializer;
 
 	private transient T ref;
 
@@ -59,12 +59,7 @@ public class FieldComparator<T extends Comparable<T>> extends TypeComparator<T> 
 		if(t != null && ref != null) {
 			return t.equals(this.ref);
 		}
-		else if(t == null && ref == null) {
-			return true;
-		}
-		else {
-			return false;
-		}
+		else return t == null && ref == null;
 	}
 
 	@Override

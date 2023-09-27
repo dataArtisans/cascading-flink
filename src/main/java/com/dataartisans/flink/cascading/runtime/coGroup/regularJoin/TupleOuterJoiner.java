@@ -24,11 +24,11 @@ import org.apache.flink.configuration.Configuration;
 
 public class TupleOuterJoiner extends RichJoinFunction<Tuple, Tuple, Tuple2<Tuple, Tuple[]>> {
 
-	private int tupleListSize;
-	private Fields inputFieldsLeft;
-	private Fields keyFieldsLeft;
-	private Fields inputFieldsRight;
-	private Fields keyFieldsRight;
+	private final int tupleListSize;
+	private final Fields inputFieldsLeft;
+	private final Fields keyFieldsLeft;
+	private final Fields inputFieldsRight;
+	private final Fields keyFieldsRight;
 
 	private transient Tuple2<Tuple, Tuple[]> outT;
 

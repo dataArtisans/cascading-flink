@@ -19,6 +19,7 @@ package com.dataartisans.flink.cascading.types.tuplearray;
 import cascading.tuple.Tuple;
 import com.dataartisans.flink.cascading.types.tuple.NullMaskSerDeUtils;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
@@ -177,6 +178,10 @@ public class TupleArraySerializer extends TypeSerializer<Tuple[]> {
 	}
 
 	@Override
+	public TypeSerializerSnapshot<Tuple[]> snapshotConfiguration() {
+		return null;
+	}
+
 	public boolean canEqual(Object obj) {
 		return obj instanceof TupleArraySerializer;
 	}

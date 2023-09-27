@@ -49,6 +49,8 @@ import com.dataartisans.flink.cascading.runtime.coGroup.bufferJoin.CoGroupBuffer
 import com.dataartisans.flink.cascading.runtime.coGroup.regularJoin.CoGroupReducer;
 import com.dataartisans.flink.cascading.runtime.coGroup.regularJoin.TupleAppendOuterJoiner;
 import com.dataartisans.flink.cascading.runtime.coGroup.regularJoin.TupleOuterJoiner;
+import com.dataartisans.flink.cascading.runtime.each.EachMapper;
+import com.dataartisans.flink.cascading.runtime.groupBy.GroupByReducer;
 import com.dataartisans.flink.cascading.runtime.groupBy.GroupByReducer;
 import com.dataartisans.flink.cascading.runtime.hashJoin.NaryHashJoinJoiner;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
@@ -57,9 +59,9 @@ import com.dataartisans.flink.cascading.runtime.hashJoin.JoinPrepareMapper;
 import com.dataartisans.flink.cascading.runtime.hashJoin.TupleAppendCrosser;
 import com.dataartisans.flink.cascading.runtime.hashJoin.TupleAppendJoiner;
 import com.dataartisans.flink.cascading.runtime.hashJoin.HashJoinMapper;
-import com.dataartisans.flink.cascading.runtime.each.EachMapper;
 import com.dataartisans.flink.cascading.runtime.sink.TapOutputFormat;
 import com.dataartisans.flink.cascading.runtime.source.TapInputFormat;
+import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
 import com.dataartisans.flink.cascading.runtime.util.IdMapper;
 import com.dataartisans.flink.cascading.types.tuple.TupleTypeInfo;
 import com.dataartisans.flink.cascading.types.tuplearray.TupleArrayTypeInfo;
@@ -71,9 +73,9 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.operators.Operator;
 import org.apache.flink.api.java.operators.GroupReduceOperator;
 import org.apache.flink.api.java.operators.JoinOperator;
-import org.apache.flink.api.java.operators.Operator;
 import org.apache.flink.api.java.operators.PartitionOperator;
 import org.apache.flink.api.java.operators.SortPartitionOperator;
 import org.apache.flink.api.java.operators.SortedGrouping;
@@ -102,8 +104,8 @@ public class FlinkFlowStep extends BaseFlowStep<Configuration> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(FlinkFlowStep.class);
 
-	private ExecutionEnvironment env;
-	private List<String> classPath;
+	private final ExecutionEnvironment env;
+	private final List<String> classPath;
 
 	public FlinkFlowStep(ExecutionEnvironment env, ElementGraph elementGraph, FlowNodeGraph flowNodeGraph, List<String> classPath) {
 		super(elementGraph, flowNodeGraph);
