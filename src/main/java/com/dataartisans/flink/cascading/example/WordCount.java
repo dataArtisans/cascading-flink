@@ -44,7 +44,6 @@ public class WordCount {
 		RegexSplitGenerator splitter = new RegexSplitGenerator( token, "\\s+" );
 		// only returns "token"
 		Pipe docPipe = new Each( "token", text, splitter, Fields.RESULTS );
-
 		Pipe wcPipe = new Pipe( "wc", docPipe );
 		wcPipe = new AggregateBy( wcPipe, token, new CountBy(new Fields("count")));
 

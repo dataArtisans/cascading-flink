@@ -34,7 +34,7 @@ import cascading.tuple.TupleEntry;
 public class SinkBoundaryInStage extends ElementStage<Void, TupleEntry> implements InputSource {
 
 	private boolean nextStarted;
-	private TupleEntry tupleEntry;
+	private final TupleEntry tupleEntry;
 
 	public SinkBoundaryInStage(FlowProcess flowProcess, FlowElement flowElement, FlowNode node) {
 		super(flowProcess, flowElement);
@@ -69,8 +69,8 @@ public class SinkBoundaryInStage extends ElementStage<Void, TupleEntry> implemen
 		try {
 			Tuple tuple = (Tuple)input;
 			tupleEntry.setTuple(tuple);
-			flowProcess.increment( StepCounters.Tuples_Read, 1 );
-			flowProcess.increment(SliceCounters.Tuples_Read, 1);
+			//flowProcess.increment( StepCounters.Tuples_Read, 1 );
+			//flowProcess.increment(SliceCounters.Tuples_Read, 1);
 		}
 		catch( OutOfMemoryError error ) {
 			handleReThrowableException("out of memory, try increasing task memory allocation", error);

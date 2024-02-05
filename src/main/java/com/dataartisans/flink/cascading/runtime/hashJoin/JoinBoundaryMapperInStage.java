@@ -61,8 +61,8 @@ public class JoinBoundaryMapperInStage extends ElementStage<Void, Tuple2<Tuple, 
 
 			try {
 				joinListTuple = joinInputIterator.next();
-				flowProcess.increment( StepCounters.Tuples_Read, 1 );
-				flowProcess.increment( SliceCounters.Tuples_Read, 1 );
+				//flowProcess.increment( StepCounters.Tuples_Read, 1 );
+				//flowProcess.increment( SliceCounters.Tuples_Read, 1 );
 			}
 			catch( CascadingException exception ) {
 				handleException( exception, null );

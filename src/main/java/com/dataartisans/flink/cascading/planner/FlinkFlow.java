@@ -24,6 +24,7 @@ import cascading.flow.hadoop.util.HadoopUtil;
 import cascading.flow.planner.PlatformInfo;
 import com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess;
 import org.apache.flink.client.program.OptimizerPlanEnvironment;
+import org.apache.flink.client.program.ProgramAbortException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import riffle.process.ProcessComplete;
@@ -81,8 +82,8 @@ public class FlinkFlow extends BaseFlow<Configuration> {
 		catch(FlowException fe) {
 			// check if we need to unwrap a ProgramAbortException
 			Throwable t = fe.getCause();
-			if (t instanceof OptimizerPlanEnvironment.ProgramAbortException) {
-				throw (OptimizerPlanEnvironment.ProgramAbortException)t;
+			if (t instanceof ProgramAbortException) {
+				throw (ProgramAbortException)t;
 			}
 			else {
 				throw fe;

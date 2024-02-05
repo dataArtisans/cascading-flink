@@ -67,12 +67,7 @@ public class WrappingFieldComparator<T extends Comparable<T>> extends TypeCompar
 		if(t != null && !this.refNull) {
 			return this.wrappedComparator.equalToReference(t);
 		}
-		else if(t == null && this.refNull) {
-			return true;
-		}
-		else {
-			return false;
-		}
+		else return t == null && this.refNull;
 	}
 
 	@Override

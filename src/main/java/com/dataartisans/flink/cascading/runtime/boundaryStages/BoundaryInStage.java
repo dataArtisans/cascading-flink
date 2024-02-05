@@ -64,8 +64,8 @@ public class BoundaryInStage extends ElementStage<Void, TupleEntry> implements I
 			{
 				tuple = tupleIterator.next();
 				tupleEntry.setTuple(tuple);
-				flowProcess.increment( StepCounters.Tuples_Read, 1 );
-				flowProcess.increment( SliceCounters.Tuples_Read, 1 );
+				//flowProcess.increment( StepCounters.Tuples_Read, 1 );
+				//flowProcess.increment( SliceCounters.Tuples_Read, 1 );
 			}
 			catch( OutOfMemoryError error ) {
 				handleReThrowableException( "out of memory, try increasing task memory allocation", error );

@@ -20,6 +20,7 @@ import cascading.flow.FlowException;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
@@ -227,6 +228,10 @@ public class DefinedTupleSerializer extends TypeSerializer<Tuple> {
 	}
 
 	@Override
+	public TypeSerializerSnapshot<Tuple> snapshotConfiguration() {
+		return null;
+	}
+
 	public boolean canEqual(Object obj) {
 		return obj instanceof DefinedTupleSerializer;
 	}

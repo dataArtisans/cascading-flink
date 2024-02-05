@@ -143,7 +143,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 
 		return new TupleBuilder()
 		{
-			Tuple result = TupleViews.createComposite(fields);
+			final Tuple result = TupleViews.createComposite(fields);
 
 			@Override
 			public Tuple makeResult( Tuple[] tuples )
@@ -158,7 +158,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 		return new Iterator<Tuple>()
 		{
 			final int cleanPos = valueFields.length == 1 ? 0 : pos; // support repeated pipes
-			cascading.tuple.util.TupleBuilder[] valueBuilder = new cascading.tuple.util.TupleBuilder[ valueFields.length ];
+			final cascading.tuple.util.TupleBuilder[] valueBuilder = new cascading.tuple.util.TupleBuilder[ valueFields.length ];
 
 			{
 				for( int i = 0; i < valueFields.length; i++ ) {
@@ -184,7 +184,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 				else {
 
 					return new cascading.tuple.util.TupleBuilder() {
-						Tuple result = TupleViews.createOverride(valueField, joinField);
+						final Tuple result = TupleViews.createOverride(valueField, joinField);
 
 						@Override
 						public Tuple makeResult(Tuple valueTuple, Tuple groupTuple) {
@@ -291,13 +291,13 @@ public class CoGroupBufferClosure extends JoinerClosure {
 		};
 	}
 
-	static interface TupleBuilder {
+	interface TupleBuilder {
 		Tuple makeResult(Tuple[] tuples);
 	}
 
 	private static class FlinkUnwrappingIterator<F1, F2> implements Iterator<Tuple> {
 
-		private Iterator<Tuple3<F1, F2, Tuple>> flinkIterator;
+		private final Iterator<Tuple3<F1, F2, Tuple>> flinkIterator;
 
 
 		public FlinkUnwrappingIterator(Iterable<Tuple3<F1, F2, Tuple>> vals) {
@@ -359,7 +359,7 @@ public class CoGroupBufferClosure extends JoinerClosure {
 			try {
 				if (iterator == null) {
 					// use emptyList() iterator for java 6 compatibility
-					return Collections.<Tuple>emptyList().iterator();
+					return Collections.emptyIterator();
 				}
 
 				return iterator;

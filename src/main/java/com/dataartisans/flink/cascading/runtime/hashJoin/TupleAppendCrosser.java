@@ -22,7 +22,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 
 public class TupleAppendCrosser implements CrossFunction<Tuple2<Tuple, Tuple[]>, Tuple, Tuple2<Tuple, Tuple[]>> {
 
-	private int tupleListPos;
+	private final int tupleListPos;
 
 	public TupleAppendCrosser(int tupleListPos) {
 		this.tupleListPos = tupleListPos;

@@ -35,11 +35,11 @@ public class TupleTypeInfo extends CompositeType<Tuple> {
 
 	private final static int NEG_FIELD_POS_OFFSET = Integer.MAX_VALUE / 2;
 
-	private Fields schema;
+	private final Fields schema;
 
 	private final int length;
-	private LinkedHashMap<String, FieldTypeInfo> fieldTypes;
-	private HashMap<String, Integer> fieldIndexes;
+	private final LinkedHashMap<String, FieldTypeInfo> fieldTypes;
+	private final HashMap<String, Integer> fieldIndexes;
 
 	public TupleTypeInfo(Fields schema) {
 		super(Tuple.class);

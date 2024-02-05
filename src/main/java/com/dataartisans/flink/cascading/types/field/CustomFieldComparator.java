@@ -37,7 +37,7 @@ public class CustomFieldComparator extends TypeComparator<Comparable> {
 
 	private final Hasher hasher;
 
-	private TypeSerializer<Comparable> serializer;
+	private final TypeSerializer<Comparable> serializer;
 
 	private transient Comparable ref;
 
@@ -75,12 +75,7 @@ public class CustomFieldComparator extends TypeComparator<Comparable> {
 	}
 
 	public void setReference(Comparable toCompare) {
-		if(toCompare == null) {
-			this.ref = null;
-		}
-		else {
-			this.ref = toCompare;
-		}
+        this.ref = toCompare;
 	}
 
 	public boolean equalToReference(Comparable candidate) {

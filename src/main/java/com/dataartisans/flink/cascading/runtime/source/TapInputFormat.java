@@ -64,7 +64,7 @@ public class TapInputFormat extends RichInputFormat<Tuple, HadoopInputSplit> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(TapInputFormat.class);
 
-	private FlowNode flowNode;
+	private final FlowNode flowNode;
 
 	private transient SourceStreamGraph streamGraph;
 	private transient TapSourceStage sourceStage;
