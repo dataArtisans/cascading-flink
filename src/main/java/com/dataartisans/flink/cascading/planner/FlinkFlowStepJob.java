@@ -179,7 +179,6 @@ public class FlinkFlowStepJob extends FlowStepJob<Configuration> {
             client.getJobExecutionResult().get(100, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             return false;
-            ExecutionException
         } catch (ExecutionException e) {
             jobException = e.getCause();
             return false;
